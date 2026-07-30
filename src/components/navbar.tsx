@@ -17,7 +17,7 @@ import { Menu, X, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 
 interface NavbarProps {
   user?: {
@@ -27,10 +27,21 @@ interface NavbarProps {
   } | null;
 }
 
-export function Navbar({ user }: NavbarProps) {
+export function Navbar({ user: serverUser }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { theme, setTheme } = useTheme();
+  const { data: clientSession } = useSession();
   const pathname = usePathname();
+  const user =
+    serverUser === undefined
+      ? clientSession?.user
+        ? {
+            name: clientSession.user.name,
+            email: clientSession.user.email || "",
+            avatar: clientSession.user.image,
+          }
+        : null
+      : serverUser;
 
   const navLinks = [
     { href: "/tools", label: "Tools" },
