@@ -17,6 +17,7 @@ import { Menu, X, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
+import { signOut } from "next-auth/react";
 
 interface NavbarProps {
   user?: {
@@ -127,12 +128,10 @@ export function Navbar({ user }: NavbarProps) {
                     <Link href="/settings">Settings</Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <form action="/api/auth/logout" method="POST">
-                      <button type="submit" className="w-full text-left">
-                        Log out
-                      </button>
-                    </form>
+                  <DropdownMenuItem
+                    onSelect={() => void signOut({ callbackUrl: "/" })}
+                  >
+                    Log out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -210,14 +209,13 @@ export function Navbar({ user }: NavbarProps) {
                   >
                     Settings
                   </Link>
-                  <form action="/api/auth/logout" method="POST">
-                    <button
-                      type="submit"
-                      className="w-full text-left px-4 py-3 text-sm text-destructive rounded-2xl hover:bg-accent"
-                    >
-                      Log out
-                    </button>
-                  </form>
+                  <button
+                    type="button"
+                    onClick={() => void signOut({ callbackUrl: "/" })}
+                    className="w-full text-left px-4 py-3 text-sm text-destructive rounded-2xl hover:bg-accent"
+                  >
+                    Log out
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-2">

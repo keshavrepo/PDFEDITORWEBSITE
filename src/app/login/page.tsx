@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { AuthForm } from "@/components/auth-form";
+import { isGoogleAuthConfigured } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -52,47 +52,13 @@ export default async function LoginPage() {
             </p>
           </div>
 
-          <form action="/api/auth/login" method="POST" className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
-                Email
-              </label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="name@example.com"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label htmlFor="password" className="text-sm font-medium">
-                  Password
-                </label>
-                <Link
-                  href="/forgot-password"
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  Forgot?
-                </Link>
-              </div>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                required
-              />
-            </div>
-
-            <Button type="submit" className="w-full" size="lg">
-              Continue
-            </Button>
-          </form>
+          <AuthForm
+            mode="login"
+            googleEnabled={isGoogleAuthConfigured()}
+          />
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <Link
               href="/register"
               className="text-foreground hover:underline font-medium"
