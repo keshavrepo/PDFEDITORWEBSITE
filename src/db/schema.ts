@@ -1,4 +1,15 @@
-import { pgTable, text, timestamp, uuid, integer, boolean, jsonb, varchar } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  integer,
+  boolean,
+  jsonb,
+  varchar,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 
 // Users table with OAuth support
 export const users = pgTable("users", {
@@ -28,21 +39,49 @@ export const sessions = pgTable("sessions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+    expiresAt: timestamp("expires_at").notNull(),
+    usedAt: timestamp("used_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("password_reset_tokens_user_id_idx").on(table.userId),
+    index("password_reset_tokens_expires_at_idx").on(table.expiresAt),
+  ]
+);
+
 // OAuth accounts (Google, etc.)
-export const accounts = pgTable("accounts", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  type: varchar("type", { length: 50 }).notNull(),
-  provider: varchar("provider", { length: 50 }).notNull(),
-  providerAccountId: varchar("provider_account_id", { length: 255 }).notNull(),
-  refreshToken: text("refresh_token"),
-  accessToken: text("access_token"),
-  expiresAt: integer("expires_at"),
-  tokenType: varchar("token_type", { length: 50 }),
-  scope: text("scope"),
-  idToken: text("id_token"),
-  sessionState: text("session_state"),
-});
+export const accounts = pgTable(
+  "accounts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    type: varchar("type", { length: 50 }).notNull(),
+    provider: varchar("provider", { length: 50 }).notNull(),
+    providerAccountId: varchar("provider_account_id", { length: 255 }).notNull(),
+    refreshToken: text("refresh_token"),
+    accessToken: text("access_token"),
+    expiresAt: integer("expires_at"),
+    tokenType: varchar("token_type", { length: 50 }),
+    scope: text("scope"),
+    idToken: text("id_token"),
+    sessionState: text("session_state"),
+  },
+  (table) => [
+    uniqueIndex("accounts_provider_account_unique").on(
+      table.provider,
+      table.providerAccountId
+    ),
+    index("accounts_user_id_idx").on(table.userId),
+  ]
+);
 
 // User files with ownership
 export const files = pgTable("files", {
@@ -76,12 +115,18 @@ export const processingHistory = pgTable("processing_history", {
 });
 
 // User favorites
-export const favorites = pgTable("favorites", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  toolName: varchar("tool_name", { length: 100 }).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const favorites = pgTable(
+  "favorites",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    toolName: varchar("tool_name", { length: 100 }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("favorites_user_tool_unique").on(table.userId, table.toolName),
+  ]
+);
 
 // Subscriptions
 export const subscriptions = pgTable("subscriptions", {
