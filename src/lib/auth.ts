@@ -7,6 +7,7 @@ export interface CurrentUser {
   name: string | null | undefined;
   avatar: string | null | undefined;
   plan: string;
+  role: string;
   storageUsed: number;
 }
 
@@ -20,6 +21,7 @@ export async function getSession(): Promise<CurrentUser | null> {
     name: session.user.name,
     avatar: session.user.image,
     plan: session.user.plan || "free",
+    role: session.user.role || "user",
     storageUsed: session.user.storageUsed || 0,
   };
 }

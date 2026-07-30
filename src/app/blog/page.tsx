@@ -1,119 +1,113 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { and, count, desc, eq, ilike, or } from "drizzle-orm";
 import { getSession } from "@/lib/auth";
+import { db } from "@/db";
+import { blogCategories, blogPosts } from "@/db/schema";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { Card } from "@/components/ui/card";
-import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
+export const metadata: Metadata = {
+  title: "Blog | PDFPilot",
+  description: "PDF guides, privacy practices, and document productivity insights from Keshav Labs.",
+};
 export const dynamic = "force-dynamic";
+const PAGE_SIZE = 7;
 
-export default async function BlogPage() {
-  const user = await getSession();
+interface BlogPageProps {
+  searchParams: Promise<{ q?: string; page?: string }>;
+}
 
-  const posts = [
-    {
-      title: "10 PDF Productivity Hacks",
-      excerpt: "Time-saving techniques for working with PDFs that will transform your workflow.",
-      date: "Mar 15, 2024",
-      readTime: "5 min",
-    },
-    {
-      title: "How to Compress PDFs Without Losing Quality",
-      excerpt: "The best techniques for reducing file size while maintaining clarity.",
-      date: "Mar 12, 2024",
-      readTime: "8 min",
-    },
-    {
-      title: "PDF Security Best Practices",
-      excerpt: "Protect your sensitive documents with these essential security measures.",
-      date: "Mar 10, 2024",
-      readTime: "6 min",
-    },
-    {
-      title: "Converting PDFs to Word: Complete Guide",
-      excerpt: "Everything you need to know about converting PDF documents to Word files.",
-      date: "Mar 8, 2024",
-      readTime: "7 min",
-    },
-    {
-      title: "Why Digital Documents Are the Future",
-      excerpt: "How digital transformation is changing the way we work with documents.",
-      date: "Mar 5, 2024",
-      readTime: "10 min",
-    },
-    {
-      title: "Merge vs. Split: When to Use Each Tool",
-      excerpt: "Understanding the right tool for your PDF organization needs.",
-      date: "Mar 1, 2024",
-      readTime: "4 min",
-    },
-  ];
+export default async function BlogPage({ searchParams }: BlogPageProps) {
+  const [user, params] = await Promise.all([getSession(), searchParams]);
+  const search = params.q?.trim() || "";
+  const page = Math.max(1, Number(params.page) || 1);
+  const where = and(
+    eq(blogPosts.status, "published"),
+    search
+      ? or(
+          ilike(blogPosts.title, `%${search}%`),
+          ilike(blogPosts.excerpt, `%${search}%`),
+          ilike(blogPosts.seoKeywords, `%${search}%`)
+        )
+      : undefined
+  );
+  const [posts, totals] = await Promise.all([
+    db
+      .select({
+        id: blogPosts.id,
+        title: blogPosts.title,
+        slug: blogPosts.slug,
+        excerpt: blogPosts.excerpt,
+        featuredImage: blogPosts.featuredImage,
+        readingTime: blogPosts.readingTime,
+        publishedAt: blogPosts.publishedAt,
+        category: blogCategories.name,
+      })
+      .from(blogPosts)
+      .leftJoin(blogCategories, eq(blogPosts.categoryId, blogCategories.id))
+      .where(where)
+      .orderBy(desc(blogPosts.publishedAt))
+      .limit(PAGE_SIZE)
+      .offset((page - 1) * PAGE_SIZE),
+    db.select({ value: count() }).from(blogPosts).where(where),
+  ]);
+  const totalPages = Math.max(1, Math.ceil((totals[0]?.value || 0) / PAGE_SIZE));
+  const featured = page === 1 && !search ? posts[0] : null;
+  const gridPosts = featured ? posts.slice(1) : posts;
+  const pageHref = (target: number) =>
+    `/blog?${new URLSearchParams({ ...(search ? { q: search } : {}), page: String(target) })}`;
+
+  const postMeta = (post: (typeof posts)[number]) => (
+    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+      {post.category && <span>{post.category}</span>}
+      {post.category && <span>·</span>}
+      <span>{post.publishedAt?.toLocaleDateString("en-IN", { dateStyle: "medium" })}</span>
+      <span>·</span><span>{post.readingTime} min read</span>
+    </div>
+  );
 
   return (
     <>
       <Navbar user={user} />
-      
       <main>
-        {/* Header */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16">
-          <div className="max-w-2xl">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              Blog
-            </h1>
-            <p className="text-lg text-muted-foreground">
-              Tips, tutorials, and insights for working with PDFs
-            </p>
-          </div>
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-12">
+          <div className="max-w-2xl"><h1 className="text-4xl md:text-5xl font-bold mb-4">Blog</h1><p className="text-lg text-muted-foreground mb-7">Practical guidance for safer, faster document work.</p><form className="flex gap-3"><Input name="q" defaultValue={search} placeholder="Search articles" aria-label="Search articles" /><Button variant="outline">Search</Button></form>{user?.role === "admin" && <Link className="inline-block mt-4 text-sm underline underline-offset-4" href="/admin/posts">Manage posts</Link>}</div>
         </section>
 
-        {/* Featured Post */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-          <Link href={`/blog/${posts[0].title.toLowerCase().replace(/\s+/g, '-')}`}>
-            <Card className="p-8 hover:bg-accent transition-colors cursor-pointer">
-              <div className="max-w-3xl">
-                <p className="text-sm text-muted-foreground mb-2">Featured</p>
-                <h2 className="text-2xl md:text-3xl font-bold mb-3">
-                  {posts[0].title}
-                </h2>
-                <p className="text-muted-foreground mb-4">
-                  {posts[0].excerpt}
-                </p>
-                <div className="flex items-center text-sm text-muted-foreground">
-                  <span>{posts[0].date}</span>
-                  <span className="mx-2">·</span>
-                  <span>{posts[0].readTime} read</span>
-                </div>
-              </div>
-            </Card>
-          </Link>
-        </section>
+        {featured && (
+          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+            <Link href={`/blog/${featured.slug}`}>
+              <Card className="overflow-hidden hover:bg-accent transition-colors cursor-pointer">
+                {featured.featuredImage && <div className="h-56 sm:h-72 bg-muted bg-cover bg-center" role="img" aria-label="" style={{ backgroundImage: `url(${JSON.stringify(featured.featuredImage)})` }} />}
+                <div className="p-7 sm:p-9 max-w-4xl"><p className="text-sm text-primary font-medium mb-2">Latest article</p><h2 className="text-2xl md:text-3xl font-bold mb-3">{featured.title}</h2><p className="text-muted-foreground mb-5">{featured.excerpt}</p>{postMeta(featured)}</div>
+              </Card>
+            </Link>
+          </section>
+        )}
 
-        {/* Posts Grid */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {posts.slice(1).map((post) => (
-              <Link
-                key={post.title}
-                href={`/blog/${post.title.toLowerCase().replace(/\s+/g, '-')}`}
-              >
-                <Card className="p-6 h-full hover:bg-accent transition-colors cursor-pointer">
-                  <h3 className="font-semibold mb-2 line-clamp-2">
-                    {post.title}
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                    {post.excerpt}
-                  </p>
-                  <div className="flex items-center text-xs text-muted-foreground">
-                    <span>{post.date}</span>
-                    <span className="mx-2">·</span>
-                    <span>{post.readTime}</span>
-                  </div>
-                </Card>
-              </Link>
-            ))}
-          </div>
+          {search && <div className="flex items-center justify-between gap-4 mb-6"><p className="text-sm text-muted-foreground">Results for “{search}”</p><Link className="text-sm underline" href="/blog">Clear search</Link></div>}
+          {gridPosts.length ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {gridPosts.map((post) => (
+                <Link key={post.id} href={`/blog/${post.slug}`}>
+                  <Card className="h-full overflow-hidden hover:bg-accent transition-colors cursor-pointer">
+                    {post.featuredImage && <div className="h-40 bg-muted bg-cover bg-center" role="img" aria-label="" style={{ backgroundImage: `url(${JSON.stringify(post.featuredImage)})` }} />}
+                    <div className="p-6"><h2 className="font-semibold text-lg mb-2 line-clamp-2">{post.title}</h2><p className="text-sm text-muted-foreground mb-5 line-clamp-3">{post.excerpt}</p>{postMeta(post)}</div>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <Card className="p-12 text-center"><h2 className="font-semibold mb-2">No published articles found</h2><p className="text-sm text-muted-foreground">Try another search or check back for new guides from Keshav Labs.</p></Card>
+          )}
+          {totalPages > 1 && <nav className="flex justify-center items-center gap-3 mt-10" aria-label="Blog pagination"><Button variant="outline" size="sm" asChild={page > 1} disabled={page <= 1}>{page > 1 ? <Link href={pageHref(page - 1)}>Previous</Link> : <span>Previous</span>}</Button><span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span><Button variant="outline" size="sm" asChild={page < totalPages} disabled={page >= totalPages}>{page < totalPages ? <Link href={pageHref(page + 1)}>Next</Link> : <span>Next</span>}</Button></nav>}
         </section>
       </main>
-
       <Footer />
     </>
   );

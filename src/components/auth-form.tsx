@@ -121,7 +121,6 @@ export function AuthForm({
             name="email"
             type="email"
             autoComplete="email"
-            placeholder="name@example.com"
             required
             maxLength={255}
             disabled={submitting}

@@ -73,7 +73,6 @@ export function ForgotPasswordForm() {
           name="email"
           type="email"
           autoComplete="email"
-          placeholder="name@example.com"
           maxLength={255}
           required
           disabled={submitting}

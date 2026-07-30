@@ -49,6 +49,7 @@ const providers: NextAuthOptions["providers"] = [
         name: user.name,
         image: user.avatar,
         plan: user.plan,
+        role: user.role,
         storageUsed: user.storageUsed,
       };
     },
@@ -89,6 +90,7 @@ export const authOptions: NextAuthOptions = {
           name: users.name,
           avatar: users.avatar,
           plan: users.plan,
+          role: users.role,
           storageUsed: users.storageUsed,
         })
         .from(users)
@@ -102,6 +104,7 @@ export const authOptions: NextAuthOptions = {
       token.name = currentUser.name;
       token.picture = currentUser.avatar;
       token.plan = currentUser.plan;
+      token.role = currentUser.role;
       token.storageUsed = currentUser.storageUsed;
       return token;
     },
@@ -109,6 +112,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user && token.sub) {
         session.user.id = token.sub;
         session.user.plan = token.plan || "free";
+        session.user.role = token.role || "user";
         session.user.storageUsed = token.storageUsed || 0;
       }
       return session;

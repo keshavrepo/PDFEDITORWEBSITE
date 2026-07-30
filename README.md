@@ -57,4 +57,23 @@ The health endpoint is available at `/api/health`. It returns HTTP 503 when requ
 - Configure the Stripe webhook endpoint as `/api/stripe/webhook`.
 - Terminate TLS at the hosting platform or reverse proxy. Security headers are emitted by Next.js.
 
-Never commit `.env` files, database credentials, OAuth secrets, or Stripe keys.
+## Blog administration
+
+The blog CMS is available to administrators at `/admin/posts`. It stores posts, categories, tags, SEO metadata, publication state, and contact messages in PostgreSQL.
+
+Create or promote the first administrator after migrations have run:
+
+```bash
+ADMIN_EMAIL="keshavchouchan78@gmail.com" \
+ADMIN_NAME="Keshav" \
+ADMIN_PASSWORD="choose-a-unique-12-character-password" \
+npm run admin:create
+```
+
+Then sign in through `/login?callbackUrl=/admin/posts`. Do not keep `ADMIN_PASSWORD` in a deployed environment after the account has been created. Administrators can create, edit, publish, search, and delete posts from the CMS.
+
+## Company
+
+PDFPilot is built by Keshav Labs, a remote company based in Babarpur, Delhi, India. Public and support enquiries can be sent to `launchstack.in@gmail.com`.
+
+Never commit `.env` files, database credentials, administrator passwords, OAuth secrets, or Stripe keys.

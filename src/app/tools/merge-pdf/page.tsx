@@ -27,6 +27,7 @@ export default function MergePDFPage() {
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<ProcessingProgress | null>(null);
   const [mergedPDF, setMergedPDF] = useState<Blob | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -57,6 +58,17 @@ export default function MergePDFPage() {
 
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const reorderFile = (targetIndex: number) => {
+    if (draggedIndex === null || draggedIndex === targetIndex) return;
+    setFiles((previous) => {
+      const next = [...previous];
+      const [moved] = next.splice(draggedIndex, 1);
+      next.splice(targetIndex, 0, moved);
+      return next;
+    });
+    setDraggedIndex(null);
   };
 
   const handleMerge = async () => {
@@ -195,8 +207,13 @@ export default function MergePDFPage() {
                 <div className="space-y-3 mb-8">
                   {files.map((file, index) => (
                     <Card
-                      key={index}
-                      className="p-5 flex items-center justify-between group hover:scale-[1.01] transition-all"
+                      key={`${file.name}-${file.lastModified}-${index}`}
+                      draggable
+                      onDragStart={() => setDraggedIndex(index)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => reorderFile(index)}
+                      onDragEnd={() => setDraggedIndex(null)}
+                      className={`p-5 flex items-center justify-between group hover:scale-[1.01] transition-all ${draggedIndex === index ? "opacity-50" : ""}`}
                     >
                       <div className="flex items-center gap-4 flex-1 min-w-0">
                         <GripVertical className="w-5 h-5 text-muted-foreground flex-shrink-0 cursor-move" />
@@ -309,7 +326,7 @@ export default function MergePDFPage() {
                 </div>
                 <h3 className="font-semibold mb-2">Fast processing</h3>
                 <p className="text-sm text-muted-foreground">
-                  Merge PDFs in seconds with our optimized infrastructure
+                  Merge PDFs in seconds with optimized browser processing
                 </p>
               </div>
               <div>
@@ -318,7 +335,7 @@ export default function MergePDFPage() {
                 </div>
                 <h3 className="font-semibold mb-2">Secure</h3>
                 <p className="text-sm text-muted-foreground">
-                  Files are encrypted and automatically deleted after processing
+                  Files remain in browser memory and are not uploaded to PDFPilot
                 </p>
               </div>
               <div>

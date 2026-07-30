@@ -7,7 +7,9 @@ export const metadata: Metadata = {
   title: "PDFPilot - Premium PDF Tools Online",
   description: "Transform, edit, convert, and manage your PDFs with professional-grade tools. Fast, secure, and easy to use.",
   keywords: ["PDF", "PDF tools", "PDF converter", "PDF editor", "merge PDF", "compress PDF"],
-  authors: [{ name: "PDFPilot" }],
+  authors: [{ name: "Keshav Labs", url: "https://github.com/keshavrepo/" }],
+  creator: "Keshav",
+  publisher: "Keshav Labs",
   openGraph: {
     title: "PDFPilot - Premium PDF Tools Online",
     description: "Transform, edit, convert, and manage your PDFs with professional-grade tools.",

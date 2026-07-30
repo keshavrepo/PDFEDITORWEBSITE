@@ -29,7 +29,7 @@ export default async function DashboardPage() {
   const quickTools = [
     { name: "Merge PDF", href: "/tools/merge-pdf" },
     { name: "Compress PDF", href: "/tools/compress-pdf" },
-    { name: "PDF to Word", href: "/tools/pdf-to-word" },
+    { name: "Rotate PDF", href: "/tools/rotate-pdf" },
     { name: "Split PDF", href: "/tools/split-pdf" },
   ];
 

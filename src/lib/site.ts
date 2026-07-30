@@ -1,0 +1,38 @@
+export const siteConfig = {
+  name: "PDFPilot",
+  company: "Keshav Labs",
+  founder: "Keshav",
+  location: "Babarpur, Delhi, India",
+  office: ["Remote Company", "India"],
+  publicEmail: "launchstack.in@gmail.com",
+  supportEmail: "launchstack.in@gmail.com",
+  founderEmail: "keshavchouchan78@gmail.com",
+  businessHours: [
+    "Monday–Friday: 10:00 AM – 7:00 PM IST",
+    "Saturday: 10:00 AM – 2:00 PM IST",
+    "Sunday: Closed",
+  ],
+  github: "https://github.com/keshavrepo/",
+  linkedin: "https://www.linkedin.com/in/keshavkumarfullstack",
+  legalUpdated: "30 July 2026",
+} as const;
+
+export const internalRoutes = [
+  "/",
+  "/features",
+  "/pricing",
+  "/tools",
+  "/api-docs",
+  "/about",
+  "/blog",
+  "/careers",
+  "/contact",
+  "/docs",
+  "/help",
+  "/community",
+  "/status",
+  "/privacy",
+  "/terms",
+  "/security",
+  "/cookies",
+] as const;

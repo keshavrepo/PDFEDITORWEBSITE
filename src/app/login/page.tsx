@@ -7,11 +7,19 @@ import { isGoogleAuthConfigured } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
-  const user = await getSession();
-  
+interface LoginPageProps {
+  searchParams: Promise<{ callbackUrl?: string }>;
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const [user, params] = await Promise.all([getSession(), searchParams]);
+  const callbackUrl =
+    params.callbackUrl?.startsWith("/") && !params.callbackUrl.startsWith("//")
+      ? params.callbackUrl
+      : "/dashboard";
+
   if (user) {
-    redirect("/dashboard");
+    redirect(callbackUrl);
   }
 
   return (
@@ -55,6 +63,7 @@ export default async function LoginPage() {
           <AuthForm
             mode="login"
             googleEnabled={isGoogleAuthConfigured()}
+            callbackUrl={callbackUrl}
           />
 
           <p className="mt-6 text-center text-sm text-muted-foreground">

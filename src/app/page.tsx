@@ -5,46 +5,36 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowRight, Upload, Shield, Zap, Check, Lock, Users, Award } from "lucide-react";
+import { tools } from "@/lib/tools";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const user = await getSession();
 
-  const tools = [
-    { name: "Merge PDF", href: "/tools/merge-pdf" },
-    { name: "Split PDF", href: "/tools/split-pdf" },
-    { name: "Compress PDF", href: "/tools/compress-pdf" },
-    { name: "PDF to Word", href: "/tools/pdf-to-word" },
-    { name: "PDF to Image", href: "/tools/pdf-to-image" },
-    { name: "Sign PDF", href: "/tools/sign-pdf" },
-    { name: "Protect PDF", href: "/tools/protect-pdf" },
-    { name: "Rotate PDF", href: "/tools/rotate-pdf" },
-  ];
-
   const features = [
     {
       icon: Zap,
       title: "Process in seconds",
-      description: "Enterprise-grade infrastructure ensures your files are processed instantly",
+      description: "Optimized browser processing completes common PDF tasks without a server upload",
     },
     {
       icon: Lock,
-      title: "Bank-level security",
-      description: "256-bit SSL encryption with automatic file deletion after 24 hours",
+      title: "Privacy-conscious by design",
+      description: "Supported tools process document bytes locally in your browser",
     },
     {
       icon: Users,
-      title: "Trusted by 500K+ users",
-      description: "Join professionals worldwide who rely on PDFPilot daily",
+      title: "Built by Keshav Labs",
+      description: "A focused, independently developed product based in Delhi, India",
     },
   ];
 
   const trustSignals = [
-    { metric: "10M+", label: "Files processed" },
-    { metric: "500K+", label: "Active users" },
-    { metric: "99.9%", label: "Uptime" },
-    { metric: "4.9/5", label: "User rating" },
+    { metric: "Local", label: "Browser processing" },
+    { metric: "Private", label: "No unnecessary uploads" },
+    { metric: "Fast", label: "Immediate downloads" },
+    { metric: "India", label: "Built in Delhi" },
   ];
 
   return (
@@ -58,7 +48,7 @@ export default async function HomePage() {
             <div className="text-center mb-16">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
                 <Award className="w-4 h-4" />
-                Trusted by 500,000+ professionals
+                Private, browser-first PDF tools
               </div>
               
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 max-w-4xl mx-auto leading-[1.1]">
@@ -145,7 +135,7 @@ export default async function HomePage() {
                 Built for professionals
               </h2>
               <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Everything you need to work with PDFs, backed by enterprise-grade infrastructure
+                Everything you need to work with PDFs in a focused, responsive workspace
               </p>
             </div>
 
@@ -209,18 +199,18 @@ export default async function HomePage() {
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               <div>
                 <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                  Your files are safe with us
+                  Your documents stay under your control
                 </h2>
                 <p className="text-lg text-muted-foreground mb-8">
-                  We take security seriously. All files are encrypted in transit and at rest,
-                  and automatically deleted from our servers after 24 hours.
+                  Supported PDF operations run in browser memory, so document bytes do not
+                  need to be uploaded to PDFPilot just to complete a task.
                 </p>
                 <div className="space-y-4">
                   {[
-                    "256-bit SSL encryption",
-                    "Automatic file deletion",
-                    "GDPR compliant",
-                    "No data sharing",
+                    "Local browser processing",
+                    "Temporary in-memory results",
+                    "Secure account sessions",
+                    "No sale of personal data",
                   ].map((item) => (
                     <div key={item} className="flex items-center gap-3">
                       <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -247,7 +237,7 @@ export default async function HomePage() {
               Ready to get started?
             </h2>
             <p className="text-xl text-muted-foreground mb-10">
-              Join thousands of professionals who trust PDFPilot
+              Start a private PDF workflow with PDFPilot
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <Button size="lg" asChild>

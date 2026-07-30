@@ -24,6 +24,7 @@ interface NavbarProps {
     name?: string | null;
     email: string;
     avatar?: string | null;
+    role?: string;
   } | null;
 }
 
@@ -39,6 +40,7 @@ export function Navbar({ user: serverUser }: NavbarProps) {
             name: clientSession.user.name,
             email: clientSession.user.email || "",
             avatar: clientSession.user.image,
+            role: clientSession.user.role,
           }
         : null
       : serverUser;
@@ -138,6 +140,11 @@ export function Navbar({ user: serverUser }: NavbarProps) {
                   <DropdownMenuItem asChild>
                     <Link href="/settings">Settings</Link>
                   </DropdownMenuItem>
+                  {user.role === "admin" && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin/posts">Blog admin</Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onSelect={() => void signOut({ callbackUrl: "/" })}
@@ -220,6 +227,15 @@ export function Navbar({ user: serverUser }: NavbarProps) {
                   >
                     Settings
                   </Link>
+                  {user.role === "admin" && (
+                    <Link
+                      href="/admin/posts"
+                      className="block px-4 py-3 text-sm rounded-2xl hover:bg-accent"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      Blog admin
+                    </Link>
+                  )}
                   <button
                     type="button"
                     onClick={() => void signOut({ callbackUrl: "/" })}

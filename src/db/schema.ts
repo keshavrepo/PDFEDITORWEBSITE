@@ -9,6 +9,7 @@ import {
   varchar,
   index,
   uniqueIndex,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 
 // Users table with OAuth support
@@ -21,6 +22,7 @@ export const users = pgTable("users", {
   avatar: text("avatar"),
   googleId: varchar("google_id", { length: 255 }).unique(),
   plan: varchar("plan", { length: 50 }).default("free").notNull(),
+  role: varchar("role", { length: 50 }).default("user").notNull(),
   storageUsed: integer("storage_used").default(0).notNull(),
   dailyProcessingCount: integer("daily_processing_count").default(0).notNull(),
   lastProcessingReset: timestamp("last_processing_reset").defaultNow(),
@@ -165,3 +167,77 @@ export const auditLogs = pgTable("audit_logs", {
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const blogCategories = pgTable("blog_categories", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  slug: varchar("slug", { length: 120 }).notNull().unique(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const blogPosts = pgTable(
+  "blog_posts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    authorId: uuid("author_id").references(() => users.id, { onDelete: "set null" }),
+    categoryId: uuid("category_id").references(() => blogCategories.id, { onDelete: "set null" }),
+    title: varchar("title", { length: 200 }).notNull(),
+    slug: varchar("slug", { length: 220 }).notNull().unique(),
+    excerpt: text("excerpt").notNull(),
+    content: text("content").notNull(),
+    featuredImage: text("featured_image"),
+    status: varchar("status", { length: 20 }).default("draft").notNull(),
+    seoTitle: varchar("seo_title", { length: 200 }),
+    seoDescription: varchar("seo_description", { length: 320 }),
+    seoKeywords: text("seo_keywords"),
+    readingTime: integer("reading_time").default(1).notNull(),
+    publishedAt: timestamp("published_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("blog_posts_status_published_idx").on(table.status, table.publishedAt),
+    index("blog_posts_author_id_idx").on(table.authorId),
+    index("blog_posts_category_id_idx").on(table.categoryId),
+  ]
+);
+
+export const blogTags = pgTable("blog_tags", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 60 }).notNull(),
+  slug: varchar("slug", { length: 80 }).notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const blogPostTags = pgTable(
+  "blog_post_tags",
+  {
+    postId: uuid("post_id").references(() => blogPosts.id, { onDelete: "cascade" }).notNull(),
+    tagId: uuid("tag_id").references(() => blogTags.id, { onDelete: "cascade" }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.postId, table.tagId] })]
+);
+
+export const contactSubmissions = pgTable(
+  "contact_submissions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    firstName: varchar("first_name", { length: 100 }).notNull(),
+    lastName: varchar("last_name", { length: 100 }).notNull(),
+    email: varchar("email", { length: 255 }).notNull(),
+    subject: varchar("subject", { length: 200 }),
+    message: text("message").notNull(),
+    status: varchar("status", { length: 30 }).default("new").notNull(),
+    ipAddress: varchar("ip_address", { length: 45 }),
+    userAgent: text("user_agent"),
+    notificationSentAt: timestamp("notification_sent_at"),
+    respondedAt: timestamp("responded_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("contact_submissions_status_created_idx").on(table.status, table.createdAt),
+    index("contact_submissions_email_idx").on(table.email),
+  ]
+);
