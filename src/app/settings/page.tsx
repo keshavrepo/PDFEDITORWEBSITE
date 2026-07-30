@@ -9,7 +9,11 @@ import { SettingsForms } from "@/components/settings-forms";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
+interface SettingsPageProps {
+  searchParams: Promise<{ billing?: string }>;
+}
+
+export default async function SettingsPage({ searchParams }: SettingsPageProps) {
   const user = await getSession();
   if (!user) redirect("/login");
 
@@ -29,7 +33,11 @@ export default async function SettingsPage() {
           <h1 className="text-3xl md:text-4xl font-bold">Settings</h1>
         </section>
         <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
-          <SettingsForms user={user} hasPassword={Boolean(account.passwordHash)} />
+          <SettingsForms
+            user={user}
+            hasPassword={Boolean(account.passwordHash)}
+            billingStatus={(await searchParams).billing}
+          />
         </section>
       </main>
       <Footer />

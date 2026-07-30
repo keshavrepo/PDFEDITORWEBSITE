@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { BillingButton } from "@/components/billing-button";
 
 interface SettingsFormsProps {
   user: {
@@ -18,6 +19,7 @@ interface SettingsFormsProps {
     plan: string;
   };
   hasPassword: boolean;
+  billingStatus?: string;
 }
 
 function getInitials(name?: string | null, email?: string) {
@@ -32,7 +34,11 @@ function getInitials(name?: string | null, email?: string) {
   return email?.slice(0, 2).toUpperCase() || "U";
 }
 
-export function SettingsForms({ user, hasPassword }: SettingsFormsProps) {
+export function SettingsForms({
+  user,
+  hasPassword,
+  billingStatus,
+}: SettingsFormsProps) {
   const router = useRouter();
   const [name, setName] = useState(user.name || "");
   const [avatar, setAvatar] = useState<string | null>(user.avatar || null);
@@ -143,6 +149,14 @@ export function SettingsForms({ user, hasPassword }: SettingsFormsProps) {
 
   return (
     <div className="space-y-12">
+      {billingStatus === "success" && (
+        <p
+          role="status"
+          className="rounded-lg border border-primary/20 bg-primary/10 p-4 text-sm text-primary"
+        >
+          Checkout completed. Your plan will update as soon as payment is confirmed.
+        </p>
+      )}
       <section>
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-6">
           Profile
@@ -308,11 +322,13 @@ export function SettingsForms({ user, hasPassword }: SettingsFormsProps) {
                   : "Manage your subscription and payment method"}
               </p>
             </div>
-            <Button asChild>
-              <Link href={user.plan === "free" ? "/pricing" : "/api/stripe/portal"}>
-                {user.plan === "free" ? "Upgrade" : "Manage billing"}
-              </Link>
-            </Button>
+            {user.plan === "free" ? (
+              <Button asChild>
+                <Link href="/pricing">Upgrade</Link>
+              </Button>
+            ) : (
+              <BillingButton mode="portal">Manage billing</BillingButton>
+            )}
           </div>
         </Card>
       </section>

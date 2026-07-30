@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Check } from "lucide-react";
+import { BillingButton } from "@/components/billing-button";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ export default async function PricingPage() {
       ],
       cta: "Get started",
       href: "/register",
+      planId: null,
     },
     {
       name: "Pro",
@@ -39,6 +41,7 @@ export default async function PricingPage() {
       ],
       cta: "Start trial",
       href: "/register?plan=pro",
+      planId: "pro" as const,
       highlighted: true,
     },
     {
@@ -55,6 +58,7 @@ export default async function PricingPage() {
       ],
       cta: "Contact sales",
       href: "/contact",
+      planId: null,
     },
   ];
 
@@ -104,14 +108,34 @@ export default async function PricingPage() {
                   ))}
                 </ul>
 
-                <Button
-                  className="w-full"
-                  variant={plan.highlighted ? "default" : "outline"}
-                  size="lg"
-                  asChild
-                >
-                  <Link href={plan.href}>{plan.cta}</Link>
-                </Button>
+                {plan.planId ? (
+                  user?.plan === plan.planId ? (
+                    <BillingButton mode="portal" className="w-full" size="lg">
+                      Manage plan
+                    </BillingButton>
+                  ) : (
+                    <BillingButton
+                      mode="checkout"
+                      plan={plan.planId}
+                      className="w-full"
+                      variant={plan.highlighted ? "default" : "outline"}
+                      size="lg"
+                    >
+                      {plan.cta}
+                    </BillingButton>
+                  )
+                ) : (
+                  <Button
+                    className="w-full"
+                    variant={plan.highlighted ? "default" : "outline"}
+                    size="lg"
+                    asChild
+                  >
+                    <Link href={plan.name === "Free" && user ? "/dashboard" : plan.href}>
+                      {plan.name === "Free" && user ? "Go to dashboard" : plan.cta}
+                    </Link>
+                  </Button>
+                )}
               </Card>
             ))}
           </div>
