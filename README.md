@@ -72,6 +72,8 @@ npm run admin:create
 
 Then sign in through `/login?callbackUrl=/admin/posts`. Do not keep `ADMIN_PASSWORD` in a deployed environment after the account has been created. Administrators can create, edit, publish, search, and delete posts from the CMS.
 
+Blog images are validated, resized, and converted to WebP during upload. Set `BLOB_READ_WRITE_TOKEN` for durable Vercel Blob storage in production. Self-hosted Node deployments without a token store images under `public/uploads/blog`; that directory must be backed by persistent storage. Vercel deployments intentionally reject local image writes when the Blob token is missing.
+
 ## Company
 
 PDFPilot is built by Keshav Labs, a remote company based in Babarpur, Delhi, India. Public and support enquiries can be sent to `launchstack.in@gmail.com`.

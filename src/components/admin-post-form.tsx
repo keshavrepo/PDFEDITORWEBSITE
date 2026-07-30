@@ -1,12 +1,27 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import {
+  type DragEvent as ReactDragEvent,
+  FormEvent,
+  useRef,
+  useState,
+} from "react";
 import { useRouter } from "next/navigation";
-import { Bold, Italic, Link as LinkIcon, List, ListOrdered, Loader2 } from "lucide-react";
+import {
+  Bold,
+  ImagePlus,
+  Italic,
+  Link as LinkIcon,
+  List,
+  ListOrdered,
+  Loader2,
+} from "lucide-react";
+import { BlogImageUpload } from "@/components/blog-image-upload";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { createSlug } from "@/lib/blog";
+import { uploadBlogImage } from "@/lib/upload-blog-image";
 
 export interface EditablePost {
   id: string;
@@ -34,6 +49,8 @@ const textareaClass =
 export function AdminPostForm({ post, categories }: AdminPostFormProps) {
   const router = useRouter();
   const editorRef = useRef<HTMLDivElement>(null);
+  const editorImageInputRef = useRef<HTMLInputElement>(null);
+  const editorSelectionRef = useRef<Range | null>(null);
   const [title, setTitle] = useState(post?.title || "");
   const [slug, setSlug] = useState(post?.slug || "");
   const [slugEdited, setSlugEdited] = useState(Boolean(post));
@@ -41,6 +58,7 @@ export function AdminPostForm({ post, categories }: AdminPostFormProps) {
   const [status, setStatus] = useState(post?.status || "draft");
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [editorImageUploading, setEditorImageUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function format(command: string, value?: string) {
@@ -55,8 +73,64 @@ export function AdminPostForm({ post, categories }: AdminPostFormProps) {
     }
   }
 
+  function openEditorImagePicker() {
+    const selection = window.getSelection();
+    if (
+      selection?.rangeCount &&
+      editorRef.current?.contains(selection.getRangeAt(0).commonAncestorContainer)
+    ) {
+      editorSelectionRef.current = selection.getRangeAt(0).cloneRange();
+    } else {
+      editorSelectionRef.current = null;
+    }
+    editorImageInputRef.current?.click();
+  }
+
+  async function addEditorImage(file?: File) {
+    if (!file) return;
+    setEditorImageUploading(true);
+    setError(null);
+    try {
+      const uploaded = await uploadBlogImage(file, "content");
+      editorRef.current?.focus();
+      const selection = window.getSelection();
+      if (selection && editorSelectionRef.current) {
+        selection.removeAllRanges();
+        selection.addRange(editorSelectionRef.current);
+      }
+      if (!document.execCommand("insertImage", false, uploaded.url) && editorRef.current) {
+        const image = document.createElement("img");
+        image.src = uploaded.url;
+        image.alt = "";
+        editorRef.current.append(image);
+      }
+      editorSelectionRef.current = null;
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error ? uploadError.message : "Unable to upload editor image"
+      );
+    } finally {
+      setEditorImageUploading(false);
+      if (editorImageInputRef.current) editorImageInputRef.current.value = "";
+    }
+  }
+
+  function handleEditorDrop(event: ReactDragEvent<HTMLDivElement>) {
+    const file = Array.from(event.dataTransfer.files).find((item) =>
+      item.type.startsWith("image/")
+    );
+    if (!file) return;
+    event.preventDefault();
+    editorSelectionRef.current = null;
+    void addEditorImage(file);
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (editorImageUploading) {
+      setError("Wait for the editor image upload to finish");
+      return;
+    }
     setBusy(true);
     setError(null);
     const form = event.currentTarget;
@@ -161,6 +235,27 @@ export function AdminPostForm({ post, categories }: AdminPostFormProps) {
                 <Button type="button" variant="ghost" size="icon" onClick={() => format("insertUnorderedList")} aria-label="Bulleted list"><List className="h-4 w-4" /></Button>
                 <Button type="button" variant="ghost" size="icon" onClick={() => format("insertOrderedList")} aria-label="Numbered list"><ListOrdered className="h-4 w-4" /></Button>
                 <Button type="button" variant="ghost" size="icon" onClick={addLink} aria-label="Add link"><LinkIcon className="h-4 w-4" /></Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={openEditorImagePicker}
+                  disabled={editorImageUploading || busy}
+                  aria-label="Upload and insert image"
+                >
+                  {editorImageUploading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ImagePlus className="h-4 w-4" />
+                  )}
+                </Button>
+                <input
+                  ref={editorImageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  onChange={(event) => void addEditorImage(event.target.files?.[0])}
+                />
                 <Button type="button" variant="ghost" size="sm" onClick={() => format("formatBlock", "h2")}>Heading</Button>
                 <Button type="button" variant="ghost" size="sm" onClick={() => format("formatBlock", "p")}>Paragraph</Button>
               </div>
@@ -168,16 +263,29 @@ export function AdminPostForm({ post, categories }: AdminPostFormProps) {
                 ref={editorRef}
                 contentEditable={!busy}
                 suppressContentEditableWarning
-                className="min-h-[320px] p-4 text-sm leading-7 focus:outline-none [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:my-4 [&_h3]:text-xl [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6"
+                onDragOver={(event) => {
+                  if (Array.from(event.dataTransfer.items).some((item) => item.type.startsWith("image/"))) {
+                    event.preventDefault();
+                  }
+                }}
+                onDrop={handleEditorDrop}
+                className="min-h-[320px] p-4 text-sm leading-7 focus:outline-none [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:my-4 [&_h3]:text-xl [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_img]:my-5 [&_img]:aspect-video [&_img]:w-full [&_img]:rounded-xl [&_img]:object-cover"
                 dangerouslySetInnerHTML={{ __html: post?.content || "" }}
               />
             </div>
+            <p className="text-xs text-muted-foreground">
+              Use the image button or drop a JPEG, PNG, or WebP into the editor. Images are optimized before insertion.
+            </p>
           </div>
 
-          <div className="space-y-2 sm:col-span-2">
-            <label htmlFor="featuredImage" className="text-sm font-medium">Featured image URL</label>
-            <Input id="featuredImage" type="url" value={featuredImage} onChange={(event) => setFeaturedImage(event.target.value)} placeholder="https://..." maxLength={2048} disabled={busy} />
-            {featuredImage && <div className="h-48 rounded-xl bg-muted bg-cover bg-center" role="img" aria-label="Featured image preview" style={{ backgroundImage: `url(${JSON.stringify(featuredImage)})` }} />}
+          <div className="sm:col-span-2">
+            <BlogImageUpload
+              value={featuredImage}
+              onChange={setFeaturedImage}
+              purpose="featured"
+              label="Featured image"
+              disabled={busy || deleting}
+            />
           </div>
           <div className="space-y-2">
             <label htmlFor="category" className="text-sm font-medium">Category</label>
@@ -210,7 +318,7 @@ export function AdminPostForm({ post, categories }: AdminPostFormProps) {
         <div>{post && <Button type="button" variant="destructive" onClick={deletePost} disabled={busy || deleting}>{deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Delete post</Button>}</div>
         <div className="flex gap-3">
           <Button type="button" variant="outline" onClick={() => router.push("/admin/posts")} disabled={busy}>Cancel</Button>
-          <Button disabled={busy || deleting}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{post ? "Save changes" : "Create post"}</Button>
+          <Button disabled={busy || deleting || editorImageUploading}>{busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{post ? "Save changes" : "Create post"}</Button>
         </div>
       </div>
     </form>

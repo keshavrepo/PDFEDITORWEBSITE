@@ -9,6 +9,7 @@ import { Footer } from "@/components/footer";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FeaturedImage } from "@/components/featured-image";
 
 export const metadata: Metadata = {
   title: "Blog | PDFPilot",
@@ -82,7 +83,13 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
           <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
             <Link href={`/blog/${featured.slug}`}>
               <Card className="overflow-hidden hover:bg-accent transition-colors cursor-pointer">
-                {featured.featuredImage && <div className="h-56 sm:h-72 bg-muted bg-cover bg-center" role="img" aria-label="" style={{ backgroundImage: `url(${JSON.stringify(featured.featuredImage)})` }} />}
+                <FeaturedImage
+                  src={featured.featuredImage}
+                  alt={featured.title}
+                  className="aspect-video"
+                  sizes="(max-width: 1280px) 100vw, 1280px"
+                  priority
+                />
                 <div className="p-7 sm:p-9 max-w-4xl"><p className="text-sm text-primary font-medium mb-2">Latest article</p><h2 className="text-2xl md:text-3xl font-bold mb-3">{featured.title}</h2><p className="text-muted-foreground mb-5">{featured.excerpt}</p>{postMeta(featured)}</div>
               </Card>
             </Link>
@@ -96,7 +103,12 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
               {gridPosts.map((post) => (
                 <Link key={post.id} href={`/blog/${post.slug}`}>
                   <Card className="h-full overflow-hidden hover:bg-accent transition-colors cursor-pointer">
-                    {post.featuredImage && <div className="h-40 bg-muted bg-cover bg-center" role="img" aria-label="" style={{ backgroundImage: `url(${JSON.stringify(post.featuredImage)})` }} />}
+                    <FeaturedImage
+                      src={post.featuredImage}
+                      alt={post.title}
+                      className="aspect-video"
+                      sizes="(max-width: 768px) 100vw, 33vw"
+                    />
                     <div className="p-6"><h2 className="font-semibold text-lg mb-2 line-clamp-2">{post.title}</h2><p className="text-sm text-muted-foreground mb-5 line-clamp-3">{post.excerpt}</p>{postMeta(post)}</div>
                   </Card>
                 </Link>

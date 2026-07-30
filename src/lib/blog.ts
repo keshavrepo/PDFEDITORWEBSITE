@@ -1,4 +1,5 @@
 import sanitizeHtml from "sanitize-html";
+import { isStoredBlogImageUrl } from "@/lib/blog-images";
 
 export function createSlug(value: string): string {
   return value
@@ -31,9 +32,11 @@ export function sanitizePostHtml(value: string): string {
       "code",
       "pre",
       "hr",
+      "img",
     ],
     allowedAttributes: {
       a: ["href", "target", "rel"],
+      img: ["src", "alt", "loading", "decoding"],
     },
     allowedSchemes: ["http", "https", "mailto"],
     transformTags: {
@@ -41,7 +44,18 @@ export function sanitizePostHtml(value: string): string {
         target: "_blank",
         rel: "noopener noreferrer",
       }),
+      img: (tagName, attribs) => ({
+        tagName,
+        attribs: {
+          src: attribs.src || "",
+          alt: attribs.alt || "Article image",
+          loading: "lazy",
+          decoding: "async",
+        },
+      }),
     },
+    exclusiveFilter: (frame) =>
+      frame.tag === "img" && !isStoredBlogImageUrl(frame.attribs.src || ""),
   }).trim();
 }
 

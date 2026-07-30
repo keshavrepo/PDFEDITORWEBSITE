@@ -7,6 +7,9 @@ import { blogCategories, blogPosts, blogPostTags, blogTags, users } from "@/db/s
 import { getSession } from "@/lib/auth";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
+import { FeaturedImage } from "@/components/featured-image";
+import { RichPostContent } from "@/components/rich-post-content";
+import { getAppUrl } from "@/lib/env";
 import { siteConfig } from "@/lib/site";
 
 interface BlogPostPageProps { params: Promise<{ slug: string }> }
@@ -50,7 +53,9 @@ export async function generateMetadata({ params }: BlogPostPageProps): Promise<M
       type: "article",
       publishedTime: post.publishedAt?.toISOString(),
       modifiedTime: post.updatedAt.toISOString(),
-      images: post.featuredImage ? [post.featuredImage] : undefined,
+      images: post.featuredImage
+        ? [new URL(post.featuredImage, getAppUrl()).toString()]
+        : undefined,
     },
   };
 }
@@ -83,11 +88,16 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
               </div>
             </div>
           </header>
-          {post.featuredImage && <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-10"><div className="aspect-[16/8] rounded-2xl bg-muted bg-cover bg-center" role="img" aria-label={post.title} style={{ backgroundImage: `url(${JSON.stringify(post.featuredImage)})` }} /></div>}
-          <div
-            className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 text-base leading-8 text-foreground/90 [&_p]:mb-5 [&_h2]:text-2xl [&_h2]:font-semibold [&_h2]:mt-10 [&_h2]:mb-4 [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:mt-8 [&_h3]:mb-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-5 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-5 [&_blockquote]:border-l-4 [&_blockquote]:pl-4 [&_blockquote]:text-muted-foreground [&_a]:underline [&_a]:underline-offset-4 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted [&_pre]:p-4"
-            dangerouslySetInnerHTML={{ __html: post.content }}
-          />
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pb-10">
+            <FeaturedImage
+              src={post.featuredImage}
+              alt={post.title}
+              className="aspect-video rounded-2xl"
+              sizes="(max-width: 1024px) 100vw, 1024px"
+              priority
+            />
+          </div>
+          <RichPostContent html={post.content} />
           {tags.length > 0 && <footer className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pb-24"><div className="border-t pt-6 flex flex-wrap gap-2">{tags.map((tag) => <span key={tag.slug} className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">{tag.name}</span>)}</div></footer>}
         </article>
       </main>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isStoredBlogImageUrl } from "@/lib/blog-images";
 
 const optionalText = (maximum: number) =>
   z.union([z.string().trim().max(maximum), z.literal("")]).optional();
@@ -9,7 +10,15 @@ export const blogPostInputSchema = z.object({
   excerpt: z.string().trim().min(20).max(600),
   content: z.string().min(20).max(250_000),
   featuredImage: z
-    .union([z.string().trim().url().max(2048), z.literal(""), z.null()])
+    .union([
+      z
+        .string()
+        .trim()
+        .max(2048)
+        .refine(isStoredBlogImageUrl, "Upload a valid featured image"),
+      z.literal(""),
+      z.null(),
+    ])
     .optional(),
   category: optionalText(100),
   tags: z.union([z.array(z.string().max(60)).max(12), z.string().max(720)]).optional(),

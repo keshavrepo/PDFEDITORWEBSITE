@@ -16,6 +16,10 @@ import {
   sanitizePostHtml,
 } from "@/lib/blog";
 import { blogPostInputSchema } from "@/lib/blog-validation";
+import {
+  deleteUnusedBlogImages,
+  extractStoredBlogImageUrls,
+} from "@/lib/image-storage";
 import { getClientIp, isSameOrigin } from "@/lib/request";
 
 interface RouteContext {
@@ -49,7 +53,12 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
     const updated = await db.transaction(async (transaction) => {
       const [existing] = await transaction
-        .select({ status: blogPosts.status, publishedAt: blogPosts.publishedAt })
+        .select({
+          status: blogPosts.status,
+          publishedAt: blogPosts.publishedAt,
+          featuredImage: blogPosts.featuredImage,
+          content: blogPosts.content,
+        })
         .from(blogPosts)
         .where(eq(blogPosts.id, id))
         .limit(1);
@@ -113,11 +122,22 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
         userAgent: request.headers.get("user-agent"),
         metadata: { previousStatus: existing.status, status: parsed.data.status, slug },
       });
-      return post;
+      return {
+        post,
+        previousFeaturedImage: existing.featuredImage,
+        previousContent: existing.content,
+      };
     });
 
     if (!updated) return Response.json({ error: "Post not found" }, { status: 404 });
-    return Response.json({ post: updated });
+    await deleteUnusedBlogImages(
+      [
+        updated.previousFeaturedImage,
+        ...extractStoredBlogImageUrls(updated.previousContent),
+      ],
+      [parsed.data.featuredImage, ...extractStoredBlogImageUrls(content)]
+    );
+    return Response.json({ post: updated.post });
   } catch (error) {
     const databaseError = error as { code?: string };
     if (databaseError.code === "23505") {
@@ -141,7 +161,12 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
       const result = await transaction
         .delete(blogPosts)
         .where(eq(blogPosts.id, id))
-        .returning({ id: blogPosts.id, slug: blogPosts.slug });
+        .returning({
+          id: blogPosts.id,
+          slug: blogPosts.slug,
+          featuredImage: blogPosts.featuredImage,
+          content: blogPosts.content,
+        });
       if (result[0]) {
         await transaction.insert(auditLogs).values({
           userId: admin.id,
@@ -157,6 +182,10 @@ export async function DELETE(request: NextRequest, { params }: RouteContext) {
     });
 
     if (!deleted) return Response.json({ error: "Post not found" }, { status: 404 });
+    await deleteUnusedBlogImages(
+      [deleted.featuredImage, ...extractStoredBlogImageUrls(deleted.content)],
+      []
+    );
     return Response.json({ message: "Post deleted" });
   } catch (error) {
     console.error("Deleting blog post failed", error);

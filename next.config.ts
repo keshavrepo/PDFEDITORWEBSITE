@@ -17,6 +17,18 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   compress: true,
+  images: {
+    formats: ["image/avif", "image/webp"],
+    qualities: [70, 82, 90],
+    minimumCacheTTL: 86_400,
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.public.blob.vercel-storage.com",
+        pathname: "/blog/**",
+      },
+    ],
+  },
   async headers() {
     return [
       {

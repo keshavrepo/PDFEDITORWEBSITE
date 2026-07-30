@@ -14,6 +14,10 @@ out/
 *.tsbuildinfo
 coverage/
 
+# Runtime-generated local blog uploads
+public/uploads/blog/*
+!public/uploads/blog/.gitkeep
+
 # Logs
 *.log
 npm-debug.log*
