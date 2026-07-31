@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { siteConfig } from "@/lib/site";
+import { platform, products } from "@/lib/products";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
   const footerLinks = {
-    Product: [
+    Platform: [
+      { label: "Products", href: "/products" },
       { label: "Features", href: "/features" },
       { label: "Pricing", href: "/pricing" },
-      { label: "Tools", href: "/tools" },
       { label: "API", href: "/api-docs" },
     ],
     Company: [
@@ -33,7 +34,37 @@ export function Footer() {
   return (
     <footer className="border-t">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
+          {/* Every LaunchStack module, so the roadmap is visible from anywhere.
+              Only live products are links; the rest are labelled, not clickable. */}
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wider mb-4 text-foreground/60">
+              Products
+            </h4>
+            <ul className="space-y-3">
+              {products.map((product) =>
+                product.status === "active" && product.href ? (
+                  <li key={product.id}>
+                    <Link
+                      href={product.href}
+                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {product.name}
+                    </Link>
+                  </li>
+                ) : (
+                  <li
+                    key={product.id}
+                    className="text-sm text-muted-foreground/60 flex items-center gap-1.5"
+                  >
+                    {product.name}
+                    <span className="text-[10px] uppercase tracking-wide">Soon</span>
+                  </li>
+                )
+              )}
+            </ul>
+          </div>
+
           {Object.entries(footerLinks).map(([category, links]) => (
             <div key={category}>
               <h4 className="text-xs font-semibold uppercase tracking-wider mb-4 text-foreground/60">
@@ -63,7 +94,7 @@ export function Footer() {
                 <polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <span className="text-sm text-muted-foreground">
-                © {currentYear} {siteConfig.name} by {siteConfig.company}. All rights reserved.
+                © {currentYear} {platform.name} by {siteConfig.company}. All rights reserved.
               </span>
             </div>
 

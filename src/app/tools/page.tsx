@@ -5,8 +5,9 @@ import { Footer } from "@/components/footer";
 import { ToolsDirectory } from "@/components/tools-directory";
 
 export const metadata: Metadata = {
-  title: "PDF Tools | PDFPilot",
-  description: "Private browser-based tools to convert, organize, optimize, edit, and secure PDFs.",
+  title: "PDF Tools | PDFPilot by LaunchStack",
+  description:
+    "Private browser-based tools to convert, organize, optimize, edit, and secure PDFs. PDFPilot is the first product on the LaunchStack platform.",
 };
 export const dynamic = "force-dynamic";
 

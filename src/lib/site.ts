@@ -19,6 +19,8 @@ export const siteConfig = {
 
 export const internalRoutes = [
   "/",
+  "/products",
+  "/products/pdfpilot",
   "/features",
   "/pricing",
   "/tools",

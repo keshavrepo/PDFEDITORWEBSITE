@@ -1,6 +1,31 @@
-# PDFPilot
+# LaunchStack
 
-PDFPilot is a Next.js application for securely processing PDF documents in the browser, managing user accounts, and offering subscription-backed limits. PDF operations that do not require server capabilities stay on the user's device.
+LaunchStack is a Next.js platform hosting a suite of focused, privacy-first
+productivity products. Each product is a module that shares the platform's
+account system, billing, blog and design system.
+
+**PDFPilot** is the first live product: a complete set of browser-based PDF
+tools for securely processing documents without uploading them. ImagePilot,
+DevPilot, OfficePilot, WebPilot, FinancePilot and AIPilot are registered on the
+platform and marked as coming soon.
+
+Products are declared in `src/lib/products.ts`, which drives the homepage,
+the products page and the footer. Launching a new module is a matter of adding
+its entry and flipping the status, with no changes needed in the surrounding
+navigation or layout.
+
+## Platform routes
+
+| Route | Purpose |
+| --- | --- |
+| `/` | LaunchStack homepage and product suite |
+| `/products` | Every product, with availability |
+| `/products/pdfpilot` | PDFPilot product overview |
+| `/tools` | PDFPilot tool directory (unchanged) |
+| `/tools/*` | Individual PDF tools (unchanged) |
+
+Existing PDFPilot URLs are preserved exactly; `/pdfpilot` and `/product/pdfpilot`
+are added as convenience aliases that redirect into the platform routes.
 
 ## Architecture
 

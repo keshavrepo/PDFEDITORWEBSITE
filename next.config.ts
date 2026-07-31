@@ -29,6 +29,18 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  /**
+   * Convenience aliases for the platform layout. Every existing PDFPilot URL
+   * (/tools and each /tools/* route) is unchanged and still served directly;
+   * these only add new entry points, so no bookmark or search result breaks.
+   */
+  async redirects() {
+    return [
+      { source: "/pdfpilot", destination: "/products/pdfpilot", permanent: false },
+      { source: "/pdfpilot/tools", destination: "/tools", permanent: false },
+      { source: "/product/pdfpilot", destination: "/products/pdfpilot", permanent: false },
+    ];
+  },
   async headers() {
     return [
       {

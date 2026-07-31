@@ -17,6 +17,7 @@ import { Menu, X, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
+import { platform } from "@/lib/products";
 import { signOut, useSession } from "next-auth/react";
 
 interface NavbarProps {
@@ -45,11 +46,20 @@ export function Navbar({ user: serverUser }: NavbarProps) {
         : null
       : serverUser;
 
+  // Platform-level navigation. Dashboard only appears once signed in, so the
+  // bar never offers a link that immediately bounces to the login page.
   const navLinks = [
-    { href: "/tools", label: "Tools" },
+    { href: "/", label: "Home" },
+    { href: "/products", label: "Products" },
     { href: "/pricing", label: "Pricing" },
     { href: "/blog", label: "Blog" },
+    { href: "/contact", label: "Contact" },
+    ...(user ? [{ href: "/dashboard", label: "Dashboard" }] : []),
   ];
+
+  // Inside PDFPilot the wordmark reads as the product, so users always know
+  // which module they are in while the platform name stays one click away.
+  const inPdfPilot = pathname?.startsWith("/tools") ?? false;
 
   const getInitials = (name?: string | null, email?: string) => {
     if (name) {
@@ -75,7 +85,12 @@ export function Navbar({ user: serverUser }: NavbarProps) {
                 <Logo className="w-5 h-5 text-primary-foreground" />
               </div>
             </div>
-            <span className="text-[15px] font-semibold tracking-tight">PDFPilot</span>
+            <span className="text-[15px] font-semibold tracking-tight">
+              {platform.name}
+              {inPdfPilot && (
+                <span className="text-muted-foreground font-normal"> / PDFPilot</span>
+              )}
+            </span>
           </Link>
 
           {/* Desktop Navigation */}
