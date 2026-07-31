@@ -4,11 +4,19 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { GenericPdfTool } from "@/components/generic-pdf-tool";
 import { tools } from "@/lib/tools";
+import { conversionToolMap } from "@/lib/conversion/tool-config";
 
 interface ToolPageProps { params: Promise<{ tool: string }> }
 
+/**
+ * Tools that ship their own route segment. Static routes already win over this
+ * dynamic one, but excluding them here keeps `generateMetadata` honest and
+ * prevents the generic PDF tool from ever rendering a converter slug.
+ */
+const dedicatedRoutes = new Set<string>(["merge-pdf", "compress-pdf", ...conversionToolMap.keys()]);
+
 function findTool(slug: string) {
-  return tools.find((tool) => tool.href === `/tools/${slug}` && !["merge-pdf", "compress-pdf"].includes(tool.id));
+  return tools.find((tool) => tool.href === `/tools/${slug}` && !dedicatedRoutes.has(tool.id));
 }
 
 export async function generateMetadata({ params }: ToolPageProps): Promise<Metadata> {

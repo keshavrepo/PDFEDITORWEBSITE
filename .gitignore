@@ -14,6 +14,10 @@ out/
 *.tsbuildinfo
 coverage/
 
+# Conversion test artifacts (fixtures are generated on demand)
+.conversion-test-build/
+scripts/fixtures/generated/
+
 # Runtime-generated local blog uploads
 public/uploads/blog/*
 !public/uploads/blog/.gitkeep

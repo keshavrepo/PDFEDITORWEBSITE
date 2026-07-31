@@ -8,6 +8,7 @@ PDFPilot is a Next.js application for securely processing PDF documents in the b
 - **Authentication:** NextAuth JWT sessions with credentials and optional Google OAuth
 - **Persistence:** PostgreSQL, Drizzle ORM, versioned SQL migrations
 - **PDF processing:** `pdf-lib` and `pdfjs-dist` in client components
+- **Document conversion:** isomorphic converters under `src/lib/conversion` using `pdfjs-dist`, `pdf-lib`, `docx` and `pptxgenjs`
 - **Billing:** Stripe Checkout, Customer Portal, and signed webhooks
 - **Email:** Resend's HTTPS API (optional, for support and password reset)
 
@@ -47,6 +48,16 @@ npm run build
 npm run check
 ```
 
+Document conversion has its own end-to-end suite that runs the production
+converters against generated Word, PowerPoint and PDF fixtures:
+
+```bash
+npm run test:conversions
+```
+
+Fixtures are created on demand and removed afterwards, so the working tree
+stays clean.
+
 The health endpoint is available at `/api/health`. It returns HTTP 503 when required production configuration or database connectivity is unavailable.
 
 ## Production deployment
@@ -56,6 +67,25 @@ The health endpoint is available at `/api/health`. It returns HTTP 503 when requ
 - Build with `npm run build` and start with `npm start`.
 - Configure the Stripe webhook endpoint as `/api/stripe/webhook`.
 - Terminate TLS at the hosting platform or reverse proxy. Security headers are emitted by Next.js.
+
+## Document conversion
+
+Four converters run entirely in the browser, so documents are never uploaded:
+
+| Tool | Route |
+| --- | --- |
+| PDF to Word | `/tools/pdf-to-word` |
+| Word to PDF | `/tools/word-to-pdf` |
+| PDF to PowerPoint | `/tools/pdf-to-powerpoint` |
+| PowerPoint to PDF | `/tools/powerpoint-to-pdf` |
+
+The conversion core in `src/lib/conversion` is deliberately free of DOM APIs so
+the same modules power the browser tools and the Node test suite. PDF pages are
+parsed into positioned text and images, analysed into paragraphs, headings,
+lists and tables, then written as real OOXML or laid out onto PDF pages.
+
+pdf.js standard fonts and CMaps are vendored into `public/pdfjs` so embedded
+and CJK fonts resolve correctly without network access.
 
 ## Blog administration
 

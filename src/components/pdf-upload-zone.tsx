@@ -19,6 +19,13 @@ interface PdfUploadZoneProps {
   disabled?: boolean;
   className?: string;
   inputId?: string;
+  /**
+   * Native `accept` list. Defaults to PDF so existing tools are unaffected;
+   * the document converters pass Word/PowerPoint types.
+   */
+  accept?: string;
+  /** Accessible name for the file input. */
+  label?: string;
 }
 
 /**
@@ -33,6 +40,8 @@ export function PdfUploadZone({
   disabled = false,
   className,
   inputId,
+  accept = "application/pdf,.pdf",
+  label,
 }: PdfUploadZoneProps) {
   const generatedId = useId();
   const id = inputId || generatedId;
@@ -87,7 +96,8 @@ export function PdfUploadZone({
         ref={inputRef}
         id={id}
         type="file"
-        accept="application/pdf,.pdf"
+        accept={accept}
+        aria-label={label}
         multiple={multiple}
         disabled={inactive}
         className="sr-only"
