@@ -79,6 +79,55 @@ export const documentationSections: DocumentationSection[] = [
     ],
   },
   {
+    id: "imagepilot",
+    title: "Using ImagePilot",
+    summary:
+      "Edit images with layers, non-destructive adjustments, text and shapes, then export to PNG, JPG, WEBP or SVG — all in the browser.",
+    keywords: [
+      "image",
+      "photo",
+      "editor",
+      "layers",
+      "crop",
+      "resize",
+      "rotate",
+      "brightness",
+      "contrast",
+      "text",
+      "shapes",
+      "png",
+      "jpg",
+      "webp",
+      "svg",
+    ],
+    items: [
+      {
+        label: "Open the editor",
+        description:
+          "Drop an image onto the canvas, paste one from the clipboard, or start from a blank canvas preset.",
+        href: "/imagepilot",
+      },
+      {
+        label: "Work in layers",
+        description:
+          "Every image, text block and shape is its own layer. Reorder, lock, hide, duplicate and blend them independently.",
+        href: "/imagepilot",
+      },
+      {
+        label: "Adjust without losing quality",
+        description:
+          "Adjustments are stored on the layer rather than baked into the pixels, so any slider can be returned to neutral at any point.",
+        href: "/imagepilot",
+      },
+      {
+        label: "Export",
+        description:
+          "PNG and WEBP keep transparency, JPG flattens onto a matte, and SVG keeps shapes and text as real vectors.",
+        href: "/imagepilot",
+      },
+    ],
+  },
+  {
     id: "files",
     title: "Files and storage",
     summary:

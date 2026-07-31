@@ -9,6 +9,7 @@
 
 import { products } from "@/lib/products";
 import { tools } from "@/lib/tools";
+import { imageTools } from "@/lib/imagepilot/tools";
 import { documentationSections } from "@/lib/platform/documentation";
 
 export type SearchResultType = "product" | "tool" | "article" | "documentation";
@@ -73,6 +74,19 @@ function buildStaticIndex(): IndexEntry[] {
       href: tool.href,
       context: `PDFPilot · ${tool.category}`,
       haystack: `${tool.name} ${tool.description} ${tool.category}`.toLowerCase(),
+      weight: 2,
+    });
+  }
+
+  for (const tool of imageTools) {
+    entries.push({
+      id: `tool-${tool.id}`,
+      type: "tool",
+      title: tool.name,
+      description: tool.description,
+      href: tool.href,
+      context: `ImagePilot · ${tool.category}`,
+      haystack: `${tool.name} ${tool.description} ${tool.category} ${tool.keywords.join(" ")}`.toLowerCase(),
       weight: 2,
     });
   }

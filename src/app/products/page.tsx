@@ -17,7 +17,7 @@ import {
 import { getAppUrl } from "@/lib/env";
 import { tools } from "@/lib/tools";
 
-const description = `Every product in the ${platform.name} suite. PDFPilot is available now with ${tools.length} browser-based PDF tools; ImagePilot, DevPilot, OfficePilot, WebPilot, FinancePilot and AIPilot are in development.`;
+const description = `Every product in the ${platform.name} suite. PDFPilot offers ${tools.length} browser-based PDF tools and ImagePilot is a full image editor; DevPilot, OfficePilot, WebPilot, FinancePilot and AIPilot are in development.`;
 const url = `${getAppUrl()}/products`;
 
 export const metadata: Metadata = {

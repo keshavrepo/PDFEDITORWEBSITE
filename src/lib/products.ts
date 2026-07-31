@@ -53,7 +53,7 @@ export const products: Product[] = [
     name: "PDFPilot",
     tagline: "Private, browser-first PDF tools",
     description:
-      "Convert, organise, optimise, edit and secure PDFs without uploading them. Twenty-eight tools covering Word, Excel, PowerPoint, images, OCR, forms, redaction and archival PDF/A.",
+      "Convert, organise, optimise, edit and secure PDFs without uploading them. Twenty-seven tools covering Word, Excel, PowerPoint, images, OCR, forms, redaction and archival PDF/A.",
     status: "active",
     category: "Documents",
     version: "1.4.0",
@@ -110,15 +110,28 @@ export const products: Product[] = [
   {
     id: "imagepilot",
     name: "ImagePilot",
-    tagline: "Image editing and optimisation",
+    tagline: "A professional image editor in your browser",
     description:
-      "Resize, convert, compress and clean up images in bulk, with the same privacy-first browser processing as PDFPilot.",
-    status: "coming-soon",
+      "Layers, non-destructive adjustments, text, shapes, crop and transform tools, with undo history and PNG, JPG, WEBP and SVG export. Everything runs on your device.",
+    status: "active",
     category: "Media",
-    version: "0.0.0",
-    accent: "text-muted-foreground",
-    highlights: ["Bulk conversion", "Smart compression", "Background removal"],
-    releaseNotes: [],
+    version: "1.0.0",
+    href: "/imagepilot",
+    accent: "text-primary",
+    highlights: ["Layer-based editing", "17 image operations", "Runs in your browser"],
+    releaseNotes: [
+      {
+        version: "1.0.0",
+        date: "2026-07-31",
+        changes: [
+          "Added the ImagePilot editor with layers, undo history and a full transform toolset",
+          "Added seventeen non-destructive image operations covering light, colour, detail and stylising",
+          "Added editable text layers with stroke, shadow, tracking and alignment",
+          "Added six shape tools with fill, stroke and rounded corners",
+          "Added PNG, JPG, WEBP and SVG export, clipboard support and drag-and-drop import",
+        ],
+      },
+    ],
   },
   {
     id: "devpilot",

@@ -5,7 +5,12 @@ productivity products. Each product is a module that shares the platform's
 account system, billing, blog and design system.
 
 **PDFPilot** is the first live product: a complete set of browser-based PDF
-tools for securely processing documents without uploading them. ImagePilot,
+tools for securely processing documents without uploading them.
+
+**ImagePilot** is the second: a professional image editor with layers, undo
+history, non-destructive adjustments, text and shapes, exporting to PNG, JPG,
+WEBP and SVG.
+
 DevPilot, OfficePilot, WebPilot, FinancePilot and AIPilot are registered on the
 platform and marked as coming soon.
 
@@ -41,8 +46,10 @@ new module inherits them rather than reimplementing them:
 | `/` | LaunchStack homepage and product suite |
 | `/products` | Every product, with availability |
 | `/products/pdfpilot` | PDFPilot product overview |
+| `/products/imagepilot` | ImagePilot product overview |
 | `/tools` | PDFPilot tool directory (unchanged) |
 | `/tools/*` | Individual PDF tools (unchanged) |
+| `/imagepilot` | ImagePilot image editor |
 | `/files` | Unified file manager, shared by every product |
 | `/dashboard` | Storage, files, activity, favourites and usage |
 | `/docs` | Documentation, with guides authored in the blog CMS |
@@ -56,6 +63,7 @@ are added as convenience aliases that redirect into the platform routes.
 - **Authentication:** NextAuth JWT sessions with credentials and optional Google OAuth
 - **Persistence:** PostgreSQL, Drizzle ORM, versioned SQL migrations
 - **PDF processing:** `pdf-lib` and `pdfjs-dist` in client components
+- **Image editing:** isomorphic editor core under `src/lib/imagepilot`. The document model, pixel pipeline, renderer and exporter are written against the standard 2D canvas surface with no DOM dependency, so the same modules run in the browser and headlessly in tests. Browser-only concerns (decoding, clipboard, downloads) are isolated in `raster.ts`
 - **Document conversion:** isomorphic converters under `src/lib/conversion` using `pdfjs-dist`, `pdf-lib`, `docx` and `pptxgenjs`. Spreadsheet support (`.xlsx` and legacy `.xls`) is read and written directly from `src/lib/conversion/spreadsheet`, reusing the existing OOXML helpers rather than adding a dependency
 - **Billing:** Stripe Checkout, Customer Portal, and signed webhooks
 - **Email:** Resend's HTTPS API (optional, for support and password reset)
@@ -96,15 +104,20 @@ npm run build
 npm run check
 ```
 
-Document conversion has its own end-to-end suite that runs the production
-converters against generated Word, PowerPoint and PDF fixtures:
+Both products have end-to-end suites that run the production code paths, not
+mocks:
 
 ```bash
-npm run test:conversions
+npm test                  # both suites
+npm run test:conversions  # 147 document conversion tests
+npm run test:imagepilot   # 103 image editor tests
 ```
 
-Fixtures are created on demand and removed afterwards, so the working tree
-stays clean.
+The conversion suite runs the real converters against generated Word,
+PowerPoint and PDF fixtures. The ImagePilot suite renders real pixels through
+`@napi-rs/canvas` and asserts on them, and drives the same reducer the UI uses.
+Fixtures and build output are created on demand and removed afterwards, so the
+working tree stays clean.
 
 The health endpoint is available at `/api/health`. It returns HTTP 503 when required production configuration or database connectivity is unavailable.
 
@@ -115,6 +128,58 @@ The health endpoint is available at `/api/health`. It returns HTTP 503 when requ
 - Build with `npm run build` and start with `npm start`.
 - Configure the Stripe webhook endpoint as `/api/stripe/webhook`.
 - Terminate TLS at the hosting platform or reverse proxy. Security headers are emitted by Next.js.
+
+## ImagePilot editor
+
+The editor is a single reusable foundation rather than a collection of separate
+tools. Planned features (background remover, screenshot editor, passport photo,
+watermark studio and so on) are entry points into this same editor with a
+task-specific starting state, so they inherit layers, history and export
+without reimplementing any of it.
+
+`src/lib/imagepilot` is organised so nothing but `raster.ts` touches the DOM:
+
+| Module | Responsibility |
+| --- | --- |
+| `types.ts` | Document, layer and adjustment model |
+| `constants.ts` | Limits, presets and descriptor tables |
+| `adjustments.ts` | Pixel pipeline for all 17 image operations |
+| `document.ts` | Pure layer and canvas operations |
+| `geometry.ts` | Viewport, transform handles, snapping, rulers |
+| `history.ts` | Snapshot undo/redo with coalescing |
+| `renderer.ts` | Canvas compositor and text layout |
+| `export.ts` | Raster compositing and SVG serialisation |
+| `editor-state.ts` | Reducer owning history, selection and tools |
+| `raster.ts` | Browser-only: decoding, clipboard, downloads |
+
+Design decisions worth knowing:
+
+- **Bitmaps live outside the document.** Layers reference a `sourceId` into a
+  raster store, so a history snapshot is a few kilobytes of JSON regardless of
+  how many megapixels are loaded, and undo never copies pixel data.
+- **History is snapshot-based, not command-based.** Because every document
+  operation is pure, a snapshot is simply the previous return value. This
+  removes the class of bugs where an inverse operation fails to exactly undo
+  its forward counterpart. Consecutive edits sharing a merge key coalesce, so a
+  slider drag is one undo step rather than a hundred.
+- **Adjustments are collapsed into two passes.** Exposure, gamma, brightness,
+  contrast, shadows, highlights, temperature and tint compile into one lookup
+  table per channel; saturation, hue, grayscale, sepia and invert compose into a
+  single 3×4 colour matrix. A full-frame edit therefore costs two passes rather
+  than a dozen, which is what keeps slider dragging interactive.
+- **The pipeline does not use CSS `filter`.** Support is inconsistent, absent in
+  workers, and several required operations (gamma, shadows, highlights,
+  temperature, threshold, noise reduction) have no CSS equivalent at all.
+- **Blur premultiplies alpha** so transparent pixels cannot bleed dark fringes
+  into visible edges, and **noise reduction uses a median filter** so it removes
+  speckle without the edge smearing a mean filter causes.
+- **The canvas is split in two.** The scene layer redraws only when the document
+  changes; the overlay layer carries selection, handles and guides and redraws
+  on every pointer move. A large document is therefore not recomposited sixty
+  times a second just to move a selection rectangle.
+- **SVG export is genuinely vector.** Shapes and text become real `<path>` and
+  `<text>` elements using the same geometry the canvas renderer uses; only
+  photo layers are embedded as bitmaps.
 
 ## Document conversion
 

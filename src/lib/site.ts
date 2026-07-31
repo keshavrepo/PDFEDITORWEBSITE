@@ -21,6 +21,8 @@ export const internalRoutes = [
   "/",
   "/products",
   "/products/pdfpilot",
+  "/products/imagepilot",
+  "/imagepilot",
   "/features",
   "/pricing",
   "/tools",
