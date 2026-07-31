@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Navbar } from "@/components/navbar";
+import { PdfUploadZone } from "@/components/pdf-upload-zone";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -17,11 +18,18 @@ import {
   Zap,
   AlertCircle,
 } from "lucide-react";
-import { mergePDFs, downloadBlob, validatePDF, type ProcessingProgress } from "@/lib/pdf-utils";
+import {
+  mergePDFs,
+  downloadBlob,
+  validatePDF,
+  validatePDFSelection,
+  type ProcessingProgress,
+} from "@/lib/pdf-utils";
 
 export default function MergePDFPage() {
   const [files, setFiles] = useState<File[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
+  const [validationsInFlight, setValidationsInFlight] = useState(0);
+  const [invalidFileKeys, setInvalidFileKeys] = useState<Set<string>>(new Set());
   const [processing, setProcessing] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,35 +37,62 @@ export default function MergePDFPage() {
   const [mergedPDF, setMergedPDF] = useState<Blob | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
+  const fileKey = (file: File) =>
+    `${file.name}:${file.size}:${file.lastModified}`;
 
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
+  const addFiles = (selectedFiles: File[]) => {
+    const accepted: File[] = [];
+    const rejected: string[] = [];
+    for (const file of selectedFiles) {
+      const selection = validatePDFSelection(file);
+      if (selection.valid) accepted.push(file);
+      else rejected.push(selection.error || `${file.name} is not a valid PDF`);
+    }
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const droppedFiles = Array.from(e.dataTransfer.files).filter(
-      (file) => file.type === "application/pdf"
-    );
-    setFiles((prev) => [...prev, ...droppedFiles]);
-  };
+    if (rejected.length) setError(rejected.join(" "));
+    else setError(null);
+    if (!accepted.length) return;
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const selectedFiles = Array.from(e.target.files).filter(
-        (file) => file.type === "application/pdf"
-      );
-      setFiles((prev) => [...prev, ...selectedFiles]);
+    // Make files visible before parsing their contents.
+    setFiles((previous) => {
+      const existing = new Set(previous.map(fileKey));
+      return [
+        ...previous,
+        ...accepted.filter((file) => !existing.has(fileKey(file))),
+      ];
+    });
+    setValidationsInFlight((count) => count + accepted.length);
+
+    for (const file of accepted) {
+      void validatePDF(file).then((validation) => {
+        const key = fileKey(file);
+        setInvalidFileKeys((previous) => {
+          const next = new Set(previous);
+          if (validation.valid) next.delete(key);
+          else next.add(key);
+          return next;
+        });
+        if (!validation.valid) {
+          setError(`${file.name}: ${validation.error || "Invalid PDF"}`);
+        }
+      }).finally(() => {
+        setValidationsInFlight((count) => Math.max(0, count - 1));
+      });
     }
   };
 
   const removeFile = (index: number) => {
+    const removed = files[index];
     setFiles((prev) => prev.filter((_, i) => i !== index));
+    if (removed) {
+      const removedWasInvalid = invalidFileKeys.has(fileKey(removed));
+      setInvalidFileKeys((previous) => {
+        const next = new Set(previous);
+        next.delete(fileKey(removed));
+        return next;
+      });
+      if (removedWasInvalid) setError(null);
+    }
   };
 
   const reorderFile = (targetIndex: number) => {
@@ -111,6 +146,15 @@ export default function MergePDFPage() {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
   };
 
+  const clearFiles = () => {
+    setFiles([]);
+    setInvalidFileKeys(new Set());
+    setError(null);
+  };
+  const hasInvalidFiles = files.some((file) =>
+    invalidFileKeys.has(fileKey(file))
+  );
+
   return (
     <>
       <Navbar />
@@ -133,55 +177,25 @@ export default function MergePDFPage() {
           <>
             {/* Upload Area */}
             <section className="max-w-4xl mx-auto px-6 lg:px-8 pb-12">
-              <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                className={`relative rounded-2xl border-2 border-dashed p-16 transition-all ${
-                  isDragging
-                    ? "border-primary bg-primary/5 scale-[1.01]"
-                    : "border-border/60 hover:border-border hover:bg-muted/30"
-                }`}
+              <PdfUploadZone
+                multiple
+                onFilesSelected={addFiles}
+                className="relative rounded-2xl border-2 border-dashed border-border/60 p-16 text-center transition-all hover:border-border hover:bg-muted/30"
               >
-                <div className="text-center">
-                  <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-6 transition-all ${
-                    isDragging
-                      ? "bg-primary/20 scale-110"
-                      : "bg-primary/10"
-                  }`}>
-                    <Upload className={`w-8 h-8 ${
-                      isDragging ? "text-primary" : "text-primary/70"
-                    }`} />
+                {(isDragging) => (
+                  <div className={isDragging ? "-m-16 rounded-2xl bg-primary/5 p-16 scale-[1.01]" : ""}>
+                    <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-6 transition-all ${isDragging ? "bg-primary/20 scale-110" : "bg-primary/10"}`}>
+                      <Upload className={`w-8 h-8 ${isDragging ? "text-primary" : "text-primary/70"}`} />
+                    </div>
+                    <h3 className="text-xl font-semibold mb-2">
+                      {isDragging ? "Drop files here" : "Upload PDF files"}
+                    </h3>
+                    <p className="text-muted-foreground mb-8">Drag and drop or click to browse</p>
+                    <Button size="lg" type="button" asChild><span>Choose files</span></Button>
+                    <p className="text-sm text-muted-foreground mt-6">Maximum file size: 100MB per file</p>
                   </div>
-                  
-                  <h3 className="text-xl font-semibold mb-2">
-                    {isDragging ? "Drop files here" : "Upload PDF files"}
-                  </h3>
-                  <p className="text-muted-foreground mb-8">
-                    Drag and drop or click to browse
-                  </p>
-                  
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    multiple
-                    onChange={handleFileSelect}
-                    className="hidden"
-                    id="file-upload"
-                  />
-                  <label htmlFor="file-upload">
-                    <Button size="lg" asChild>
-                      <span className="cursor-pointer">
-                        Choose files
-                      </span>
-                    </Button>
-                  </label>
-                  
-                  <p className="text-sm text-muted-foreground mt-6">
-                    Maximum file size: 100MB per file
-                  </p>
-                </div>
-              </div>
+                )}
+              </PdfUploadZone>
             </section>
 
             {/* File List */}
@@ -197,7 +211,7 @@ export default function MergePDFPage() {
                     </p>
                   </div>
                   <button
-                    onClick={() => setFiles([])}
+                    onClick={clearFiles}
                     className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                   >
                     Clear all
@@ -224,6 +238,7 @@ export default function MergePDFPage() {
                           <p className="font-medium truncate">{file.name}</p>
                           <p className="text-sm text-muted-foreground">
                             {formatFileSize(file.size)}
+                            {invalidFileKeys.has(fileKey(file)) ? " · Invalid PDF" : validationsInFlight > 0 ? " · Checking..." : " · Ready"}
                           </p>
                         </div>
                       </div>
@@ -238,7 +253,7 @@ export default function MergePDFPage() {
                 </div>
 
                 {error && (
-                  <div className="mb-6 p-4 rounded-xl bg-destructive/10 border border-destructive/20 flex items-start gap-3">
+                  <div role="alert" className="mb-6 p-4 rounded-xl bg-destructive/10 border border-destructive/20 flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
                       <p className="font-medium text-destructive">Error</p>
@@ -267,13 +282,13 @@ export default function MergePDFPage() {
                 <Button
                   size="lg"
                   onClick={handleMerge}
-                  disabled={files.length < 2 || processing}
+                  disabled={files.length < 2 || processing || validationsInFlight > 0 || hasInvalidFiles}
                   className="w-full"
                 >
-                  {processing ? (
+                  {processing || validationsInFlight > 0 ? (
                     <>
                       <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      {progress ? progress.stage : 'Merging files...'}
+                      {processing ? (progress ? progress.stage : "Merging files...") : "Checking PDFs..."}
                     </>
                   ) : (
                     `Merge ${files.length} files`
@@ -303,7 +318,7 @@ export default function MergePDFPage() {
                   size="lg"
                   variant="outline"
                   onClick={() => {
-                    setFiles([]);
+                    clearFiles();
                     setCompleted(false);
                     setMergedPDF(null);
                     setError(null);

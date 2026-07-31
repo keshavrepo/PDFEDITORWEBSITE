@@ -12,6 +12,29 @@ export type CompressionLevel = 'low' | 'medium' | 'high';
 
 export const MAX_PDF_SIZE = 100 * 1024 * 1024;
 
+export function validatePDFSelection(
+  file: File,
+  maxSize = MAX_PDF_SIZE
+): { valid: boolean; error?: string } {
+  const hasPdfExtension = file.name.toLowerCase().endsWith('.pdf');
+  const hasPdfMime =
+    !file.type ||
+    file.type === 'application/pdf' ||
+    file.type === 'application/x-pdf';
+
+  if (!hasPdfExtension && !hasPdfMime) {
+    return { valid: false, error: `${file.name} is not a PDF file` };
+  }
+  if (!file.size) return { valid: false, error: `${file.name} is empty` };
+  if (file.size > maxSize) {
+    return {
+      valid: false,
+      error: `${file.name} exceeds the ${Math.round(maxSize / 1024 / 1024)}MB file limit`,
+    };
+  }
+  return { valid: true };
+}
+
 // Helper to convert Uint8Array to Blob properly
 function createPDFBlob(pdfBytes: Uint8Array): Blob {
   return new Blob([pdfBytes as unknown as BlobPart], { type: 'application/pdf' });
@@ -136,10 +159,14 @@ async function runQpdf(
 
   onProgress?.({ stage: 'Loading processor', progress: 20, total: 100 });
   const { createQpdfRunner } = await import('qpdf-run');
+  const origin = window.location.origin;
   const runner = await createQpdfRunner({
-    workerUrl: '/qpdf/worker.js',
-    qpdfJsUrl: '/qpdf/qpdf.js',
-    wasmUrl: '/qpdf/qpdf.wasm',
+    workerUrl: new URL('/qpdf/worker.js', origin).href,
+    // qpdf-run resolves these against its bundled import.meta.url. Passing
+    // absolute HTTP URLs prevents Turbopack from turning root-relative paths
+    // into file:/// URLs inside the worker.
+    qpdfJsUrl: new URL('/qpdf/qpdf.js', origin).href,
+    wasmUrl: new URL('/qpdf/qpdf.wasm', origin).href,
     timeoutMs: 120_000,
   });
 
@@ -529,18 +556,17 @@ export async function validatePDF(
   options: { allowEncrypted?: boolean; maxSize?: number } = {}
 ): Promise<{ valid: boolean; error?: string }> {
   try {
-    const isPdfName = file.name.toLowerCase().endsWith('.pdf');
-    if (file.type && file.type !== 'application/pdf' && !isPdfName) {
-      return { valid: false, error: 'File is not a PDF' };
-    }
-    if (!file.size) return { valid: false, error: 'The file is empty' };
-    if (file.size > (options.maxSize || MAX_PDF_SIZE)) {
-      return { valid: false, error: 'PDF exceeds the 100MB file limit' };
-    }
+    const selection = validatePDFSelection(
+      file,
+      options.maxSize || MAX_PDF_SIZE
+    );
+    if (!selection.valid) return selection;
 
     const arrayBuffer = await file.arrayBuffer();
-    const header = new TextDecoder('ascii').decode(arrayBuffer.slice(0, 5));
-    if (header !== '%PDF-') {
+    // ISO 32000 readers locate the PDF header near the start of the file; some
+    // valid producer output includes a BOM or whitespace before it.
+    const prefix = new TextDecoder('latin1').decode(arrayBuffer.slice(0, 1024));
+    if (!prefix.includes('%PDF-')) {
       return { valid: false, error: 'File does not contain valid PDF data' };
     }
     if (!options.allowEncrypted) await PDFDocument.load(arrayBuffer);

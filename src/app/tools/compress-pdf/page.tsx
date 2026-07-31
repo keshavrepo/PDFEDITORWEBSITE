@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AlertCircle, Download, Loader2, Upload } from "lucide-react";
 import { Navbar } from "@/components/navbar";
+import { PdfUploadZone } from "@/components/pdf-upload-zone";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -10,14 +11,17 @@ import {
   compressPDF,
   downloadBlob,
   validatePDF,
+  validatePDFSelection,
   type CompressionLevel,
   type ProcessingProgress,
 } from "@/lib/pdf-utils";
 
 export default function CompressPDFPage() {
+  const validationSequence = useRef(0);
   const [file, setFile] = useState<File | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [fileReady, setFileReady] = useState(false);
   const [compressed, setCompressed] = useState<Blob | null>(null);
   const [compressionLevel, setCompressionLevel] = useState<CompressionLevel>("medium");
   const [progress, setProgress] = useState<ProcessingProgress | null>(null);
@@ -25,15 +29,32 @@ export default function CompressPDFPage() {
 
   async function selectFile(selected?: File) {
     if (!selected) return;
-    const validation = await validatePDF(selected);
-    if (!validation.valid) return setError(validation.error || "Choose a valid PDF");
+    const sequence = ++validationSequence.current;
     setFile(selected);
     setCompressed(null);
+    setFileReady(false);
+    setValidating(true);
     setError(null);
+
+    const selection = validatePDFSelection(selected);
+    if (!selection.valid) {
+      setError(selection.error || "Choose a valid PDF");
+      setValidating(false);
+      return;
+    }
+    const validation = await validatePDF(selected);
+    if (sequence !== validationSequence.current) return;
+    if (!validation.valid) {
+      setError(validation.error || "Choose a valid PDF");
+      setValidating(false);
+      return;
+    }
+    setFileReady(true);
+    setValidating(false);
   }
 
   async function handleCompress() {
-    if (!file) return;
+    if (!file || !fileReady || validating) return;
     setProcessing(true);
     setError(null);
     try {
@@ -53,7 +74,15 @@ export default function CompressPDFPage() {
     return `${Math.round((bytes / 1024 ** index) * 100) / 100} ${units[index]}`;
   };
   const reduction = file && compressed ? Math.max(0, Math.round((1 - compressed.size / file.size) * 100)) : 0;
-  const reset = () => { setFile(null); setCompressed(null); setError(null); setProgress(null); };
+  const reset = () => {
+    validationSequence.current += 1;
+    setFile(null);
+    setCompressed(null);
+    setFileReady(false);
+    setValidating(false);
+    setError(null);
+    setProgress(null);
+  };
 
   return (
     <>
@@ -64,15 +93,25 @@ export default function CompressPDFPage() {
         {!compressed ? (
           <>
             <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-              <div onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={(event) => { event.preventDefault(); setIsDragging(false); void selectFile(event.dataTransfer.files[0]); }} className={`relative border-2 border-dashed rounded-lg p-16 transition-colors ${isDragging ? "border-foreground bg-accent" : "border-input"}`}>
-                <div className="text-center"><div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent mb-4"><Upload className="w-5 h-5" /></div><h2 className="text-lg font-semibold mb-2">{isDragging ? "Drop file here" : "Upload PDF file"}</h2><p className="text-sm text-muted-foreground mb-6">Drag and drop or click to browse</p><label htmlFor="file-upload"><Button size="lg" asChild><span className="cursor-pointer">Choose file</span></Button></label><input type="file" accept="application/pdf,.pdf" onChange={(event) => void selectFile(event.target.files?.[0])} className="sr-only" id="file-upload" /></div>
-              </div>
+              <PdfUploadZone
+                onFilesSelected={(files) => void selectFile(files[0])}
+                className="relative border-2 border-dashed rounded-lg p-16 text-center transition-colors border-input data-[dragging=true]:border-foreground"
+              >
+                {(isDragging) => (
+                  <div className={isDragging ? "-m-16 p-16 bg-accent rounded-lg" : ""}>
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-accent mb-4"><Upload className="w-5 h-5" /></div>
+                    <h2 className="text-lg font-semibold mb-2">{isDragging ? "Drop file here" : "Upload PDF file"}</h2>
+                    <p className="text-sm text-muted-foreground mb-6">Drag and drop or click to browse</p>
+                    <Button size="lg" type="button" asChild><span>Choose file</span></Button>
+                  </div>
+                )}
+              </PdfUploadZone>
             </section>
 
             {file && (
               <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
                 <Card className="p-6 mb-6">
-                  <div className="mb-6"><p className="font-medium mb-1">{file.name}</p><p className="text-sm text-muted-foreground">{formatFileSize(file.size)}</p></div>
+                  <div className="mb-6"><p className="font-medium mb-1">{file.name}</p><p className="text-sm text-muted-foreground">{formatFileSize(file.size)} · {validating ? "Checking PDF..." : fileReady ? "Ready" : "Needs attention"}</p></div>
                   <div className="space-y-3 mb-6"><p className="text-sm font-medium">Optimization level</p><div className="grid sm:grid-cols-3 gap-3">{([
                     ["low", "Low", "Maximum compatibility"],
                     ["medium", "Medium", "Balanced structure"],
@@ -81,7 +120,7 @@ export default function CompressPDFPage() {
                   <div className="p-4 bg-accent rounded-lg mb-6"><p className="text-sm font-medium">Lossless optimization</p><p className="text-xs text-muted-foreground mt-1">Actual reduction depends on the source file. Already optimized PDFs may remain the same size.</p></div>
                   {progress && <div className="mb-5"><div className="flex justify-between text-xs mb-2"><span>{progress.stage}</span><span>{Math.round((progress.progress / Math.max(progress.total, 1)) * 100)}%</span></div><div className="h-2 bg-muted rounded-full"><div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(progress.progress / Math.max(progress.total, 1)) * 100}%` }} /></div></div>}
                   {error && <div className="mb-5 flex gap-2 rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive" role="alert"><AlertCircle className="h-4 w-4 mt-0.5" />{error}</div>}
-                  <Button size="lg" onClick={() => void handleCompress()} disabled={processing} className="w-full">{processing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}{processing ? "Compressing..." : "Compress PDF"}</Button>
+                  <Button size="lg" onClick={() => void handleCompress()} disabled={processing || validating || !fileReady} className="w-full">{(processing || validating) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}{validating ? "Checking PDF..." : processing ? "Compressing..." : "Compress PDF"}</Button>
                 </Card>
               </section>
             )}

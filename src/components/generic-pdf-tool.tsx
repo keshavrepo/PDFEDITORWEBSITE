@@ -1,8 +1,9 @@
 "use client";
 
-import { ChangeEvent, useState } from "react";
+import { ChangeEvent, useRef, useState } from "react";
 import JSZip from "jszip";
 import { AlertCircle, Check, Download, FileText, Loader2, Upload, X } from "lucide-react";
+import { PdfUploadZone } from "@/components/pdf-upload-zone";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ import {
   splitPDF,
   unlockPDF,
   validatePDF,
+  validatePDFSelection,
   type ProcessingProgress,
   type TextPosition,
 } from "@/lib/pdf-utils";
@@ -42,6 +44,7 @@ async function zipBlobs(blobs: Blob[], baseName: string, extension: string) {
 
 export function GenericPdfTool({ tool }: GenericPdfToolProps) {
   const imageMode = tool.id === "image-to-pdf";
+  const validationSequence = useRef(0);
   const [file, setFile] = useState<File | null>(null);
   const [images, setImages] = useState<File[]>([]);
   const [pageCount, setPageCount] = useState(0);
@@ -54,26 +57,52 @@ export function GenericPdfTool({ tool }: GenericPdfToolProps) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [imageFormat, setImageFormat] = useState<"png" | "jpeg">("png");
   const [processing, setProcessing] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [fileReady, setFileReady] = useState(false);
   const [progress, setProgress] = useState<ProcessingProgress | null>(null);
   const [result, setResult] = useState<{ blob: Blob; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function choosePdf(selected?: File) {
     if (!selected) return;
+    const sequence = ++validationSequence.current;
+
+    // Reflect the native selection before doing any asynchronous parsing. A
+    // large document must never make the picker appear unresponsive.
+    setFile(selected);
+    setPageCount(0);
+    setFileReady(false);
+    setValidating(true);
     setError(null);
     setResult(null);
-    const allowEncrypted = tool.id === "unlock-pdf" || tool.id === "repair-pdf";
-    const validation = await validatePDF(selected, { allowEncrypted });
-    if (!validation.valid) {
-      setError(validation.error || "Choose a valid PDF");
+
+    const selection = validatePDFSelection(selected);
+    if (!selection.valid) {
+      setError(selection.error || "Choose a valid PDF");
+      setValidating(false);
       return;
     }
-    setFile(selected);
+
+    const allowEncrypted = tool.id === "unlock-pdf" || tool.id === "repair-pdf";
+    const validation = await validatePDF(selected, { allowEncrypted });
+    if (sequence !== validationSequence.current) return;
+    if (!validation.valid) {
+      setError(validation.error || "Choose a valid PDF");
+      setValidating(false);
+      return;
+    }
+
+    setFileReady(true);
+    setValidating(false);
     try {
       const metadata = await getPDFMetadata(selected);
-      setPageCount(metadata.pageCount);
+      if (sequence === validationSequence.current) {
+        setPageCount(metadata.pageCount);
+      }
     } catch {
-      setPageCount(0);
+      // Encrypted documents accepted by Unlock PDF cannot be inspected until
+      // after decryption. Their selection is still valid and processable.
+      if (sequence === validationSequence.current) setPageCount(0);
     }
   }
 
@@ -89,7 +118,10 @@ export function GenericPdfTool({ tool }: GenericPdfToolProps) {
   }
 
   async function process() {
-    if ((!file && !imageMode) || (imageMode && !images.length)) return;
+    if (
+      (!imageMode && (!file || !fileReady || validating)) ||
+      (imageMode && !images.length)
+    ) return;
     setProcessing(true);
     setError(null);
     setProgress(null);
@@ -176,7 +208,17 @@ export function GenericPdfTool({ tool }: GenericPdfToolProps) {
   }
 
   const hasInput = imageMode ? images.length > 0 : Boolean(file);
-  const reset = () => { setFile(null); setImages([]); setResult(null); setError(null); setProgress(null); };
+  const reset = () => {
+    validationSequence.current += 1;
+    setFile(null);
+    setImages([]);
+    setPageCount(0);
+    setFileReady(false);
+    setValidating(false);
+    setResult(null);
+    setError(null);
+    setProgress(null);
+  };
 
   return (
     <main className="pt-16 min-h-screen bg-gradient-to-b from-background to-muted/30">
@@ -184,12 +226,36 @@ export function GenericPdfTool({ tool }: GenericPdfToolProps) {
 
       <section className="max-w-3xl mx-auto px-6 lg:px-8 pb-12">
         {!hasInput ? (
-          <label className="block rounded-2xl border-2 border-dashed border-border/60 p-12 sm:p-16 text-center hover:bg-muted/30 cursor-pointer transition-colors"><Upload className="w-10 h-10 text-primary mx-auto mb-4" /><h2 className="text-xl font-semibold mb-2">Choose {imageMode ? "images" : "a PDF file"}</h2><p className="text-sm text-muted-foreground mb-6">{imageMode ? "JPG or PNG, up to 20MB each" : "PDF, up to 100MB"}</p><Button type="button" asChild><span>Browse files</span></Button><input className="sr-only" type="file" accept={imageMode ? "image/jpeg,image/png" : "application/pdf,.pdf"} multiple={imageMode} onChange={imageMode ? chooseImages : (event) => void choosePdf(event.target.files?.[0])} /></label>
+          imageMode ? (
+            <label className="block rounded-2xl border-2 border-dashed border-border/60 p-12 sm:p-16 text-center hover:bg-muted/30 cursor-pointer transition-colors">
+              <Upload className="w-10 h-10 text-primary mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Choose images</h2>
+              <p className="text-sm text-muted-foreground mb-6">JPG or PNG, up to 20MB each</p>
+              <Button type="button" asChild><span>Browse files</span></Button>
+              <input className="sr-only" type="file" accept="image/jpeg,image/png" multiple onChange={chooseImages} />
+            </label>
+          ) : (
+            <PdfUploadZone
+              onFilesSelected={(files) => void choosePdf(files[0])}
+              className="rounded-2xl border-2 border-dashed border-border/60 p-12 sm:p-16 text-center hover:bg-muted/30 transition-colors"
+            >
+              {(isDragging) => (
+                <>
+                  <Upload className="w-10 h-10 text-primary mx-auto mb-4" />
+                  <h2 className="text-xl font-semibold mb-2">
+                    {isDragging ? "Drop PDF here" : "Choose a PDF file"}
+                  </h2>
+                  <p className="text-sm text-muted-foreground mb-6">PDF, up to 100MB</p>
+                  <Button type="button" asChild><span>Browse files</span></Button>
+                </>
+              )}
+            </PdfUploadZone>
+          )
         ) : result ? (
           <Card className="p-10 text-center"><div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 mb-5"><Check className="h-7 w-7 text-primary" /></div><h2 className="text-2xl font-semibold mb-2">Your file is ready</h2><p className="text-sm text-muted-foreground mb-7">{result.name}</p><div className="flex flex-col sm:flex-row justify-center gap-3"><Button onClick={() => downloadBlob(result.blob, result.name)}><Download className="mr-2 h-4 w-4" />Download</Button><Button variant="outline" onClick={reset}>Process another file</Button></div></Card>
         ) : (
           <Card className="p-6 sm:p-8 space-y-6">
-            <div className="flex items-start justify-between gap-3"><div><h2 className="font-semibold">{imageMode ? `${images.length} images selected` : file?.name}</h2><p className="text-xs text-muted-foreground mt-1">{imageMode ? "Images are added in file-picker order" : `${pageCount || "Unknown"} pages`}</p></div><button onClick={reset} className="p-2 rounded-lg hover:bg-accent" aria-label="Remove file"><X className="h-4 w-4" /></button></div>
+            <div className="flex items-start justify-between gap-3"><div><h2 className="font-semibold">{imageMode ? `${images.length} images selected` : file?.name}</h2><p className="text-xs text-muted-foreground mt-1">{imageMode ? "Images are added in file-picker order" : validating ? "Checking PDF..." : pageCount ? `${pageCount} ${pageCount === 1 ? "page" : "pages"}` : fileReady ? "Ready to process" : "PDF needs attention"}</p></div><button onClick={reset} className="p-2 rounded-lg hover:bg-accent" aria-label="Remove file"><X className="h-4 w-4" /></button></div>
 
             {tool.id === "pdf-to-image" && <div className="space-y-2"><label className="text-sm font-medium" htmlFor="format">Image format</label><select id="format" value={imageFormat} onChange={(event) => setImageFormat(event.target.value as "png" | "jpeg")} className={fieldClass}><option value="png">PNG</option><option value="jpeg">JPG</option></select></div>}
             {(tool.id === "rotate-pdf" || tool.id === "delete-pages") && <div className="space-y-2"><label className="text-sm font-medium" htmlFor="pages">{tool.id === "rotate-pdf" ? "Pages (leave blank for all)" : "Pages to delete"}</label><Input id="pages" value={pages} onChange={(event) => setPages(event.target.value)} placeholder="1, 3-5" required={tool.id === "delete-pages"} /><p className="text-xs text-muted-foreground">Use commas and ranges between 1 and {pageCount}.</p></div>}
@@ -201,7 +267,7 @@ export function GenericPdfTool({ tool }: GenericPdfToolProps) {
             {tool.id === "sign-pdf" && <p className="text-xs text-muted-foreground">This adds a visual signature. It is not a certificate-backed cryptographic digital signature.</p>}
             {progress && <div><div className="flex justify-between text-xs mb-2"><span>{progress.stage}</span><span>{Math.round((progress.progress / Math.max(progress.total, 1)) * 100)}%</span></div><div className="h-2 rounded-full bg-muted overflow-hidden"><div className="h-full bg-primary transition-all" style={{ width: `${(progress.progress / Math.max(progress.total, 1)) * 100}%` }} /></div></div>}
             {error && <div className="flex gap-2 rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive" role="alert"><AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />{error}</div>}
-            <Button size="lg" className="w-full" onClick={() => void process()} disabled={processing}>{processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{processing ? "Processing..." : tool.name}</Button>
+            <Button size="lg" className="w-full" onClick={() => void process()} disabled={processing || validating || (!imageMode && !fileReady)}>{(processing || validating) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{validating ? "Checking PDF..." : processing ? "Processing..." : tool.name}</Button>
           </Card>
         )}
       </section>
