@@ -57,13 +57,14 @@ export function hasAdjustments(a: Adjustments): boolean {
     a.invert > 0 ||
     a.sepia > 0 ||
     a.thresholdEnabled ||
-    a.noiseReduction > 0
+    a.noiseReduction > 0 ||
+    a.pixelate > 0
   );
 }
 
 /** True when the adjustment needs neighbouring pixels (and so a full buffer). */
 export function hasSpatialAdjustments(a: Adjustments): boolean {
-  return a.blur > 0 || a.sharpen > 0 || a.noiseReduction > 0;
+  return a.blur > 0 || a.sharpen > 0 || a.noiseReduction > 0 || a.pixelate > 0;
 }
 
 /**
@@ -92,6 +93,7 @@ export function adjustmentsKey(a: Adjustments): string {
     a.sepia,
     a.thresholdEnabled ? a.threshold : "x",
     a.noiseReduction,
+    a.pixelate,
   ].join(",");
 }
 
@@ -555,6 +557,74 @@ function median9(v: number[]): number {
 }
 
 /**
+ * Mosaic (pixelate) filter.
+ *
+ * Averages each cell and writes the mean back across the whole cell. Unlike a
+ * blur this is genuinely irreversible once flattened, which is why redaction
+ * work in the screenshot editor uses it rather than a heavy blur: a blurred
+ * region can often be recovered by deconvolution, an averaged block cannot.
+ *
+ * Alpha is averaged alongside colour so the filter behaves correctly on
+ * partially transparent layers, and colour is weighted by alpha so fully
+ * transparent pixels contribute no colour to the cell mean.
+ */
+export function pixelate(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  cellSize: number
+): void {
+  const cell = Math.max(1, Math.round(cellSize));
+  if (cell <= 1 || width < 1 || height < 1) return;
+
+  for (let cellY = 0; cellY < height; cellY += cell) {
+    const maxY = Math.min(cellY + cell, height);
+
+    for (let cellX = 0; cellX < width; cellX += cell) {
+      const maxX = Math.min(cellX + cell, width);
+
+      let sumR = 0;
+      let sumG = 0;
+      let sumB = 0;
+      let sumA = 0;
+      let weight = 0;
+      let count = 0;
+
+      for (let y = cellY; y < maxY; y++) {
+        for (let x = cellX; x < maxX; x++) {
+          const index = (y * width + x) * 4;
+          const alpha = data[index + 3];
+          // Weighting by alpha stops transparent black dragging the mean down.
+          sumR += data[index] * alpha;
+          sumG += data[index + 1] * alpha;
+          sumB += data[index + 2] * alpha;
+          sumA += alpha;
+          weight += alpha;
+          count++;
+        }
+      }
+
+      if (!count) continue;
+
+      const meanA = sumA / count;
+      const meanR = weight > 0 ? sumR / weight : 0;
+      const meanG = weight > 0 ? sumG / weight : 0;
+      const meanB = weight > 0 ? sumB / weight : 0;
+
+      for (let y = cellY; y < maxY; y++) {
+        for (let x = cellX; x < maxX; x++) {
+          const index = (y * width + x) * 4;
+          data[index] = meanR;
+          data[index + 1] = meanG;
+          data[index + 2] = meanB;
+          data[index + 3] = meanA;
+        }
+      }
+    }
+  }
+}
+
+/**
  * Edge-preserving noise reduction via a 3×3 median filter.
  *
  * A median removes speckle and sensor noise without the edge smearing a mean
@@ -696,6 +766,13 @@ export function applyAdjustments(
     const amount = (a.sharpen / 100) * 1.6;
     const radius = Math.max(0.5, (a.sharpen / 100) * MAX_SHARPEN_RADIUS * scale);
     unsharpMask(data, width, height, amount, radius);
+  }
+
+  // Last, so the mosaic blocks stay perfectly flat. Running it earlier would
+  // let the tone curve or sharpening reintroduce variation inside a cell and
+  // leave a faint ghost of the content the block is meant to hide.
+  if (a.pixelate > 0) {
+    pixelate(data, width, height, a.pixelate * scale);
   }
 }
 

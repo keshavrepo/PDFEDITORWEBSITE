@@ -17,13 +17,19 @@ import {
   Type,
   Zap,
 } from "lucide-react";
-import { ADJUSTMENTS, EDITOR_TOOLS, EXPORT_FORMATS } from "@/lib/imagepilot/core";
+import {
+  ADJUSTMENTS,
+  EDITOR_TOOLS,
+  EXPORT_FORMATS,
+  workspaceHref,
+  workspaces,
+} from "@/lib/imagepilot/core";
 import { getProduct, platform } from "@/lib/products";
 import { getAppUrl } from "@/lib/env";
 
 const product = getProduct("imagepilot");
 const url = `${getAppUrl()}/products/imagepilot`;
-const description = `ImagePilot is a professional image editor that runs entirely in your browser: layers, undo history, ${ADJUSTMENTS.length} non-destructive image operations, editable text, shapes, and PNG, JPG, WEBP and SVG export.`;
+const description = `ImagePilot is a professional image editor that runs entirely in your browser: layers, undo history, ${ADJUSTMENTS.length} non-destructive image operations, editable text and shapes, plus focused studios for screenshots, watermarks, passport photos and compression.`;
 
 export const metadata: Metadata = {
   title: `ImagePilot — Browser Image Editor | ${platform.name}`,
@@ -176,6 +182,40 @@ export default async function ImagePilotProductPage() {
                 <h2 className="mb-2 text-lg font-semibold">{item.title}</h2>
                 <p className="text-sm leading-relaxed text-muted-foreground">{item.body}</p>
               </Card>
+            ))}
+          </div>
+
+          <h2 className="mb-6 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Tools
+          </h2>
+          <div className="mb-16 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {workspaces.map((workspace) => (
+              <Link key={workspace.id} href={workspaceHref(workspace)}>
+                <Card className="group h-full cursor-pointer p-6 transition-colors hover:bg-accent">
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <h3 className="font-semibold transition-transform group-hover:translate-x-0.5">
+                      {workspace.name}
+                    </h3>
+                    <ArrowRight
+                      className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+                      aria-hidden="true"
+                    />
+                  </div>
+                  <p className="mb-3 text-sm leading-relaxed text-muted-foreground">
+                    {workspace.description}
+                  </p>
+                  <ul className="flex flex-wrap gap-1.5">
+                    {workspace.highlights.map((highlight) => (
+                      <li
+                        key={highlight}
+                        className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+                      >
+                        {highlight}
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              </Link>
             ))}
           </div>
 

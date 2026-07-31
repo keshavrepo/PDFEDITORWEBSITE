@@ -1635,6 +1635,721 @@ await test("reordering through the reducer records history", () => {
 
 /* -------------------------------------------------------------------------- */
 
+suite("Workspaces");
+
+await test("every workspace is well formed and routes uniquely", () => {
+  const slugs = new Set();
+  for (const workspace of core.workspaces) {
+    assert(workspace.id && workspace.name, "expected an id and name");
+    assert(workspace.panels.length > 0, `${workspace.id}: expected at least one panel`);
+    assert(workspace.keywords.length > 0, `${workspace.id}: expected search keywords`);
+    assert(workspace.highlights.length > 0, `${workspace.id}: expected highlights`);
+    assert(
+      ["png", "jpeg", "webp", "svg"].includes(workspace.defaultFormat),
+      `${workspace.id}: unknown default format`
+    );
+    assert(!slugs.has(workspace.slug), `duplicate slug ${workspace.slug}`);
+    slugs.add(workspace.slug);
+  }
+  assert(core.workspaces.length === 5, `expected five workspaces, got ${core.workspaces.length}`);
+});
+
+await test("focused workspaces expose only real tools", () => {
+  const known = new Set(core.EDITOR_TOOLS.map((tool) => tool.id));
+  for (const workspace of core.workspaces) {
+    if (workspace.tools === null) continue;
+    assert(workspace.tools.length > 0, `${workspace.id}: expected a non-empty tool list`);
+    for (const tool of workspace.tools) {
+      assert(known.has(tool), `${workspace.id}: unknown tool ${tool}`);
+    }
+  }
+  // The full editor must keep every tool.
+  assert(core.getWorkspace("editor").tools === null, "expected the editor to expose all tools");
+});
+
+await test("workspace lookup and hrefs resolve", () => {
+  assert(core.getWorkspace("screenshot").name === "Screenshot Editor", "expected lookup by id");
+  assert(core.getWorkspaceBySlug("compressor")?.id === "compress", "expected lookup by slug");
+  assert(core.getWorkspaceBySlug("nope") === undefined, "expected an unknown slug to be undefined");
+  assert(core.workspaceHref(core.getWorkspace("editor")) === "/imagepilot", "editor route");
+  assert(
+    core.workspaceHref(core.getWorkspace("watermark")) === "/imagepilot/watermark-studio",
+    "watermark route"
+  );
+  assert(core.focusedWorkspaces.length === 4, "expected four focused workspaces");
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Pixelate");
+
+await test("pixelate averages each cell to a flat block", async () => {
+  const raster = makeSplitRaster("split", 40, 40, "#000000", "#ffffff");
+  let doc = core.createDocument(40, 40, { background: null });
+  const layer = core.createImageLayer("Photo", "split", { x: 0, y: 0, width: 40, height: 40 }, {
+    width: 40,
+    height: 40,
+  });
+  layer.adjustments = core.createAdjustments({ pixelate: 10 });
+  doc = core.addLayer(doc, layer);
+
+  const { data, width } = await renderToPixels(doc, makeRasterStore([raster]), { transparent: true });
+
+  // Every pixel inside one cell must be identical.
+  const corner = pixelAt(data, width, 1, 1);
+  for (const [x, y] of [[2, 3], [8, 8], [5, 9]]) {
+    const sample = pixelAt(data, width, x, y);
+    assert(
+      sample[0] === corner[0] && sample[1] === corner[1],
+      `expected a flat cell, got ${sample} vs ${corner}`
+    );
+  }
+  // The left cells stay dark and the right cells stay light.
+  assert(pixelAt(data, width, 5, 20)[0] < 40, "expected the dark half to stay dark");
+  assertGreater(pixelAt(data, width, 35, 20)[0], 215, "expected the light half to stay light");
+});
+
+await test("pixelate destroys fine detail that blur only softens", async () => {
+  // Fine striping stands in for small text: the worst case for anyone trying
+  // to recover content that was meant to be hidden. It has to live in a single
+  // raster so the filter has neighbouring detail to average across.
+  const size = 48;
+  const striped = (() => {
+    const { canvas, ctx } = nodeCanvasFactory.create(size, size);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = "#000000";
+    for (let y = 0; y < size; y += 4) ctx.fillRect(0, y, size, 2);
+    return { id: "striped", width: size, height: size, image: canvas };
+  })();
+
+  async function detailVariance(adjustments) {
+    let doc = core.createDocument(size, size, { background: "#ffffff" });
+    const layer = core.createImageLayer("Stripes", "striped", { x: 0, y: 0, width: size, height: size }, {
+      width: size,
+      height: size,
+    });
+    layer.adjustments = core.createAdjustments(adjustments);
+    doc = core.addLayer(doc, layer);
+    const { data } = await renderToPixels(doc, makeRasterStore([striped]));
+    return luminanceDeviation(data);
+  }
+
+  const plain = await detailVariance({});
+  const pixelated = await detailVariance({ pixelate: 16 });
+  const blurred = await detailVariance({ blur: 12 });
+
+  assertGreater(plain, 90, "expected the striped source to be high contrast");
+  assert(
+    pixelated < plain * 0.35,
+    `expected pixelation to destroy the detail: ${plain.toFixed(1)} -> ${pixelated.toFixed(1)}`
+  );
+  assert(
+    blurred < plain,
+    `expected blur to reduce detail too: ${plain.toFixed(1)} -> ${blurred.toFixed(1)}`
+  );
+});
+
+await test("pixelate is registered as a detail adjustment", () => {
+  const entry = core.ADJUSTMENTS.find((a) => a.key === "pixelate");
+  assert(entry, "expected a pixelate descriptor");
+  assert(entry.group === "detail", "expected it grouped with detail");
+  assert(entry.neutral === 0, "expected 0 to be neutral");
+  assert(core.createAdjustments().pixelate === 0, "expected the default to be off");
+  assert(core.hasAdjustments(core.createAdjustments({ pixelate: 8 })), "expected it to count");
+  assert(
+    core.hasSpatialAdjustments(core.createAdjustments({ pixelate: 8 })),
+    "expected it to be spatial"
+  );
+});
+
+await test("pixelate leaves fully transparent regions alone", async () => {
+  let doc = core.createDocument(40, 40, { background: null });
+  const layer = core.createShapeLayer("ellipse", { x: 10, y: 10, width: 20, height: 20 }, {
+    fill: "#ff0000",
+    strokeWidth: 0,
+  });
+  layer.adjustments = core.createAdjustments({ pixelate: 6 });
+  doc = core.addLayer(doc, layer);
+
+  const { data, width } = await renderToPixels(doc, makeRasterStore(), { transparent: true });
+  // The far corner is outside the shape entirely and must stay clear.
+  assert(pixelAt(data, width, 1, 38)[3] === 0, "expected the empty corner untouched");
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Watermark studio");
+
+/** Rough text measurer standing in for a canvas context. */
+const measure = (fontSize) => fontSize * 5;
+
+await test("places a single watermark at each corner preset", () => {
+  const settings = { ...core.defaultWatermarkSettings, scale: 0.1, margin: 0.05 };
+  const width = 1000;
+  const height = 800;
+
+  const topLeft = core.buildWatermarkLayers({ ...settings, position: "top-left" }, width, height, measure);
+  const bottomRight = core.buildWatermarkLayers(
+    { ...settings, position: "bottom-right" },
+    width,
+    height,
+    measure
+  );
+  const centre = core.buildWatermarkLayers({ ...settings, position: "center" }, width, height, measure);
+
+  assert(topLeft.length === 1 && bottomRight.length === 1, "expected one layer each");
+
+  assert(topLeft[0].x < width / 2 && topLeft[0].y < height / 2, "expected the top-left corner");
+  assertGreater(bottomRight[0].x, width / 2, "expected the right side");
+  assertGreater(bottomRight[0].y, height / 2, "expected the bottom");
+
+  // Centre must actually be centred.
+  assertClose(centre[0].x + centre[0].width / 2, width / 2, 1, "centred horizontally");
+  assertClose(centre[0].y + centre[0].height / 2, height / 2, 1, "centred vertically");
+});
+
+await test("watermark honours opacity, rotation and scale", () => {
+  const settings = {
+    ...core.defaultWatermarkSettings,
+    opacity: 0.3,
+    rotation: 45,
+    scale: 0.2,
+  };
+  const [layer] = core.buildWatermarkLayers(settings, 1000, 1000, measure);
+
+  assertClose(layer.opacity, 0.3, 1e-9, "opacity");
+  assert(layer.rotation === 45, "rotation");
+  // scale 0.2 of a 1000px shorter side gives a 200px cap height.
+  assertClose(layer.fontSize, 200, 1, "font size follows scale");
+
+  const smaller = core.buildWatermarkLayers({ ...settings, scale: 0.05 }, 1000, 1000, measure);
+  assert(smaller[0].fontSize < layer.fontSize, "expected a smaller scale to shrink the mark");
+});
+
+await test("scale is relative so one setting suits mixed resolutions", () => {
+  const settings = { ...core.defaultWatermarkSettings, scale: 0.1 };
+  const [small] = core.buildWatermarkLayers(settings, 500, 500, measure);
+  const [large] = core.buildWatermarkLayers(settings, 2000, 2000, measure);
+
+  // Four times the canvas should give four times the mark.
+  assertClose(large.fontSize / small.fontSize, 4, 0.01, "proportional sizing");
+});
+
+await test("tiling covers the canvas and stays bounded", () => {
+  const settings = { ...core.defaultWatermarkSettings, position: "tile", scale: 0.08 };
+  const layers = core.buildWatermarkLayers(settings, 1200, 900, measure);
+
+  assertGreater(layers.length, 4, "expected several tiles");
+  assert(layers.length <= 400, `expected the tile count capped, got ${layers.length}`);
+
+  // Tiles must span the canvas in both axes.
+  const xs = layers.map((l) => l.x);
+  const ys = layers.map((l) => l.y);
+  assert(Math.min(...xs) < 1200 * 0.3, "expected tiles on the left");
+  assertGreater(Math.max(...xs), 1200 * 0.5, "expected tiles on the right");
+  assert(Math.min(...ys) < 900 * 0.3, "expected tiles at the top");
+  assertGreater(Math.max(...ys), 900 * 0.5, "expected tiles at the bottom");
+});
+
+await test("a very small tile scale cannot explode the layer count", () => {
+  const settings = {
+    ...core.defaultWatermarkSettings,
+    position: "tile",
+    scale: 0.005,
+    tileGap: 0,
+  };
+  const layers = core.buildWatermarkLayers(settings, 4000, 4000, measure);
+  assert(layers.length <= 400, `expected a hard cap, got ${layers.length}`);
+  assertGreater(layers.length, 0, "expected it to still produce tiles");
+});
+
+await test("image watermarks keep the logo aspect ratio", () => {
+  const logo = { id: "logo", width: 400, height: 100, image: null };
+  const settings = { ...core.defaultWatermarkSettings, kind: "image", imageSourceId: "logo" };
+  const [layer] = core.buildWatermarkLayers(settings, 1000, 1000, measure, logo);
+
+  assert(layer.type === "image", "expected an image layer");
+  assertClose(layer.width / layer.height, 4, 0.01, "expected a 4:1 logo to stay 4:1");
+  assert(layer.sourceId === "logo", "expected the logo raster referenced");
+
+  const tall = { id: "tall", width: 100, height: 400, image: null };
+  const [tallLayer] = core.buildWatermarkLayers(settings, 1000, 1000, measure, tall);
+  assertClose(tallLayer.width / tallLayer.height, 0.25, 0.01, "expected a 1:4 logo to stay 1:4");
+});
+
+await test("an image watermark without a logo produces nothing", () => {
+  const settings = { ...core.defaultWatermarkSettings, kind: "image", imageSourceId: null };
+  assert(core.buildWatermarkLayers(settings, 500, 500, measure).length === 0, "expected no layers");
+});
+
+await test("an empty text watermark produces nothing", () => {
+  const settings = { ...core.defaultWatermarkSettings, text: "   " };
+  assert(core.buildWatermarkLayers(settings, 500, 500, measure).length === 0, "expected no layers");
+});
+
+await test("applying a watermark replaces the previous one", () => {
+  let doc = core.createDocument(800, 600);
+  doc = core.addLayer(
+    doc,
+    core.createImageLayer("Photo", "photo", { x: 0, y: 0, width: 800, height: 600 }, {
+      width: 800,
+      height: 600,
+    })
+  );
+
+  const first = core.applyWatermark(doc, core.defaultWatermarkSettings, measure);
+  const firstCount = first.layers.length;
+  assertGreater(firstCount, 1, "expected the watermark added");
+
+  const second = core.applyWatermark(first, core.defaultWatermarkSettings, measure);
+  assert(
+    second.layers.length === firstCount,
+    `expected the old watermark replaced, went ${firstCount} -> ${second.layers.length}`
+  );
+
+  // The user's own photo must survive both applications.
+  assert(second.layers[0].name === "Photo", "expected the base layer preserved");
+
+  const stripped = core.stripWatermarks(second);
+  assert(stripped.layers.length === 1, "expected only the photo to remain");
+});
+
+await test("watermarks render as visible pixels over an image", async () => {
+  const photo = makeSolidRaster("photo", 200, 200, "#000000");
+  let doc = core.createDocument(200, 200, { background: null });
+  doc = core.addLayer(
+    doc,
+    core.createImageLayer("Photo", "photo", { x: 0, y: 0, width: 200, height: 200 }, {
+      width: 200,
+      height: 200,
+    })
+  );
+
+  const { ctx } = nodeCanvasFactory.create(8, 8);
+  const measureReal = (fontSize) => {
+    ctx.font = `700 ${fontSize}px sans-serif`;
+    return ctx.measureText("WATERMARK").width;
+  };
+
+  const marked = core.applyWatermark(
+    doc,
+    {
+      ...core.defaultWatermarkSettings,
+      text: "WATERMARK",
+      position: "center",
+      opacity: 1,
+      color: "#ffffff",
+      scale: 0.12,
+    },
+    measureReal
+  );
+
+  const { data } = await renderToPixels(marked, makeRasterStore([photo]), { transparent: true });
+  let bright = 0;
+  for (let i = 0; i < data.length; i += 4) if (data[i] > 200) bright++;
+  assertGreater(bright, 50, "expected visible white watermark pixels over the black photo");
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Passport photo studio");
+
+await test("specifications are internally consistent", () => {
+  assertGreater(core.PASSPORT_SPECS.length, 5, "expected several countries");
+  const ids = new Set();
+  for (const spec of core.PASSPORT_SPECS) {
+    assert(!ids.has(spec.id), `duplicate spec id ${spec.id}`);
+    ids.add(spec.id);
+    assertGreater(spec.widthMm, 0, `${spec.id}: width`);
+    assertGreater(spec.heightMm, 0, `${spec.id}: height`);
+    assert(spec.headMin < spec.headMax, `${spec.id}: expected a valid head range`);
+    assert(spec.headMax < 1, `${spec.id}: head cannot exceed the photo`);
+    assert(spec.backgrounds.length > 0, `${spec.id}: expected a background colour`);
+    // The whole head plus its top gap must fit inside the photo.
+    assert(
+      spec.crownGap + spec.headMax <= 1,
+      `${spec.id}: crown gap plus head height overflows the photo`
+    );
+  }
+});
+
+await test("millimetres convert to pixels at the chosen resolution", () => {
+  // 51 mm at 300 dpi is 51/25.4*300 = 602 px.
+  assertClose(core.mmToPx(51, 300), 602, 1, "51mm at 300dpi");
+  assertClose(core.mmToPx(25.4, 300), 300, 0.5, "one inch at 300dpi");
+  assertClose(core.mmToPx(25.4, 600), 600, 0.5, "one inch at 600dpi");
+
+  const spec = core.PASSPORT_SPECS.find((s) => s.id === "uk-passport");
+  const size = core.specPixelSize(spec, 300);
+  assertClose(size.width, 413, 2, "UK width at 300dpi");
+  assertClose(size.height, 531, 2, "UK height at 300dpi");
+});
+
+await test("head guides sit inside the photo and in the right order", () => {
+  for (const spec of core.PASSPORT_SPECS) {
+    const guide = core.headGuide(spec);
+    assert(guide.crownY >= 0, `${spec.id}: crown above the photo`);
+    assert(guide.chinY <= 1, `${spec.id}: chin below the photo`);
+    assert(guide.crownY < guide.eyeY, `${spec.id}: eyes must be below the crown`);
+    assert(guide.eyeY < guide.chinY, `${spec.id}: chin must be below the eyes`);
+    assert(guide.chinMinY < guide.chinMaxY, `${spec.id}: expected a tolerance band`);
+    // The ideal chin must fall inside its own tolerance band.
+    assert(
+      guide.chinY >= guide.chinMinY - 1e-9 && guide.chinY <= guide.chinMaxY + 1e-9,
+      `${spec.id}: ideal chin outside the permitted band`
+    );
+  }
+});
+
+await test("auto-crop covers the frame and positions the head", () => {
+  const spec = core.PASSPORT_SPECS.find((s) => s.id === "us-passport");
+  const target = core.specPixelSize(spec, 300);
+  const rect = core.fitPortrait(spec, 1200, 1600, target.width, target.height);
+
+  // Must cover the whole photo area, leaving no background gap.
+  assert(rect.x <= 0.01, `expected full width coverage, x=${rect.x}`);
+  assert(rect.x + rect.width >= target.width - 0.01, "expected full width coverage");
+  assertGreater(rect.width, 0, "expected a positive size");
+
+  // A landscape source must also cover.
+  const wide = core.fitPortrait(spec, 2000, 800, target.width, target.height);
+  assert(wide.width >= target.width - 0.01, "expected a wide source to cover");
+  assert(wide.height >= target.height - 0.01, "expected a wide source to cover");
+});
+
+await test("print sheets fit multiple copies and never overlap", () => {
+  const spec = core.PASSPORT_SPECS.find((s) => s.id === "uk-passport");
+  const sheet = core.PRINT_SHEETS.find((s) => s.id === "4x6");
+  const layout = core.planPrintSheet(spec, sheet, 300, 8);
+
+  assertGreater(layout.capacity, 1, "expected more than one copy on 4x6");
+  assert(layout.cells.length === Math.min(8, layout.capacity), "expected the requested copies");
+
+  // No two cells may overlap.
+  for (let i = 0; i < layout.cells.length; i++) {
+    for (let j = i + 1; j < layout.cells.length; j++) {
+      const a = layout.cells[i];
+      const b = layout.cells[j];
+      const overlap =
+        a.x < b.x + b.width &&
+        b.x < a.x + a.width &&
+        a.y < b.y + b.height &&
+        b.y < a.y + a.height;
+      assert(!overlap, `cells ${i} and ${j} overlap`);
+    }
+  }
+
+  // Every cell must sit inside the sheet.
+  for (const cell of layout.cells) {
+    assert(cell.x >= -0.5 && cell.y >= -0.5, "cell outside the sheet");
+    assert(cell.x + cell.width <= layout.width + 0.5, "cell past the right edge");
+    assert(cell.y + cell.height <= layout.height + 0.5, "cell past the bottom edge");
+  }
+});
+
+await test("print sheet picks the orientation that fits more copies", () => {
+  const spec = core.PASSPORT_SPECS.find((s) => s.id === "uk-passport");
+  const sheet = core.PRINT_SHEETS.find((s) => s.id === "4x6");
+  const layout = core.planPrintSheet(spec, sheet, 300, 100);
+  // A 35x45mm photo on 4x6in paper fits at least 6 either way.
+  assertGreater(layout.capacity, 5, `expected a sensible capacity, got ${layout.capacity}`);
+  assert(layout.columns * layout.rows === layout.capacity, "expected capacity to match the grid");
+});
+
+await test("requesting more copies than fit is clamped", () => {
+  const spec = core.PASSPORT_SPECS.find((s) => s.id === "canada-passport");
+  const sheet = core.PRINT_SHEETS.find((s) => s.id === "4x6");
+  const layout = core.planPrintSheet(spec, sheet, 300, 999);
+  assert(layout.cells.length === layout.capacity, "expected clamping to capacity");
+});
+
+await test("guide layers are locked and strippable", () => {
+  const spec = core.PASSPORT_SPECS[0];
+  const layers = core.buildGuideLayers(spec, 600, 600);
+
+  assertGreater(layers.length, 3, "expected several guides");
+  for (const layer of layers) {
+    assert(layer.locked, "expected guides locked so they cannot be dragged");
+    assert(core.isGuideLayer(layer), "expected the guide marker");
+  }
+
+  let doc = core.createDocument(600, 600);
+  doc = core.addLayer(doc, core.createShapeLayer("rectangle", { x: 0, y: 0, width: 10, height: 10 }));
+  const withGuides = { ...doc, layers: [...doc.layers, ...layers] };
+  const stripped = core.stripGuides(withGuides);
+
+  assert(stripped.layers.length === 1, "expected only the real layer to survive");
+  assert(!core.isGuideLayer(stripped.layers[0]), "expected the real layer kept");
+});
+
+await test("guides render without covering the photo", async () => {
+  const spec = core.PASSPORT_SPECS.find((s) => s.id === "us-passport");
+  const photo = makeSolidRaster("photo", 200, 200, "#3366cc");
+  let doc = core.createDocument(200, 200, { background: "#ffffff" });
+  doc = core.addLayer(
+    doc,
+    core.createImageLayer("Photo", "photo", { x: 0, y: 0, width: 200, height: 200 }, {
+      width: 200,
+      height: 200,
+    })
+  );
+  doc = { ...doc, layers: [...doc.layers, ...core.buildGuideLayers(spec, 200, 200)] };
+
+  const { data, width } = await renderToPixels(doc, makeRasterStore([photo]));
+  // Most of the frame must still show the photo underneath.
+  let photoPixels = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i] < 120 && data[i + 2] > 150) photoPixels++;
+  }
+  assertGreater(photoPixels, 200 * 200 * 0.6, "expected the guides to remain an overlay");
+  assert(width === 200, "expected the document size");
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Image compressor");
+
+/** Encoder backed by the real Node canvas, matching the browser contract. */
+const nodeEncoder = core.createCanvasEncoder(nodeCanvasFactory, async (canvas, mimeType, quality) => {
+  const buffer =
+    mimeType === "image/jpeg"
+      ? canvas.toBuffer("image/jpeg", quality === undefined ? undefined : Math.round(quality * 100))
+      : mimeType === "image/webp"
+        ? canvas.toBuffer("image/webp", quality === undefined ? undefined : Math.round(quality * 100))
+        : canvas.toBuffer("image/png");
+  return new Blob([buffer], { type: mimeType });
+});
+
+/** A detailed source: flat colour would compress identically at every quality. */
+function makeDetailedCanvas(size = 256) {
+  const { canvas, ctx } = nodeCanvasFactory.create(size, size);
+  const gradient = ctx.createLinearGradient(0, 0, size, size);
+  gradient.addColorStop(0, "#1e3a8a");
+  gradient.addColorStop(0.5, "#f59e0b");
+  gradient.addColorStop(1, "#be123c");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+  // Fine detail so quality genuinely changes the encoded size.
+  let seed = 7;
+  for (let i = 0; i < 3000; i++) {
+    seed = (seed * 16807) % 2147483647;
+    const x = seed % size;
+    seed = (seed * 16807) % 2147483647;
+    const y = seed % size;
+    ctx.fillStyle = `hsl(${(x * y) % 360},70%,${40 + (y % 40)}%)`;
+    ctx.fillRect(x, y, 3, 3);
+  }
+  return canvas;
+}
+
+await test("format helpers map mime types and losslessness", () => {
+  assert(core.formatFromMime("image/png") === "png", "png");
+  assert(core.formatFromMime("image/webp") === "webp", "webp");
+  assert(core.formatFromMime("image/jpeg") === "jpeg", "jpeg");
+  assert(core.formatFromMime("image/gif") === "jpeg", "expected an unknown type to fall back");
+
+  assert(core.isLossless("png"), "png is lossless");
+  assert(!core.isLossless("jpeg"), "jpeg is lossy");
+  assert(!core.isLossless("webp"), "webp is treated as lossy here");
+
+  assert(core.MIME_BY_FORMAT.jpeg === "image/jpeg", "jpeg mime");
+  assert(core.EXTENSION_BY_FORMAT.jpeg === "jpg", "expected jpg rather than jpeg");
+});
+
+await test("byte formatting is readable", () => {
+  assert(core.formatBytes(0) === "0 KB", "zero");
+  assert(core.formatBytes(512) === "512 B", "bytes");
+  assert(core.formatBytes(2048) === "2 KB", "kilobytes");
+  assert(core.formatBytes(1024 * 1024 * 3) === "3 MB", "megabytes");
+});
+
+await test("dimension capping preserves the aspect ratio", () => {
+  const wide = core.scaledSize(4000, 2000, 1920);
+  assert(wide.width === 1920, "expected the long edge capped");
+  assert(wide.height === 960, "expected the ratio preserved");
+
+  const tall = core.scaledSize(1000, 3000, 1500);
+  assert(tall.height === 1500, "expected the tall edge capped");
+  assert(tall.width === 500, "expected the ratio preserved");
+
+  const small = core.scaledSize(800, 600, 1920);
+  assert(small.width === 800 && small.height === 600, "expected no upscaling");
+
+  const off = core.scaledSize(4000, 2000, null);
+  assert(off.width === 4000, "expected null to disable capping");
+});
+
+await test("lower quality produces a smaller JPEG", async () => {
+  const canvas = makeDetailedCanvas();
+  const high = await core.compressImage(
+    canvas,
+    256,
+    256,
+    { ...core.defaultCompressionSettings, quality: 95 },
+    nodeEncoder
+  );
+  const low = await core.compressImage(
+    canvas,
+    256,
+    256,
+    { ...core.defaultCompressionSettings, quality: 20 },
+    nodeEncoder
+  );
+
+  assertGreater(high.blob.size, low.blob.size, "expected lower quality to be smaller");
+  assert(high.attempts === 1, "expected a single encode with no target");
+  assert(low.width === 256 && low.height === 256, "expected the size preserved");
+});
+
+await test("target size search lands under the budget", async () => {
+  const canvas = makeDetailedCanvas();
+  const full = await core.compressImage(
+    canvas,
+    256,
+    256,
+    { ...core.defaultCompressionSettings, quality: 100 },
+    nodeEncoder
+  );
+
+  // Aim for roughly half the full-quality size.
+  const target = Math.floor(full.blob.size * 0.5);
+  const result = await core.compressImage(
+    canvas,
+    256,
+    256,
+    { ...core.defaultCompressionSettings, targetBytes: target },
+    nodeEncoder
+  );
+
+  assert(result.blob.size <= target, `expected <= ${target}, got ${result.blob.size}`);
+  assert(!result.missedTarget, "expected the target to be met");
+  assertGreater(result.attempts, 1, "expected a search");
+  assert(result.attempts <= 9, `expected a bounded search, got ${result.attempts}`);
+  assertGreater(result.quality, 0, "expected a real quality value");
+});
+
+await test("target search returns the highest quality that fits", async () => {
+  const canvas = makeDetailedCanvas();
+  const full = await core.compressImage(
+    canvas,
+    256,
+    256,
+    { ...core.defaultCompressionSettings, quality: 100 },
+    nodeEncoder
+  );
+  const target = Math.floor(full.blob.size * 0.6);
+  const result = await core.compressImage(
+    canvas,
+    256,
+    256,
+    { ...core.defaultCompressionSettings, targetBytes: target },
+    nodeEncoder
+  );
+
+  // One quality point higher should breach the budget, proving the search did
+  // not simply stop at the first value that happened to fit.
+  const higher = await core.compressImage(
+    canvas,
+    256,
+    256,
+    { ...core.defaultCompressionSettings, quality: Math.min(100, result.quality + 6) },
+    nodeEncoder
+  );
+  assertGreater(higher.blob.size, result.blob.size, "expected higher quality to be larger");
+});
+
+await test("an impossible target reports the miss instead of lying", async () => {
+  const canvas = makeDetailedCanvas();
+  const result = await core.compressImage(
+    canvas,
+    256,
+    256,
+    { ...core.defaultCompressionSettings, targetBytes: 10 },
+    nodeEncoder
+  );
+  assert(result.missedTarget, "expected the miss to be reported");
+  assertGreater(result.blob.size, 0, "expected bytes to still be produced");
+});
+
+await test("PNG ignores quality and stays lossless", async () => {
+  const canvas = makeDetailedCanvas(128);
+  const a = await core.compressImage(
+    canvas,
+    128,
+    128,
+    { ...core.defaultCompressionSettings, format: "png", quality: 10 },
+    nodeEncoder
+  );
+  const b = await core.compressImage(
+    canvas,
+    128,
+    128,
+    { ...core.defaultCompressionSettings, format: "png", quality: 95 },
+    nodeEncoder
+  );
+
+  assert(a.blob.size === b.blob.size, "expected PNG output to ignore quality");
+  assert(a.quality === 100, "expected lossless to report full quality");
+  assert(a.attempts === 1, "expected no search for a lossless format");
+});
+
+await test("downscaling shrinks the output", async () => {
+  const canvas = makeDetailedCanvas(512);
+  const full = await core.compressImage(
+    canvas,
+    512,
+    512,
+    { ...core.defaultCompressionSettings, quality: 85 },
+    nodeEncoder
+  );
+  const scaled = await core.compressImage(
+    canvas,
+    512,
+    512,
+    { ...core.defaultCompressionSettings, quality: 85, maxDimension: 128 },
+    nodeEncoder
+  );
+
+  assert(scaled.width === 128, "expected the capped width");
+  assertGreater(full.blob.size, scaled.blob.size, "expected downscaling to shrink the file");
+});
+
+await test("encodes real bytes for every offered format", async () => {
+  const canvas = makeDetailedCanvas(64);
+  for (const format of ["jpeg", "png", "webp"]) {
+    const result = await core.compressImage(
+      canvas,
+      64,
+      64,
+      { ...core.defaultCompressionSettings, format, quality: 80 },
+      nodeEncoder
+    );
+    assertGreater(result.blob.size, 20, `${format}: expected real bytes`);
+    assert(result.blob.type === core.MIME_BY_FORMAT[format], `${format}: expected the mime type`);
+  }
+});
+
+await test("savings are reported and never negative", () => {
+  assert(core.savingsPercent(1000, 250) === 75, "expected 75%");
+  assert(core.savingsPercent(1000, 1000) === 0, "expected no saving");
+  assert(core.savingsPercent(1000, 1500) === 0, "expected a larger output to clamp to zero");
+  assert(core.savingsPercent(0, 100) === 0, "expected division by zero to be handled");
+});
+
+await test("presets are well formed", () => {
+  for (const preset of core.TARGET_SIZE_PRESETS) {
+    assertGreater(preset.bytes, 0, `${preset.label}: expected a positive size`);
+  }
+  const original = core.DIMENSION_PRESETS.find((p) => p.value === null);
+  assert(original, "expected an 'Original' option");
+  for (const preset of core.DIMENSION_PRESETS) {
+    assert(preset.value === null || preset.value > 0, `${preset.label}: bad dimension`);
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+
 suite("End-to-end composition");
 
 await test("builds, edits and exports a multi-layer composition", async () => {

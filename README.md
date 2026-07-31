@@ -9,7 +9,9 @@ tools for securely processing documents without uploading them.
 
 **ImagePilot** is the second: a professional image editor with layers, undo
 history, non-destructive adjustments, text and shapes, exporting to PNG, JPG,
-WEBP and SVG.
+WEBP and SVG. Four focused studios — Screenshot Editor, Watermark Studio,
+Passport Photo Studio and Image Compressor — are configurations of that same
+editor rather than separate applications.
 
 DevPilot, OfficePilot, WebPilot, FinancePilot and AIPilot are registered on the
 platform and marked as coming soon.
@@ -50,6 +52,10 @@ new module inherits them rather than reimplementing them:
 | `/tools` | PDFPilot tool directory (unchanged) |
 | `/tools/*` | Individual PDF tools (unchanged) |
 | `/imagepilot` | ImagePilot image editor |
+| `/imagepilot/screenshot-editor` | Annotate and redact screenshots |
+| `/imagepilot/watermark-studio` | Text and logo watermarks, single or batch |
+| `/imagepilot/passport-photo` | Compliant ID photos and print sheets |
+| `/imagepilot/compressor` | Compress JPG, PNG and WEBP |
 | `/files` | Unified file manager, shared by every product |
 | `/dashboard` | Storage, files, activity, favourites and usage |
 | `/docs` | Documentation, with guides authored in the blog CMS |
@@ -110,7 +116,7 @@ mocks:
 ```bash
 npm test                  # both suites
 npm run test:conversions  # 147 document conversion tests
-npm run test:imagepilot   # 103 image editor tests
+npm run test:imagepilot   # 141 image editor tests
 ```
 
 The conversion suite runs the real converters against generated Word,
@@ -150,6 +156,10 @@ without reimplementing any of it.
 | `renderer.ts` | Canvas compositor and text layout |
 | `export.ts` | Raster compositing and SVG serialisation |
 | `editor-state.ts` | Reducer owning history, selection and tools |
+| `workspaces.ts` | Task configurations layered over the one editor |
+| `watermark.ts` | Watermark layer generation, including tiling |
+| `passport.ts` | ID photo specifications, guides and print sheets |
+| `compress.ts` | Quality and target-size compression |
 | `raster.ts` | Browser-only: decoding, clipboard, downloads |
 
 Design decisions worth knowing:
@@ -180,6 +190,32 @@ Design decisions worth knowing:
 - **SVG export is genuinely vector.** Shapes and text become real `<path>` and
   `<text>` elements using the same geometry the canvas renderer uses; only
   photo layers are embedded as bitmaps.
+
+### One editor, several tools
+
+The Screenshot Editor, Watermark Studio, Passport Photo Studio and Image
+Compressor are *workspaces*: descriptors in `workspaces.ts` that declare which
+tools to surface, which inspector panels to show and how an imported image is
+staged. `ImageEditor` takes a workspace as a prop and the default is the full
+editor, so `/imagepilot` behaves exactly as before. There is one canvas, one
+history stack, one renderer and one exporter behind all five.
+
+Consequences worth noting:
+
+- **Watermarks are ordinary layers**, not painted pixels, so they can be
+  nudged, restyled and undone like anything else — and the batch runner is
+  simply "build these layers over each image and composite".
+- **Passport guides are locked layers** rather than a bespoke overlay, so the
+  existing renderer draws them with no special-casing. They are stripped
+  automatically before any export.
+- **Pixelate is a separate operation from blur** because averaging into blocks
+  is irreversible, whereas a blur can often be undone by deconvolution. That
+  distinction is the whole point when the operation is used to hide something.
+- **Target-size compression is a binary search** over quality: encode, measure,
+  adjust. The relationship between quality and file size is image-dependent, so
+  a guessed quality value cannot hit a byte budget reliably. Eight encodes
+  resolve it to within one quality point, and the result is the *highest*
+  quality that fits rather than the first one that happens to.
 
 ## Document conversion
 

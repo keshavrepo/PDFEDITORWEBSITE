@@ -125,6 +125,30 @@ export const documentationSections: DocumentationSection[] = [
           "PNG and WEBP keep transparency, JPG flattens onto a matte, and SVG keeps shapes and text as real vectors.",
         href: "/imagepilot",
       },
+      {
+        label: "Annotate a screenshot",
+        description:
+          "Add arrows, boxes and highlights, then hide anything sensitive with pixelation, which removes the detail rather than merely softening it.",
+        href: "/imagepilot/screenshot-editor",
+      },
+      {
+        label: "Watermark images",
+        description:
+          "Apply a text or logo watermark with tiling and corner presets, and run the same settings across a batch.",
+        href: "/imagepilot/watermark-studio",
+      },
+      {
+        label: "Make a passport photo",
+        description:
+          "Crop to an official specification with head-height guides, then export a single photo or a print sheet of copies.",
+        href: "/imagepilot/passport-photo",
+      },
+      {
+        label: "Compress images",
+        description:
+          "Reduce file size by quality or to a target size, with a before-and-after preview and batch processing.",
+        href: "/imagepilot/compressor",
+      },
     ],
   },
   {

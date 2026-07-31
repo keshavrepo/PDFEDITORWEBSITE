@@ -15,3 +15,7 @@ export * from "./geometry";
 export * from "./history";
 export * from "./renderer";
 export * from "./export";
+export * from "./workspaces";
+export * from "./watermark";
+export * from "./passport";
+export * from "./compress";

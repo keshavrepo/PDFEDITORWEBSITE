@@ -117,6 +117,7 @@ export const ADJUSTMENTS: AdjustmentDescriptor[] = [
   { key: "blur", label: "Blur", min: 0, max: 100, step: 1, neutral: 0, group: "detail" },
   { key: "sharpen", label: "Sharpen", min: 0, max: 100, step: 1, neutral: 0, group: "detail" },
   { key: "noiseReduction", label: "Noise Reduction", min: 0, max: 100, step: 1, neutral: 0, group: "detail" },
+  { key: "pixelate", label: "Pixelate", min: 0, max: 80, step: 1, neutral: 0, unit: " px", group: "detail" },
 
   { key: "grayscale", label: "Grayscale", min: 0, max: 100, step: 1, neutral: 0, group: "stylise" },
   { key: "sepia", label: "Sepia", min: 0, max: 100, step: 1, neutral: 0, group: "stylise" },

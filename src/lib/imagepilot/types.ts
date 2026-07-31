@@ -55,6 +55,14 @@ export interface Adjustments {
   thresholdEnabled: boolean;
   /** 0..100, edge-preserving median blend. */
   noiseReduction: number;
+  /**
+   * Mosaic cell size in document pixels. 0 disables it.
+   *
+   * Kept separate from `blur` because averaging into blocks is irreversible
+   * whereas a blur can often be undone by deconvolution — the distinction
+   * matters when the operation is used to obscure sensitive content.
+   */
+  pixelate: number;
 }
 
 export const defaultAdjustments: Readonly<Adjustments> = Object.freeze({
@@ -76,6 +84,7 @@ export const defaultAdjustments: Readonly<Adjustments> = Object.freeze({
   threshold: 128,
   thresholdEnabled: false,
   noiseReduction: 0,
+  pixelate: 0,
 });
 
 /** Metadata describing every adjustment, used to build the panel generically. */

@@ -1,16 +1,15 @@
 /**
  * ImagePilot tool registry.
  *
- * Mirrors `src/lib/tools.ts` for PDFPilot so the platform's search, navigation
- * and product pages can enumerate ImagePilot the same way they enumerate
- * PDFPilot.
+ * Mirrors `src/lib/tools.ts` for PDFPilot so the platform's search and product
+ * pages can enumerate ImagePilot the same way they enumerate PDFPilot.
  *
- * The editor is the foundation: the planned tools (background remover,
- * screenshot editor, passport photo, watermark studio and so on) are entry
- * points into the same editor with a task-specific starting state, not
- * separate editors. Adding one means adding an entry here, not rebuilding the
- * canvas.
+ * The list is *derived* from the workspace descriptors rather than written out
+ * again: every tool is a configuration of the one editor, so adding a
+ * workspace publishes the tool everywhere with no second list to keep in sync.
  */
+
+import { workspaces, workspaceHref } from "./workspaces";
 
 export type ImageToolCategory = "Edit" | "Enhance" | "Create";
 
@@ -24,33 +23,22 @@ export interface ImageToolDefinition {
   keywords: string[];
 }
 
-export const imageTools: ImageToolDefinition[] = [
-  {
-    id: "image-editor",
-    name: "Image Editor",
-    description: "Layers, adjustments, text and shapes in your browser",
-    href: "/imagepilot",
-    category: "Edit",
-    keywords: [
-      "photo editor",
-      "image editor",
-      "photoshop alternative",
-      "layers",
-      "crop image",
-      "resize image",
-      "rotate image",
-      "flip image",
-      "brightness",
-      "contrast",
-      "saturation",
-      "add text to image",
-      "draw shapes",
-      "png",
-      "jpg",
-      "webp",
-      "svg",
-    ],
-  },
-];
+/** Where each workspace belongs in the directory. */
+const CATEGORY_BY_WORKSPACE: Record<string, ImageToolCategory> = {
+  editor: "Edit",
+  screenshot: "Edit",
+  watermark: "Create",
+  passport: "Create",
+  compress: "Enhance",
+};
+
+export const imageTools: ImageToolDefinition[] = workspaces.map((workspace) => ({
+  id: workspace.id === "editor" ? "image-editor" : workspace.id,
+  name: workspace.name,
+  description: workspace.tagline,
+  href: workspaceHref(workspace),
+  category: CATEGORY_BY_WORKSPACE[workspace.id] ?? "Edit",
+  keywords: workspace.keywords,
+}));
 
 export const imageToolIds = new Set(imageTools.map((tool) => tool.id));
