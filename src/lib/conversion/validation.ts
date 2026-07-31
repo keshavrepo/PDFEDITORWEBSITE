@@ -12,27 +12,32 @@ import {
   MAX_CONVERSION_SIZE,
   PDF_MIME_TYPES,
   PPTX_MIME_TYPES,
+  XLSX_MIME_TYPES,
 } from "./constants";
 import { ConversionError, conversionErrors } from "./errors";
 
-export type ConversionFormat = "pdf" | "docx" | "pptx";
+export type ConversionFormat = "pdf" | "docx" | "pptx" | "excel";
 
 const FORMAT_LABEL: Record<ConversionFormat, string> = {
   pdf: "PDF",
   docx: "Word (.docx)",
   pptx: "PowerPoint (.pptx)",
+  excel: "Excel (.xlsx or .xls)",
 };
 
 const FORMAT_EXTENSION: Record<ConversionFormat, string> = {
   pdf: ".pdf",
   docx: ".docx",
   pptx: ".pptx",
+  // Excel accepts two extensions; `matchesExtension` handles the pair.
+  excel: ".xlsx",
 };
 
 const FORMAT_MIME: Record<ConversionFormat, readonly string[]> = {
   pdf: PDF_MIME_TYPES,
   docx: DOCX_MIME_TYPES,
   pptx: PPTX_MIME_TYPES,
+  excel: XLSX_MIME_TYPES,
 };
 
 /** Legacy binary formats we can detect precisely enough to explain the failure. */
@@ -41,6 +46,13 @@ const LEGACY_OLE_SIGNATURE = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1];
 export interface ValidationResult {
   valid: boolean;
   error?: string;
+}
+
+/** Excel is the one format with two valid extensions. */
+function matchesExtension(fileName: string, format: ConversionFormat): boolean {
+  const lower = fileName.toLowerCase();
+  if (format === "excel") return lower.endsWith(".xlsx") || lower.endsWith(".xls");
+  return lower.endsWith(FORMAT_EXTENSION[format]);
 }
 
 /**
@@ -52,9 +64,8 @@ export function validateSelection(
   format: ConversionFormat,
   maxSize = MAX_CONVERSION_SIZE
 ): ValidationResult {
-  const extension = FORMAT_EXTENSION[format];
   const label = FORMAT_LABEL[format];
-  const hasExtension = file.name.toLowerCase().endsWith(extension);
+  const hasExtension = matchesExtension(file.name, format);
   const hasMime = !file.type || FORMAT_MIME[format].includes(file.type);
 
   // Accept when either signal matches; the byte-level check is authoritative.
@@ -107,6 +118,14 @@ export async function assertFormat(file: File, format: ConversionFormat): Promis
       throw conversionErrors.invalidFile(file.name, label);
     }
     return;
+  }
+
+  // Excel accepts both the modern ZIP package and the legacy OLE2 container.
+  if (format === "excel") {
+    if (bytesMatch(head, LEGACY_OLE_SIGNATURE)) return;
+    if (bytesMatch(head, [0x50, 0x4b, 0x03, 0x04])) return;
+    if (bytesMatch(head, [0x50, 0x4b, 0x05, 0x06])) throw conversionErrors.emptyFile(file.name);
+    throw conversionErrors.invalidFile(file.name, label);
   }
 
   // DOCX and PPTX are ZIP (PK\x03\x04) containers.

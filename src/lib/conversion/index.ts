@@ -6,6 +6,27 @@
  */
 
 export { convertPdfToWord, type PdfToWordOptions } from "./pdf-to-word";
+export { convertExcelToPdf, type ExcelToPdfOptions } from "./excel-to-pdf";
+export { convertPdfToExcel, type PdfToExcelOptions } from "./pdf-to-excel";
+export { writeXlsx, columnName } from "./spreadsheet/xlsx-writer";
+export { readXlsx } from "./spreadsheet/xlsx-reader";
+export { readXls } from "./spreadsheet/xls-reader";
+export {
+  renderPdfPages,
+  zipRenderedPages,
+  type PageImageFormat,
+  type PdfToImageOptions,
+  type RenderedPage,
+} from "./pdf-to-image";
+export {
+  convertImagesToPdf,
+  type ImageFitMode,
+  type ImageInput,
+  type ImageToPdfOptions,
+  type MarginSize,
+  type PageOrientation,
+  type PageSizeId,
+} from "./image-to-pdf";
 export { convertWordToPdf, type WordToPdfOptions } from "./word-to-pdf";
 export {
   convertPdfToPowerPoint,
@@ -19,6 +40,8 @@ export {
 export {
   MAX_CONVERSION_SIZE,
   DOCX_ACCEPT,
+  EXCEL_ACCEPT,
+  IMAGE_ACCEPT,
   PDF_ACCEPT,
   PPTX_ACCEPT,
 } from "./constants";

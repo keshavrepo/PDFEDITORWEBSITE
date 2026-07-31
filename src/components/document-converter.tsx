@@ -36,6 +36,14 @@ interface DocumentConverterProps {
   tool: ConversionToolConfig;
 }
 
+/** Short badge text for the input format shown in the conversion summary. */
+const INPUT_LABELS: Record<ConversionToolConfig["input"], string> = {
+  pdf: "PDF",
+  docx: "DOCX",
+  pptx: "PPTX",
+  excel: "XLSX / XLS",
+};
+
 type Phase = "idle" | "validating" | "ready" | "converting" | "done";
 
 function formatFileSize(bytes: number): string {
@@ -191,6 +199,20 @@ export function DocumentConverter({ tool }: DocumentConverterProps) {
           break;
         case "powerpoint-to-pdf":
           output = await conversion.convertPowerPointToPdf(
+            data,
+            { signal: controller.signal },
+            onProgress
+          );
+          break;
+        case "pdf-to-excel":
+          output = await conversion.convertPdfToExcel(
+            data,
+            { signal: controller.signal },
+            onProgress
+          );
+          break;
+        case "excel-to-pdf":
+          output = await conversion.convertExcelToPdf(
             data,
             { signal: controller.signal },
             onProgress
@@ -380,7 +402,7 @@ export function DocumentConverter({ tool }: DocumentConverterProps) {
             </div>
 
             <div className="flex items-center justify-center gap-3 rounded-xl bg-muted/50 py-4 text-sm font-medium">
-              <span className="uppercase">{tool.input === "docx" ? "DOCX" : tool.input === "pptx" ? "PPTX" : "PDF"}</span>
+              <span className="uppercase">{INPUT_LABELS[tool.input]}</span>
               <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <span className="uppercase text-primary">{tool.outputExtension}</span>
             </div>

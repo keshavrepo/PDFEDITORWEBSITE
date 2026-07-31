@@ -5,14 +5,16 @@
  * directory, metadata, breadcrumbs and structured data all stay in sync.
  */
 
-import { DOCX_ACCEPT, PDF_ACCEPT, PPTX_ACCEPT } from "./constants";
+import { DOCX_ACCEPT, EXCEL_ACCEPT, PDF_ACCEPT, PPTX_ACCEPT } from "./constants";
 import type { ConversionFormat } from "./validation";
 
 export type ConversionToolId =
   | "pdf-to-word"
   | "word-to-pdf"
   | "pdf-to-powerpoint"
-  | "powerpoint-to-pdf";
+  | "powerpoint-to-pdf"
+  | "pdf-to-excel"
+  | "excel-to-pdf";
 
 export interface ConversionToolConfig {
   id: ConversionToolId;
@@ -40,8 +42,85 @@ export interface ConversionToolConfig {
 const PDF_MIME = "application/pdf";
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 export const conversionTools: ConversionToolConfig[] = [
+  {
+    id: "pdf-to-excel",
+    name: "PDF to Excel",
+    description: "Extract PDF tables into a spreadsheet",
+    longDescription:
+      "Turn PDF tables into an editable Excel workbook. Rows and columns are detected from the page layout, numbers stay numeric, and each page becomes its own worksheet.",
+    href: "/tools/pdf-to-excel",
+    input: "pdf",
+    output: "excel",
+    accept: PDF_ACCEPT,
+    inputLabel: "PDF",
+    outputExtension: "xlsx",
+    outputMimeType: XLSX_MIME,
+    outputSuffix: "tables",
+    highlights: [
+      "Detects tables into real rows and columns",
+      "Numbers stay numeric and computable",
+      "One worksheet per page, in order",
+    ],
+    faqs: [
+      {
+        question: "Will my table structure be preserved?",
+        answer:
+          "PDFPilot analyses the page layout to find column boundaries, including tables drawn without visible borders, and rebuilds them as real spreadsheet rows and columns.",
+      },
+      {
+        question: "Are numbers still usable in formulas?",
+        answer:
+          "Yes. Values that are genuinely numeric are written as numbers, so you can sum and chart them immediately. Codes with leading zeros are kept as text so nothing is lost.",
+      },
+      {
+        question: "What happens with multi-page PDFs?",
+        answer:
+          "Every page becomes its own worksheet, named in page order, so a long report stays organised and easy to navigate.",
+      },
+    ],
+    keywords: ["PDF to Excel", "PDF to XLSX", "extract PDF tables", "PDF table converter"],
+  },
+  {
+    id: "excel-to-pdf",
+    name: "Excel to PDF",
+    description: "Convert spreadsheets to printable PDF",
+    longDescription:
+      "Convert Excel workbooks into clean, printable PDFs. Column widths, merged cells, alignment, fonts, fills and number formatting are preserved, and wide sheets are split across pages just like Excel's own print output.",
+    href: "/tools/excel-to-pdf",
+    input: "excel",
+    output: "pdf",
+    accept: EXCEL_ACCEPT,
+    inputLabel: "Excel workbook",
+    outputExtension: "pdf",
+    outputMimeType: PDF_MIME,
+    outputSuffix: "converted",
+    highlights: [
+      "Supports .xlsx and legacy .xls",
+      "Keeps merged cells and alignment",
+      "Printable, page-ready output",
+    ],
+    faqs: [
+      {
+        question: "Are .xls files supported?",
+        answer:
+          "Yes. Both modern .xlsx workbooks and legacy Excel 97-2003 .xls files are read directly in your browser, with no need to convert them first.",
+      },
+      {
+        question: "Is formatting preserved?",
+        answer:
+          "Column widths, merged cells, text alignment, bold and italic fonts, cell fills and number formats such as currency, percentages and dates are all carried into the PDF.",
+      },
+      {
+        question: "What happens to very wide sheets?",
+        answer:
+          "Wide sheets are split across multiple pages horizontally, the same way Excel prints them, so no columns are cut off.",
+      },
+    ],
+    keywords: ["Excel to PDF", "XLSX to PDF", "XLS to PDF", "spreadsheet to PDF"],
+  },
   {
     id: "pdf-to-word",
     name: "PDF to Word",

@@ -13,9 +13,19 @@ export const PPTX_MIME_TYPES = [
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 ] as const;
 
+export const XLSX_MIME_TYPES = [
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+] as const;
+
+export const IMAGE_MIME_TYPES = ["image/jpeg", "image/png"] as const;
+
 export const DOCX_ACCEPT = ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 export const PPTX_ACCEPT = ".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation";
 export const PDF_ACCEPT = "application/pdf,.pdf";
+export const EXCEL_ACCEPT =
+  ".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel";
+export const IMAGE_ACCEPT = "image/jpeg,image/png,.jpg,.jpeg,.png";
 
 /* Unit conversions. Points (1/72 inch) are the internal unit everywhere. */
 export const EMU_PER_INCH = 914_400;

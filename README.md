@@ -8,7 +8,7 @@ PDFPilot is a Next.js application for securely processing PDF documents in the b
 - **Authentication:** NextAuth JWT sessions with credentials and optional Google OAuth
 - **Persistence:** PostgreSQL, Drizzle ORM, versioned SQL migrations
 - **PDF processing:** `pdf-lib` and `pdfjs-dist` in client components
-- **Document conversion:** isomorphic converters under `src/lib/conversion` using `pdfjs-dist`, `pdf-lib`, `docx` and `pptxgenjs`
+- **Document conversion:** isomorphic converters under `src/lib/conversion` using `pdfjs-dist`, `pdf-lib`, `docx` and `pptxgenjs`. Spreadsheet support (`.xlsx` and legacy `.xls`) is read and written directly from `src/lib/conversion/spreadsheet`, reusing the existing OOXML helpers rather than adding a dependency
 - **Billing:** Stripe Checkout, Customer Portal, and signed webhooks
 - **Email:** Resend's HTTPS API (optional, for support and password reset)
 
@@ -78,6 +78,10 @@ Four converters run entirely in the browser, so documents are never uploaded:
 | Word to PDF | `/tools/word-to-pdf` |
 | PDF to PowerPoint | `/tools/pdf-to-powerpoint` |
 | PowerPoint to PDF | `/tools/powerpoint-to-pdf` |
+| PDF to Excel | `/tools/pdf-to-excel` |
+| Excel to PDF | `/tools/excel-to-pdf` |
+| PDF to JPG or PNG | `/tools/pdf-to-image` |
+| JPG or PNG to PDF | `/tools/image-to-pdf` |
 
 The conversion core in `src/lib/conversion` is deliberately free of DOM APIs so
 the same modules power the browser tools and the Node test suite. PDF pages are

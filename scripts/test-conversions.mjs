@@ -17,6 +17,7 @@ import { FIXTURE_DIR, generateFixtures } from "./fixtures/generate.mjs";
 import {
   assertValidPackage,
   assertWellFormedXml,
+  openPackage,
   summarizeDocx,
   summarizePptx,
 } from "./ooxml-inspect.mjs";
@@ -759,6 +760,364 @@ await test("quality analysis stays fast on scanned documents", async () => {
   const seconds = (Date.now() - started) / 1000;
   assert(seconds < 5, `analysis took ${seconds.toFixed(1)}s, expected well under 5s`);
   console.log(`      (${seconds.toFixed(2)}s)`);
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("PDF to Excel");
+
+let tablesXlsx;
+
+await test("produces a valid, well-formed .xlsx package", async () => {
+  tablesXlsx = await core.convertPdfToExcel(await read("tables.pdf"));
+  await assertValidPackage(tablesXlsx, ["xl/workbook.xml", "xl/worksheets/sheet1.xml"]);
+});
+
+await test("creates one worksheet per page, in page order", async () => {
+  const zip = await openPackage(tablesXlsx);
+  const sheets = Object.keys(zip.files).filter((name) => /worksheets\/sheet\d+\.xml$/.test(name));
+  assert(sheets.length === 2, `expected 2 sheets, found ${sheets.length}`);
+
+  const workbook = await zip.file("xl/workbook.xml").async("string");
+  assertIncludes(workbook, 'name="Page 1"', "first sheet name");
+  assertIncludes(workbook, 'name="Page 2"', "second sheet name");
+});
+
+await test("detects the table into real rows and columns", async () => {
+  const zip = await openPackage(tablesXlsx);
+  const sheet = await zip.file("xl/worksheets/sheet1.xml").async("string");
+
+  // Header cells must land in separate columns of the same row.
+  for (const [reference, value] of [
+    ["A", "Product"],
+    ["B", "Units"],
+    ["C", "Price"],
+    ["D", "Revenue"],
+  ]) {
+    assert(
+      new RegExp(`<c r="${reference}\\d+"[^>]*><is><t[^>]*>${value}</t>`).test(sheet),
+      `${value} should occupy column ${reference}`
+    );
+  }
+  assertIncludes(sheet, "Thingamajig", "last data row");
+});
+
+await test("numbers are written as numeric cells, not text", async () => {
+  const zip = await openPackage(tablesXlsx);
+  const sheet = await zip.file("xl/worksheets/sheet1.xml").async("string");
+  // A numeric cell carries a bare <v>; text cells use inlineStr.
+  assert(/<c r="B\d+"[^>]*><v>1200<\/v><\/c>/.test(sheet), "unit counts must be numeric");
+  assert(/<c r="D\d+"[^>]*><v>23988<\/v><\/c>/.test(sheet), "revenue must be numeric");
+});
+
+await test("the generated workbook reopens through the project's own reader", async () => {
+  const workbook = await core.readXlsx(tablesXlsx);
+  assert(workbook.sheets.length === 2, `expected 2 sheets, found ${workbook.sheets.length}`);
+
+  const values = workbook.sheets[0].cells.map((cell) => cell.text);
+  assertIncludes(values.join(" "), "Product", "header round trip");
+
+  const numeric = workbook.sheets[0].cells.find((cell) => cell.text === "1200");
+  assert(numeric?.type === "number", `expected a numeric cell, got ${numeric?.type}`);
+});
+
+await test("refuses PDFs whose text cannot be read", async () => {
+  for (const name of ["gov-legacy-hindi.pdf", "scanned.pdf"]) {
+    await assertRejects(
+      async () => core.convertPdfToExcel(await read(name)),
+      /OCR is required for accurate conversion/,
+      `${name} to Excel`
+    );
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Excel to PDF");
+
+await test("converts a modern .xlsx workbook", async () => {
+  const output = await core.convertExcelToPdf(await read("sales.xlsx"));
+  const inspected = await inspectPdf(output);
+  assert(inspected.pageCount >= 1, "expected at least one page");
+  for (const value of ["Annual Sales Report 2026", "Region", "North", "Total"]) {
+    assertIncludes(inspected.text, value, "xlsx content");
+  }
+});
+
+await test("preserves number formatting from the workbook", async () => {
+  const output = await core.convertExcelToPdf(await read("sales.xlsx"));
+  const inspected = await inspectPdf(output);
+  // 1200.5 carries a #,##0.00 format in the fixture.
+  assertIncludes(inspected.text, "1,200.50", "formatted number");
+});
+
+await test("renders every sheet, labelled by name", async () => {
+  const output = await core.convertExcelToPdf(await read("sales.xlsx"));
+  const inspected = await inspectPdf(output);
+  assertIncludes(inspected.text, "Sales", "first sheet header");
+  assertIncludes(inspected.text, "Notes", "second sheet header");
+  assertIncludes(inspected.text, "Finance Team", "second sheet content");
+});
+
+await test("converts a legacy .xls workbook", async () => {
+  const output = await core.convertExcelToPdf(await read("legacy.xls"));
+  const inspected = await inspectPdf(output);
+  for (const value of ["Legacy Inventory Report", "SKU", "Widget", "Doohickey"]) {
+    assertIncludes(inspected.text, value, "xls content");
+  }
+});
+
+await test("legacy .xls numbers and merges are read correctly", async () => {
+  const workbook = await core.readXls(await read("legacy.xls"));
+  const sheet = workbook.sheets[0];
+
+  assert(sheet.merges.length === 1, `expected 1 merge, found ${sheet.merges.length}`);
+  assert(sheet.merges[0].lastColumn === 3, "title should span four columns");
+
+  const price = sheet.cells.find((cell) => cell.text === "19.99");
+  assert(price?.type === "number", `price should be numeric, got ${price?.type}`);
+
+  const header = sheet.cells.find((cell) => cell.text === "SKU");
+  assert(header?.style?.bold, "header row should be bold");
+  assert(sheet.columnWidths.get(1) === 20, `expected width 20, got ${sheet.columnWidths.get(1)}`);
+});
+
+await test("honours a forced orientation", async () => {
+  const portrait = await inspectPdf(
+    await core.convertExcelToPdf(await read("sales.xlsx"), { orientation: "portrait" })
+  );
+  const landscape = await inspectPdf(
+    await core.convertExcelToPdf(await read("sales.xlsx"), { orientation: "landscape" })
+  );
+  assert(portrait.pages[0].width < portrait.pages[0].height, "portrait pages must be tall");
+  assert(landscape.pages[0].width > landscape.pages[0].height, "landscape pages must be wide");
+});
+
+await test("rejects files that are not workbooks", async () => {
+  await assertRejects(
+    async () => core.convertExcelToPdf(await read("notapdf.pdf")),
+    /damaged|could not be converted|no readable content/i,
+    "non-workbook input"
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Image to PDF");
+
+await test("converts a single PNG onto an A4 page", async () => {
+  const output = await core.convertImagesToPdf(
+    [{ name: "logo.png", data: await read("image.png") }],
+    { pageSize: "a4", orientation: "portrait" }
+  );
+  const inspected = await inspectPdf(output);
+  assert(inspected.pageCount === 1, `expected 1 page, found ${inspected.pageCount}`);
+  assert(
+    Math.abs(inspected.pages[0].width - 595.3) < 2,
+    `expected A4 width, got ${inspected.pages[0].width}`
+  );
+});
+
+await test("combines multiple images in the given order, one page each", async () => {
+  const output = await core.convertImagesToPdf([
+    { name: "a.png", data: await read("image.png") },
+    { name: "b.jpg", data: await read("photo.jpg") },
+    { name: "c.png", data: await read("image.png") },
+  ]);
+  const inspected = await inspectPdf(output);
+  assert(inspected.pageCount === 3, `expected 3 pages, found ${inspected.pageCount}`);
+});
+
+await test("supports both JPG and PNG sources", async () => {
+  const jpeg = await core.convertImagesToPdf([{ name: "photo.jpg", data: await read("photo.jpg") }]);
+  const asText = new TextDecoder("latin1").decode(jpeg);
+  assertIncludes(asText, "/DCTDecode", "JPEG should embed without re-encoding");
+
+  const png = await core.convertImagesToPdf([{ name: "logo.png", data: await read("image.png") }]);
+  assertIncludes(new TextDecoder("latin1").decode(png), "/Image", "PNG should embed as an image");
+});
+
+await test("applies orientation, page size and fit-to-image options", async () => {
+  const landscape = await inspectPdf(
+    await core.convertImagesToPdf([{ name: "a.png", data: await read("image.png") }], {
+      pageSize: "a4",
+      orientation: "landscape",
+    })
+  );
+  assert(landscape.pages[0].width > landscape.pages[0].height, "landscape must be wide");
+
+  const letter = await inspectPdf(
+    await core.convertImagesToPdf([{ name: "a.png", data: await read("image.png") }], {
+      pageSize: "letter",
+      orientation: "portrait",
+    })
+  );
+  assert(Math.abs(letter.pages[0].width - 612) < 2, `expected Letter width, got ${letter.pages[0].width}`);
+
+  // `fit` sizes the page to the image itself.
+  const fitted = await inspectPdf(
+    await core.convertImagesToPdf([{ name: "a.png", data: await read("image.png") }], {
+      pageSize: "fit",
+      margin: "none",
+    })
+  );
+  assert(
+    fitted.pages[0].width < 200 && fitted.pages[0].height < 200,
+    `fit page should match the image, got ${fitted.pages[0].width}x${fitted.pages[0].height}`
+  );
+});
+
+await test("margin options change the page geometry", async () => {
+  const none = await inspectPdf(
+    await core.convertImagesToPdf([{ name: "a.png", data: await read("image.png") }], {
+      pageSize: "fit",
+      margin: "none",
+    })
+  );
+  const large = await inspectPdf(
+    await core.convertImagesToPdf([{ name: "a.png", data: await read("image.png") }], {
+      pageSize: "fit",
+      margin: "large",
+    })
+  );
+  assert(
+    large.pages[0].width - none.pages[0].width === 144,
+    `large margin should add 2x72 points, got ${large.pages[0].width - none.pages[0].width}`
+  );
+});
+
+await test("fill mode still produces a valid single page", async () => {
+  const output = await core.convertImagesToPdf(
+    [{ name: "a.png", data: await read("image.png") }],
+    { pageSize: "a4", fit: "fill", margin: "medium" }
+  );
+  const inspected = await inspectPdf(output);
+  assert(inspected.pageCount === 1, "fill mode should still emit one page");
+});
+
+await test("rejects files that are not images", async () => {
+  await assertRejects(
+    async () => core.convertImagesToPdf([{ name: "bad.png", data: await read("notapdf.pdf") }]),
+    /not a JPG or PNG/i,
+    "non-image input"
+  );
+});
+
+await test("skips a damaged image but keeps the rest of the batch", async () => {
+  const output = await core.convertImagesToPdf([
+    { name: "good.png", data: await read("image.png") },
+    { name: "bad.png", data: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3, 4]) },
+    { name: "good2.jpg", data: await read("photo.jpg") },
+  ]);
+  const inspected = await inspectPdf(output);
+  assert(inspected.pageCount === 2, `expected the 2 valid images, found ${inspected.pageCount}`);
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("PDF to image");
+
+/**
+ * Rendering needs a real canvas, which Node lacks. `@napi-rs/canvas` provides
+ * one for tests, so the production render path is exercised exactly as the
+ * browser would run it.
+ */
+async function installCanvas() {
+  const canvasModule = await import("@napi-rs/canvas");
+  const originalDocument = globalThis.document;
+  const originalPath2D = globalThis.Path2D;
+
+  globalThis.Path2D = canvasModule.Path2D;
+  globalThis.document = {
+    createElement: (tag) => {
+      if (tag !== "canvas") throw new Error(`unexpected element: ${tag}`);
+      const canvas = canvasModule.createCanvas(1, 1);
+      // pdf.js expects the browser's async toBlob callback.
+      canvas.toBlob = (callback, type, quality) => {
+        const buffer =
+          type === "image/jpeg"
+            ? canvas.toBuffer("image/jpeg", quality)
+            : canvas.toBuffer("image/png");
+        callback(new Blob([buffer], { type }));
+      };
+      return canvas;
+    },
+  };
+
+  return () => {
+    if (originalDocument === undefined) delete globalThis.document;
+    else globalThis.document = originalDocument;
+    if (originalPath2D === undefined) delete globalThis.Path2D;
+    else globalThis.Path2D = originalPath2D;
+  };
+}
+
+await test("renders every page at the requested DPI", async () => {
+  const restore = await installCanvas();
+  try {
+    const pages = await core.renderPdfPages(await read("simple.pdf"), { format: "png", dpi: 150 });
+    assert(pages.length === 2, `expected 2 pages, found ${pages.length}`);
+    assert(pages[0].pageNumber === 1 && pages[1].pageNumber === 2, "pages must stay in order");
+    // A4 at 150 DPI is about 1241x1754 pixels.
+    assert(
+      Math.abs(pages[0].width - 1241) <= 2 && Math.abs(pages[0].height - 1754) <= 2,
+      `unexpected page size ${pages[0].width}x${pages[0].height}`
+    );
+  } finally {
+    restore();
+  }
+});
+
+await test("DPI selection changes the output resolution", async () => {
+  const restore = await installCanvas();
+  try {
+    const low = await core.renderPdfPages(await read("simple.pdf"), { format: "png", dpi: 96 });
+    const high = await core.renderPdfPages(await read("simple.pdf"), { format: "png", dpi: 300 });
+    assert(high[0].width > low[0].width * 2.5, "300 DPI should be far larger than 96 DPI");
+  } finally {
+    restore();
+  }
+});
+
+await test("emits the requested image format", async () => {
+  const restore = await installCanvas();
+  try {
+    const png = await core.renderPdfPages(await read("simple.pdf"), { format: "png" });
+    assert(png[0].blob.type === "image/png", `expected image/png, got ${png[0].blob.type}`);
+
+    const jpeg = await core.renderPdfPages(await read("simple.pdf"), { format: "jpeg" });
+    assert(jpeg[0].blob.type === "image/jpeg", `expected image/jpeg, got ${jpeg[0].blob.type}`);
+  } finally {
+    restore();
+  }
+});
+
+await test("packages multi-page output as a ZIP with ordered names", async () => {
+  const restore = await installCanvas();
+  try {
+    const pages = await core.renderPdfPages(await read("simple.pdf"), { format: "png" });
+    const zip = await core.zipRenderedPages(pages, "report", "png");
+    const archive = await openPackage(new Uint8Array(await zip.arrayBuffer()));
+    const names = Object.keys(archive.files).sort();
+    assert(names.length === 2, `expected 2 entries, found ${names.length}`);
+    assert(names[0] === "report-page-1.png", `unexpected name ${names[0]}`);
+    assert(names[1] === "report-page-2.png", `unexpected name ${names[1]}`);
+  } finally {
+    restore();
+  }
+});
+
+await test("rejects a corrupted PDF", async () => {
+  const restore = await installCanvas();
+  try {
+    await assertRejects(
+      async () => core.renderPdfPages(await read("corrupted.pdf"), { format: "png" }),
+      /damaged|could not be converted/i,
+      "corrupted PDF rendering"
+    );
+  } finally {
+    restore();
+  }
 });
 
 /* -------------------------------------------------------------------------- */

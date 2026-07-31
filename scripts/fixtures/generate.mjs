@@ -332,6 +332,382 @@ async function buildScannedPdf(pageCount = 2) {
   return pdf.save();
 }
 
+
+/* -------------------------------------------------------------------------- */
+/* Spreadsheet and image fixtures                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A realistic .xlsx workbook with a merged title, styled header row, numeric
+ * cells, a percentage, a date and a second sheet. Written with the project's
+ * own writer so the fixture needs no extra dependency.
+ */
+async function buildSalesXlsx() {
+  const { writeXlsx } = await loadConversionCore();
+
+  const bold = { bold: true };
+  const header = { bold: true, fill: "DDEEFF" };
+  const cell = (row, column, text, value, type, style) => ({ row, column, text, value, type, style });
+
+  const sheet1 = {
+    name: "Sales",
+    cells: [
+      cell(0, 0, "Annual Sales Report 2026", "Annual Sales Report 2026", "string", {
+        bold: true,
+        fontSize: 16,
+        color: "1F3864",
+        horizontal: "center",
+      }),
+      ...["Region", "Q1", "Q2", "Total"].map((label, column) =>
+        cell(1, column, label, label, "string", header)
+      ),
+      ...[
+        ["North", 1200.5, 1400.25, 2600.75],
+        ["South", 900, 1100, 2000],
+        ["East", 1500, 1600, 3100],
+        ["West", 1100, 1250, 2350],
+      ].flatMap((row, index) =>
+        row.map((value, column) =>
+          typeof value === "number"
+            ? cell(index + 2, column, String(value), value, "number", {
+                numberFormat: "#,##0.00",
+              })
+            : cell(index + 2, column, value, value, "string")
+        )
+      ),
+      cell(6, 0, "Total", "Total", "string", bold),
+      cell(6, 3, "10050.75", 10050.75, "number", { ...bold, numberFormat: "#,##0.00" }),
+    ],
+    merges: [{ firstRow: 0, lastRow: 0, firstColumn: 0, lastColumn: 3 }],
+    columnWidths: new Map([[0, 22], [1, 14], [2, 14], [3, 16]]),
+    rowHeights: new Map([[0, 26]]),
+    rowCount: 7,
+    columnCount: 4,
+  };
+
+  const sheet2 = {
+    name: "Notes",
+    cells: [
+      cell(0, 0, "Prepared by", "Prepared by", "string", bold),
+      cell(0, 1, "Finance Team", "Finance Team", "string"),
+      cell(1, 0, "Confidential", "Confidential", "string", bold),
+      cell(1, 1, "TRUE", true, "boolean"),
+    ],
+    merges: [],
+    columnWidths: new Map([[0, 18], [1, 24]]),
+    rowHeights: new Map(),
+    rowCount: 2,
+    columnCount: 2,
+  };
+
+  return writeXlsx([sheet1, sheet2], { title: "Annual Sales", author: "PDFPilot Tests" });
+}
+
+/**
+ * A genuine Excel 97-2003 (.xls) file: an OLE2 container holding a BIFF8
+ * Workbook stream. Written by hand so the legacy reader is exercised against a
+ * real binary rather than a stand-in.
+ */
+function buildLegacyXls() {
+  const records = [];
+  const record = (id, payload) => {
+    const buffer = new Uint8Array(4 + payload.length);
+    const view = new DataView(buffer.buffer);
+    view.setUint16(0, id, true);
+    view.setUint16(2, payload.length, true);
+    buffer.set(payload, 4);
+    records.push(buffer);
+  };
+
+  const u16 = (...values) => {
+    const buffer = new Uint8Array(values.length * 2);
+    const view = new DataView(buffer.buffer);
+    values.forEach((value, index) => view.setUint16(index * 2, value, true));
+    return buffer;
+  };
+  /** BIFF8 short unicode string: 1-byte length, 1 flag byte, then characters. */
+  const shortString = (text) => {
+    const buffer = new Uint8Array(2 + text.length);
+    buffer[0] = text.length;
+    buffer[1] = 0;
+    for (let index = 0; index < text.length; index++) buffer[2 + index] = text.charCodeAt(index);
+    return buffer;
+  };
+  const concat = (parts) => {
+    const total = parts.reduce((sum, part) => sum + part.length, 0);
+    const output = new Uint8Array(total);
+    let offset = 0;
+    for (const part of parts) {
+      output.set(part, offset);
+      offset += part.length;
+    }
+    return output;
+  };
+
+  const rows = [
+    ["Legacy Inventory Report", null, null, null],
+    ["SKU", "Item", "Qty", "Price"],
+    ["A-100", "Widget", 25, 19.99],
+    ["A-200", "Gadget", 10, 149.5],
+    ["A-300", "Doohickey", 7, 8.25],
+    [null, "TOTAL", 42, null],
+  ];
+
+  // Shared string table, in first-seen order.
+  const strings = [];
+  for (const row of rows) {
+    for (const value of row) {
+      if (typeof value === "string" && !strings.includes(value)) strings.push(value);
+    }
+  }
+
+  /* Globals substream. */
+  record(0x0809, concat([u16(0x0600, 0x0005), u16(0x0dbb, 0x07cc), u16(0x00c1, 0x0000), u16(0x0006, 0x0000)]));
+  // Two fonts: default, then bold. BIFF8 FONT layout is height(0), attributes(2),
+  // colour(4), weight(6), escapement(8), then byte fields before the name.
+  const fontRecord = (weight) =>
+    concat([
+      u16(200, 0x0000, 0x7fff, weight, 0x0000),
+      new Uint8Array([0, 0, 0, 0]),
+      shortString("Arial"),
+    ]);
+  record(0x0031, fontRecord(400));
+  record(0x0031, fontRecord(700));
+  // XF 0: plain. XF 1: bold font, centred.
+  record(0x00e0, concat([u16(0, 0, 0), new Uint8Array([0x00, 0x00]), u16(0, 0, 0, 0)]));
+  record(0x00e0, concat([u16(1, 0, 0), new Uint8Array([0x02, 0x00]), u16(0, 0, 0, 0)]));
+
+  const sstPayload = [u16(strings.length, strings.length).slice(0, 0)];
+  const sstHeader = new Uint8Array(8);
+  const sstView = new DataView(sstHeader.buffer);
+  sstView.setUint32(0, strings.length, true);
+  sstView.setUint32(4, strings.length, true);
+  sstPayload.push(sstHeader);
+  for (const text of strings) {
+    const buffer = new Uint8Array(3 + text.length);
+    const view = new DataView(buffer.buffer);
+    view.setUint16(0, text.length, true);
+    buffer[2] = 0;
+    for (let index = 0; index < text.length; index++) buffer[3 + index] = text.charCodeAt(index);
+    sstPayload.push(buffer);
+  }
+  record(0x00fc, concat(sstPayload));
+
+  const boundSheetIndex = records.length;
+  record(0x0085, concat([u16(0, 0), new Uint8Array([0x00, 0x00]), shortString("Inventory")]));
+  record(0x000a, new Uint8Array(0));
+
+  const globalsLength = records.reduce((sum, part) => sum + part.length, 0);
+
+  /* Worksheet substream. */
+  const sheetRecords = [];
+  const sheetRecord = (id, payload) => {
+    const buffer = new Uint8Array(4 + payload.length);
+    const view = new DataView(buffer.buffer);
+    view.setUint16(0, id, true);
+    view.setUint16(2, payload.length, true);
+    buffer.set(payload, 4);
+    sheetRecords.push(buffer);
+  };
+
+  sheetRecord(0x0809, concat([u16(0x0600, 0x0010), u16(0x0dbb, 0x07cc), u16(0x00c1, 0x0000), u16(0x0006, 0x0000)]));
+  sheetRecord(0x0200, concat([u16(0, 0), u16(rows.length, 0), u16(0, 4), u16(0, 0)]));
+  // Column widths, in 1/256 character units.
+  [12, 20, 8, 12].forEach((chars, column) => {
+    sheetRecord(0x007d, concat([u16(column, column, chars * 256, 0), u16(0, 0)]));
+  });
+
+  rows.forEach((row, rowIndex) => {
+    row.forEach((value, column) => {
+      if (value === null) return;
+      const xf = rowIndex <= 1 ? 1 : 0;
+      if (typeof value === "number") {
+        const buffer = new Uint8Array(14);
+        const view = new DataView(buffer.buffer);
+        view.setUint16(0, rowIndex, true);
+        view.setUint16(2, column, true);
+        view.setUint16(4, xf, true);
+        view.setFloat64(6, value, true);
+        sheetRecord(0x0203, buffer);
+      } else {
+        const buffer = new Uint8Array(10);
+        const view = new DataView(buffer.buffer);
+        view.setUint16(0, rowIndex, true);
+        view.setUint16(2, column, true);
+        view.setUint16(4, xf, true);
+        view.setUint32(6, strings.indexOf(value), true);
+        sheetRecord(0x00fd, buffer);
+      }
+    });
+  });
+
+  // Merge the title across all four columns.
+  sheetRecord(0x00e5, concat([u16(1), u16(0, 0, 0, 3)]));
+  sheetRecord(0x000a, new Uint8Array(0));
+
+  // Patch the BOUNDSHEET stream position now that the globals length is known.
+  const boundSheet = records[boundSheetIndex];
+  new DataView(boundSheet.buffer).setUint32(4, globalsLength, true);
+
+  const workbookStream = concat([...records, ...sheetRecords]);
+  return buildOleContainer(workbookStream);
+}
+
+/**
+ * Wraps a byte stream in a minimal OLE2 compound document named "Workbook".
+ *
+ * Streams below the 4096-byte cutoff must be stored in the mini stream, which
+ * is itself held by the Root Entry, so both the mini FAT and the mini stream
+ * are written. Keeping the standard cutoff means strict readers accept the
+ * file, which is the whole point of using a real container in the fixtures.
+ */
+function buildOleContainer(stream) {
+  const SECTOR = 512;
+  const MINI_SECTOR = 64;
+  const CUTOFF = 4096;
+
+  const miniSectorCount = Math.max(1, Math.ceil(stream.length / MINI_SECTOR));
+  // The mini stream is stored in ordinary sectors, referenced by Root Entry.
+  const miniStreamBytes = new Uint8Array(miniSectorCount * MINI_SECTOR);
+  miniStreamBytes.set(stream, 0);
+  const miniStreamSectorCount = Math.max(1, Math.ceil(miniStreamBytes.length / SECTOR));
+
+  const fatSector = 0;
+  const directorySector = 1;
+  const miniFatSector = 2;
+  const firstMiniStreamSector = 3;
+  const totalSectors = firstMiniStreamSector + miniStreamSectorCount;
+
+  const output = new Uint8Array(SECTOR * (1 + totalSectors));
+  const view = new DataView(output.buffer);
+
+  output.set([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1], 0);
+  view.setUint16(24, 0x003e, true);
+  view.setUint16(26, 0x0003, true);
+  view.setUint16(28, 0xfffe, true);
+  view.setUint16(30, 9, true);
+  view.setUint16(32, 6, true);
+  view.setUint32(44, 1, true);
+  view.setUint32(48, directorySector, true);
+  view.setUint32(56, CUTOFF, true);
+  view.setUint32(60, miniFatSector, true);
+  view.setUint32(64, 1, true);
+  view.setUint32(68, 0xfffffffe, true);
+  view.setUint32(72, 0, true);
+  view.setUint32(76, fatSector, true);
+  for (let index = 1; index < 109; index++) view.setUint32(76 + index * 4, 0xffffffff, true);
+
+  // Main FAT.
+  const fatOffset = SECTOR * (1 + fatSector);
+  for (let index = 0; index < SECTOR / 4; index++) {
+    view.setUint32(fatOffset + index * 4, 0xffffffff, true);
+  }
+  view.setUint32(fatOffset + fatSector * 4, 0xfffffffd, true);
+  view.setUint32(fatOffset + directorySector * 4, 0xfffffffe, true);
+  view.setUint32(fatOffset + miniFatSector * 4, 0xfffffffe, true);
+  for (let index = 0; index < miniStreamSectorCount; index++) {
+    const sector = firstMiniStreamSector + index;
+    const next = index === miniStreamSectorCount - 1 ? 0xfffffffe : sector + 1;
+    view.setUint32(fatOffset + sector * 4, next, true);
+  }
+
+  // Mini FAT: one chain covering the whole workbook stream.
+  const miniFatOffset = SECTOR * (1 + miniFatSector);
+  for (let index = 0; index < SECTOR / 4; index++) {
+    view.setUint32(miniFatOffset + index * 4, 0xffffffff, true);
+  }
+  for (let index = 0; index < miniSectorCount; index++) {
+    const next = index === miniSectorCount - 1 ? 0xfffffffe : index + 1;
+    view.setUint32(miniFatOffset + index * 4, next, true);
+  }
+
+  // Directory.
+  const directoryOffset = SECTOR * (1 + directorySector);
+  const writeEntry = (index, name, type, start, size, child) => {
+    const base = directoryOffset + index * 128;
+    for (let position = 0; position < name.length; position++) {
+      view.setUint16(base + position * 2, name.charCodeAt(position), true);
+    }
+    view.setUint16(base + 64, (name.length + 1) * 2, true);
+    output[base + 66] = type;
+    output[base + 67] = 1;
+    view.setUint32(base + 68, 0xffffffff, true);
+    view.setUint32(base + 72, 0xffffffff, true);
+    view.setUint32(base + 76, child, true);
+    view.setUint32(base + 116, start, true);
+    view.setUint32(base + 120, size, true);
+  };
+  // Root Entry owns the mini stream.
+  writeEntry(0, "Root Entry", 5, firstMiniStreamSector, miniStreamBytes.length, 1);
+  // The workbook lives at mini-sector 0.
+  writeEntry(1, "Workbook", 2, 0, stream.length, 0xffffffff);
+  for (let index = 2; index < 4; index++) {
+    const base = directoryOffset + index * 128;
+    output[base + 66] = 0;
+    view.setUint32(base + 68, 0xffffffff, true);
+    view.setUint32(base + 72, 0xffffffff, true);
+    view.setUint32(base + 76, 0xffffffff, true);
+  }
+
+  output.set(miniStreamBytes, SECTOR * (1 + firstMiniStreamSector));
+  return output;
+}
+
+/**
+ * A minimal but valid baseline JPEG.
+ *
+ * Encoding one by hand keeps the fixtures dependency-free: a single flat 8x8
+ * block is enough to prove the JPEG path embeds without re-encoding.
+ */
+async function makeJpeg() {
+  const quantisation = new Uint8Array(64).fill(16);
+  const segments = [
+    [0xff, 0xd8],
+    [0xff, 0xdb, 0x00, 0x43, 0x00, ...quantisation],
+    [0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x08, 0x00, 0x08, 0x01, 0x01, 0x11, 0x00],
+    [0xff, 0xc4, 0x00, 0x1f, 0x00, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0x0a, 0x0b],
+    [0xff, 0xc4, 0x00, 0x14, 0x10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0xff, 0xda, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3f, 0x00],
+    [0x54, 0xff, 0xd9],
+  ];
+  return Buffer.from(segments.flat());
+}
+
+/** A PDF whose pages are a clean table, used to test PDF to Excel. */
+async function buildTablePdf() {
+  const pdf = await PDFDocument.create();
+  const helvetica = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+
+  const columns = [56, 200, 320, 440];
+  const data = [
+    ["Product", "Units", "Price", "Revenue"],
+    ["Widget", "1200", "19.99", "23988.00"],
+    ["Gadget", "850", "149.50", "127075.00"],
+    ["Doohickey", "430", "8.25", "3547.50"],
+    ["Thingamajig", "275", "62.00", "17050.00"],
+  ];
+
+  for (let pageIndex = 0; pageIndex < 2; pageIndex++) {
+    const page = pdf.addPage([595.28, 841.89]);
+    page.drawText(`Revenue Summary — Part ${pageIndex + 1}`, {
+      x: 56, y: 780, size: 16, font: bold,
+    });
+    data.forEach((row, rowIndex) => {
+      row.forEach((value, column) => {
+        page.drawText(value, {
+          x: columns[column],
+          y: 720 - rowIndex * 22,
+          size: 10,
+          font: rowIndex === 0 ? bold : helvetica,
+        });
+      });
+    });
+  }
+  return pdf.save();
+}
+
 /** Valid PDF structure containing no text or images at all. */
 async function buildEmptyContentPdf() {
   const pdf = await PDFDocument.create();
@@ -740,6 +1116,10 @@ export async function generateFixtures() {
     "hindi-unicode.pdf": await buildUnicodeHindiPdf(),
     "gov-legacy-hindi.pdf": await buildLegacyGovernmentPdf(),
     "scanned.pdf": await buildScannedPdf(),
+    "tables.pdf": await buildTablePdf(),
+    "sales.xlsx": await buildSalesXlsx(),
+    "legacy.xls": buildLegacyXls(),
+    "photo.jpg": await makeJpeg(),
     "corrupted.pdf": buildCorruptedPdf(simplePdf),
     "rich.docx": richDocx,
     "landscape.docx": await buildLandscapeDocx(),

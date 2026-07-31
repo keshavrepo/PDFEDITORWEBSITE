@@ -13,7 +13,13 @@ interface ToolPageProps { params: Promise<{ tool: string }> }
  * dynamic one, but excluding them here keeps `generateMetadata` honest and
  * prevents the generic PDF tool from ever rendering a converter slug.
  */
-const dedicatedRoutes = new Set<string>(["merge-pdf", "compress-pdf", ...conversionToolMap.keys()]);
+const dedicatedRoutes = new Set<string>([
+  "merge-pdf",
+  "compress-pdf",
+  "pdf-to-image",
+  "image-to-pdf",
+  ...conversionToolMap.keys(),
+]);
 
 function findTool(slug: string) {
   return tools.find((tool) => tool.href === `/tools/${slug}` && !dedicatedRoutes.has(tool.id));

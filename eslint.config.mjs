@@ -10,6 +10,7 @@ export default defineConfig([
     "build/**",
     "next-env.d.ts",
     "public/qpdf/**",
+    ".conversion-test-build/**",
     "public/pdf.worker.min.mjs",
   ]),
 ]);
