@@ -7,6 +7,50 @@
 
 export { convertPdfToWord, type PdfToWordOptions } from "./pdf-to-word";
 export {
+  ocrPdf,
+  type OcrOptions,
+  type OcrPageSummary,
+  type OcrResult,
+} from "./ocr-pdf";
+export {
+  DEFAULT_OCR_LANGUAGE,
+  OCR_LANGUAGES,
+  normalizeLanguages,
+  type OcrLanguageCode,
+} from "./ocr/tesseract-runner";
+export {
+  cropRgba,
+  detectDocumentEdges,
+  enhanceScan,
+  readEncodedImageSize,
+  rotateRgba90,
+  scanToPdf,
+  shouldAutoRotate,
+  type DetectedEdges,
+  type ScanPageInput,
+  type ScanPageSize,
+  type ScanToPdfOptions,
+} from "./scan-to-pdf";
+export {
+  comparePdfs,
+  type ChangeType,
+  type CompareOptions,
+  type ComparisonSummary,
+  type PageComparison,
+  type PageStatus,
+  type TextChange,
+} from "./compare-pdf";
+export {
+  convertToPdfA,
+  validateForPdfA,
+  type PdfALevel,
+  type PdfAOptions,
+  type PdfAResult,
+  type PdfAValidation,
+  type ValidationIssue,
+  type ValidationSeverity,
+} from "./pdfa-converter";
+export {
   fillPdfForm,
   inspectPdfForm,
   type FillFormOptions,

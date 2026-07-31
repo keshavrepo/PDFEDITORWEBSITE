@@ -43,7 +43,11 @@ export async function openPdf(data: Uint8Array): Promise<LoadedPdf> {
 
   try {
     const task = pdfjs.getDocument({
-      data,
+      // pdf.js transfers ownership of this buffer to its worker, which
+      // detaches the caller's array. Copying keeps the input reusable, which
+      // matters whenever the same bytes are read twice (comparing a document
+      // with itself, or extracting then rebuilding with pdf-lib).
+      data: new Uint8Array(data),
       // Style/width fidelity depends on real font programs being available.
       useSystemFonts: false,
       disableFontFace: true,

@@ -22,6 +22,10 @@ const dedicatedRoutes = new Set<string>([
   "page-numbers",
   "crop-pdf",
   "redact-pdf",
+  "ocr-pdf",
+  "scan-to-pdf",
+  "compare-pdf",
+  "pdfa-converter",
   ...conversionToolMap.keys(),
 ]);
 

@@ -86,6 +86,10 @@ Four converters run entirely in the browser, so documents are never uploaded:
 | Page Numbers | `/tools/page-numbers` |
 | Crop PDF | `/tools/crop-pdf` |
 | Redact PDF | `/tools/redact-pdf` |
+| OCR PDF | `/tools/ocr-pdf` |
+| Scan to PDF | `/tools/scan-to-pdf` |
+| Compare PDF | `/tools/compare-pdf` |
+| PDF/A Converter | `/tools/pdfa-converter` |
 
 The conversion core in `src/lib/conversion` is deliberately free of DOM APIs so
 the same modules power the browser tools and the Node test suite. PDF pages are
@@ -122,6 +126,20 @@ stream with those text-showing operators deleted, draws an opaque box, flattens
 interactive content and strips document metadata. The redacted characters are
 gone from the file itself, so they cannot be copied out or recovered by reading
 the raw stream — a property the test suite asserts against the output bytes.
+
+### OCR
+
+Optical character recognition uses Tesseract, with the engine, its WebAssembly
+core and every language model vendored into `public/tesseract`. Nothing is
+fetched from a CDN, so recognition works offline and no page image leaves the
+browser — which matters most for exactly the scanned documents people are least
+willing to upload. English, Hindi, French, German and Spanish are included and
+can be combined for pages that mix scripts.
+
+The output is a searchable PDF: the original page image is kept and an
+invisible text layer (PDF text render mode 3) is positioned over the recognised
+words, so the document looks unchanged but can be searched, selected and
+copied.
 
 ### Pluggable conversion engines
 

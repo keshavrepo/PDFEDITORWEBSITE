@@ -33,10 +33,15 @@ export async function loadConversionCore() {
     platform: "node",
     target: "node22",
     // pdf.js ships browser and Node builds; let Node resolve its own.
-    external: ["pdfjs-dist"],
+    // Tesseract is likewise left external: bundling it pulls in its Node
+    // worker internals, whereas the browser loads it as a plain dependency.
+    external: ["pdfjs-dist", "tesseract.js"],
     // Production imports the browser build. Under Node the `legacy` build is
     // required because the default one touches DOMMatrix at module scope.
     alias: { "pdfjs-dist": "pdfjs-dist/legacy/build/pdf.mjs" },
+    // Without this, esbuild honours tesseract.js's `browser` field and pulls
+    // in its browser worker, which needs `window`. Tests run on Node.
+    mainFields: ["module", "main"],
     logLevel: "silent",
   });
 

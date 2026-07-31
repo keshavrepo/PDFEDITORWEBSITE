@@ -787,6 +787,48 @@ async function buildMarginPdf() {
   return pdf.save();
 }
 
+/** A revised copy of simple.pdf: one word changed and a page appended. */
+async function buildRevisedPdf() {
+  const pdf = await PDFDocument.create();
+  const helvetica = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+
+  const first = pdf.addPage([595.28, 841.89]);
+  // "2026" becomes "2027"; everything else on the page is untouched.
+  first.drawText("Quarterly Report 2027", { x: 56, y: 780, size: 24, font: bold });
+  first.drawText("Prepared by the Finance Team", { x: 56, y: 748, size: 12, font: helvetica });
+  first.drawText("This paragraph is ordinary body copy used to verify text extraction.", {
+    x: 56, y: 716, size: 11, font: helvetica,
+  });
+
+  const second = pdf.addPage([595.28, 841.89]);
+  second.drawText("Second Page Heading", { x: 56, y: 780, size: 18, font: bold });
+
+  const third = pdf.addPage([595.28, 841.89]);
+  third.drawText("Brand new appendix page", { x: 56, y: 780, size: 18, font: bold });
+
+  return pdf.save();
+}
+
+/** The matching original for {@link buildRevisedPdf}. */
+async function buildBaselinePdf() {
+  const pdf = await PDFDocument.create();
+  const helvetica = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+
+  const first = pdf.addPage([595.28, 841.89]);
+  first.drawText("Quarterly Report 2026", { x: 56, y: 780, size: 24, font: bold });
+  first.drawText("Prepared by the Finance Team", { x: 56, y: 748, size: 12, font: helvetica });
+  first.drawText("This paragraph is ordinary body copy used to verify text extraction.", {
+    x: 56, y: 716, size: 11, font: helvetica,
+  });
+
+  const second = pdf.addPage([595.28, 841.89]);
+  second.drawText("Second Page Heading", { x: 56, y: 780, size: 18, font: bold });
+
+  return pdf.save();
+}
+
 /** Valid PDF structure containing no text or images at all. */
 async function buildEmptyContentPdf() {
   const pdf = await PDFDocument.create();
@@ -1198,6 +1240,8 @@ export async function generateFixtures() {
     "tables.pdf": await buildTablePdf(),
     "form.pdf": await buildFormPdf(),
     "margins.pdf": await buildMarginPdf(),
+    "baseline.pdf": await buildBaselinePdf(),
+    "revised.pdf": await buildRevisedPdf(),
     "sales.xlsx": await buildSalesXlsx(),
     "legacy.xls": buildLegacyXls(),
     "photo.jpg": await makeJpeg(),

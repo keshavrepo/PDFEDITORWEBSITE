@@ -1537,6 +1537,306 @@ await test("the operator rewriter only drops the targeted operations", async () 
 
 /* -------------------------------------------------------------------------- */
 
+suite("Compare PDF");
+
+await test("reports identical documents as unchanged", async () => {
+  const summary = await core.comparePdfs(await read("baseline.pdf"), await read("baseline.pdf"));
+  assert(summary.identical, "a document compared with itself must be identical");
+  assert(summary.totalAdded === 0 && summary.totalRemoved === 0, "no word changes expected");
+  assert(
+    summary.pages.every((page) => page.status === "unchanged"),
+    "every page should be unchanged"
+  );
+});
+
+await test("finds the exact words that changed", async () => {
+  const summary = await core.comparePdfs(await read("baseline.pdf"), await read("revised.pdf"));
+  assert(!summary.identical, "the documents differ");
+
+  const modified = summary.pages.find((page) => page.status === "modified");
+  assert(modified, "expected a modified page");
+
+  const inserted = modified.changes.filter((change) => change.type === "insert").map((c) => c.text);
+  const deleted = modified.changes.filter((change) => change.type === "delete").map((c) => c.text);
+  assert(deleted.join(" ").includes("2026"), `expected 2026 removed, got ${deleted}`);
+  assert(inserted.join(" ").includes("2027"), `expected 2027 inserted, got ${inserted}`);
+});
+
+await test("detects an added page without shifting the others", async () => {
+  const summary = await core.comparePdfs(await read("baseline.pdf"), await read("revised.pdf"));
+  assert(summary.pagesAdded === 1, `expected 1 added page, got ${summary.pagesAdded}`);
+  assert(summary.pagesRemoved === 0, `expected no removed pages, got ${summary.pagesRemoved}`);
+
+  const added = summary.pages.find((page) => page.status === "added");
+  assert(added?.revisedPage === 3, `added page should be revised p.3, got ${added?.revisedPage}`);
+
+  // Page 2 is unchanged and must be recognised as such, not dragged along.
+  const secondPage = summary.pages.find((page) => page.originalPage === 2);
+  assert(secondPage?.status === "unchanged", `page 2 should be unchanged, got ${secondPage?.status}`);
+});
+
+await test("detects a removed page when the arguments are reversed", async () => {
+  const summary = await core.comparePdfs(await read("revised.pdf"), await read("baseline.pdf"));
+  assert(summary.pagesRemoved === 1, `expected 1 removed page, got ${summary.pagesRemoved}`);
+  const removed = summary.pages.find((page) => page.status === "removed");
+  assert(removed?.originalPage === 3, `removed page should be original p.3`);
+});
+
+await test("case sensitivity is configurable", async () => {
+  const insensitive = await core.comparePdfs(await read("baseline.pdf"), await read("baseline.pdf"), {
+    caseSensitive: true,
+  });
+  assert(insensitive.identical, "identical files match under either setting");
+});
+
+await test("reports page counts for both documents", async () => {
+  const summary = await core.comparePdfs(await read("baseline.pdf"), await read("revised.pdf"));
+  assert(summary.originalPageCount === 2, `original pages ${summary.originalPageCount}`);
+  assert(summary.revisedPageCount === 3, `revised pages ${summary.revisedPageCount}`);
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Scan to PDF");
+
+/** Builds a synthetic phone capture: dark surround, bright page, text bars. */
+function makeCapture(width, height, padX, padY) {
+  const rgba = new Uint8Array(width * height * 4);
+  for (let index = 0; index < rgba.length; index += 4) {
+    rgba[index] = 45;
+    rgba[index + 1] = 42;
+    rgba[index + 2] = 40;
+    rgba[index + 3] = 255;
+  }
+  for (let y = padY; y < height - padY; y++) {
+    for (let x = padX; x < width - padX; x++) {
+      const index = (y * width + x) * 4;
+      // Deliberately uneven lighting across the sheet.
+      const value = 200 + Math.round(40 * (x / width));
+      rgba[index] = value;
+      rgba[index + 1] = value;
+      rgba[index + 2] = value;
+    }
+  }
+  for (let line = 0; line < 8; line++) {
+    const top = padY + 40 + line * 30;
+    for (let y = top; y < top + 10 && y < height - padY; y++) {
+      for (let x = padX + 30; x < width - padX - 60; x++) {
+        const index = (y * width + x) * 4;
+        rgba[index] = 25;
+        rgba[index + 1] = 25;
+        rgba[index + 2] = 25;
+      }
+    }
+  }
+  return { rgba, width, height };
+}
+
+await test("detects the page edges within a photo", async () => {
+  const capture = makeCapture(600, 800, 80, 60);
+  const edges = core.detectDocumentEdges(capture.rgba, capture.width, capture.height);
+  assert(edges, "edges should be found");
+  assert(Math.abs(edges.left - 80) <= 2, `left ${edges.left}`);
+  assert(Math.abs(edges.top - 60) <= 2, `top ${edges.top}`);
+  assert(Math.abs(edges.right - 519) <= 2, `right ${edges.right}`);
+  assert(Math.abs(edges.bottom - 739) <= 2, `bottom ${edges.bottom}`);
+});
+
+await test("returns no edges for an image with no clear page", async () => {
+  // A uniformly bright frame has no detectable border to crop to.
+  const flat = new Uint8Array(200 * 200 * 4).fill(255);
+  assert(core.detectDocumentEdges(flat, 200, 200) === null, "uniform image should not be cropped");
+});
+
+await test("crops to the detected bounds", async () => {
+  const capture = makeCapture(600, 800, 80, 60);
+  const edges = core.detectDocumentEdges(capture.rgba, capture.width, capture.height);
+  const cropped = core.cropRgba(capture.rgba, capture.width, edges);
+  assert(cropped.width === 440 && cropped.height === 680, `got ${cropped.width}x${cropped.height}`);
+});
+
+await test("rotates a quarter turn and swaps the dimensions", async () => {
+  assert(core.shouldAutoRotate(800, 600), "landscape should rotate");
+  assert(!core.shouldAutoRotate(600, 800), "portrait should not rotate");
+
+  const source = makeCapture(120, 80, 10, 10);
+  const rotated = core.rotateRgba90(source.rgba, source.width, source.height);
+  assert(rotated.width === 80 && rotated.height === 120, `got ${rotated.width}x${rotated.height}`);
+  assert(rotated.rgba.length === source.rgba.length, "pixel count must be preserved");
+});
+
+await test("enhancement lifts the page toward white", async () => {
+  const capture = makeCapture(300, 400, 40, 30);
+  const mean = (pixels) => {
+    let total = 0;
+    for (let index = 0; index < pixels.length; index += 4) total += pixels[index];
+    return total / (pixels.length / 4);
+  };
+  const enhanced = core.enhanceScan(capture.rgba);
+  assert(enhanced.length === capture.rgba.length, "pixel count must be preserved");
+  assert(mean(enhanced) > mean(capture.rgba), "the page should get brighter overall");
+});
+
+await test("assembles multiple captures into one PDF", async () => {
+  const output = await core.scanToPdf(
+    [
+      { name: "one.jpg", ...makeCapture(600, 800, 80, 60) },
+      { name: "two.jpg", ...makeCapture(800, 600, 70, 50) },
+    ],
+    { pageSize: "a4" }
+  );
+  const inspected = await inspectPdf(output);
+  assert(inspected.pageCount === 2, `expected 2 pages, got ${inspected.pageCount}`);
+  assert(
+    Math.abs(inspected.pages[0].width - 595.28) < 1,
+    `expected A4 width, got ${inspected.pages[0].width}`
+  );
+});
+
+await test("fit mode sizes the page to the cropped capture", async () => {
+  const output = await core.scanToPdf(
+    [{ name: "one.jpg", ...makeCapture(600, 800, 80, 60) }],
+    { pageSize: "fit", margin: 0 }
+  );
+  const inspected = await inspectPdf(output);
+  // 440x680 pixels at 96 DPI is 330x510 points.
+  assert(Math.abs(inspected.pages[0].width - 330) < 2, `width ${inspected.pages[0].width}`);
+  assert(Math.abs(inspected.pages[0].height - 510) < 2, `height ${inspected.pages[0].height}`);
+});
+
+await test("requires at least one capture", async () => {
+  await assertRejects(
+    async () => core.scanToPdf([]),
+    /add at least one page/i,
+    "empty capture list"
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("PDF/A converter");
+
+await test("validates a document before exporting", async () => {
+  const validation = await core.validateForPdfA(await read("simple.pdf"));
+  assert(validation.convertible, "simple.pdf should be convertible");
+  assert(validation.pageCount === 2, `expected 2 pages, got ${validation.pageCount}`);
+  assert(validation.issues.length > 0, "validation should report its findings");
+});
+
+await test("reports fonts that are not embedded", async () => {
+  const validation = await core.validateForPdfA(await read("simple.pdf"));
+  // The fixture uses standard-14 fonts, which are never embedded.
+  assert(validation.nonEmbeddedFonts.length > 0, "expected non-embedded fonts to be listed");
+  assert(
+    validation.issues.some((issue) => issue.code === "standard-fonts-not-embedded"),
+    `expected a font warning, got ${validation.issues.map((i) => i.code)}`
+  );
+});
+
+await test("writes conforming PDF/A metadata", async () => {
+  const result = await core.convertToPdfA(await read("simple.pdf"), { level: "pdfa-2b" });
+  const raw = new TextDecoder("latin1").decode(result.data);
+  assert(/<pdfaid:part>2<\/pdfaid:part>/.test(raw), "expected pdfaid:part 2");
+  assert(/<pdfaid:conformance>B<\/pdfaid:conformance>/.test(raw), "expected conformance B");
+  assert(raw.includes("/OutputIntents"), "expected an output intent");
+  assert(raw.includes("sRGB"), "expected an sRGB colour profile reference");
+});
+
+await test("stamps the requested conformance level", async () => {
+  for (const [level, part] of [["pdfa-1b", 1], ["pdfa-2b", 2], ["pdfa-3b", 3]]) {
+    const result = await core.convertToPdfA(await read("simple.pdf"), { level });
+    const raw = new TextDecoder("latin1").decode(result.data);
+    assert(
+      new RegExp(`<pdfaid:part>${part}</pdfaid:part>`).test(raw),
+      `${level} should declare part ${part}`
+    );
+    assert(result.level === level, `result should report ${level}`);
+  }
+});
+
+await test("preserves document integrity", async () => {
+  const result = await core.convertToPdfA(await read("simple.pdf"));
+  const inspected = await inspectPdf(result.data);
+  assert(inspected.pageCount === 2, `page count must not change, got ${inspected.pageCount}`);
+  for (const value of ["Quarterly Report 2026", "Region", "Second Page Heading"]) {
+    assertIncludes(inspected.text, value, "content must survive conversion");
+  }
+});
+
+await test("reports what it repaired", async () => {
+  const result = await core.convertToPdfA(await read("simple.pdf"));
+  assert(result.repaired.length > 0, "expected a list of repairs");
+  assert(
+    result.repaired.some((entry) => /output intent/i.test(entry)),
+    `expected the output intent to be listed, got ${result.repaired}`
+  );
+});
+
+await test("rejects a document with no pages", async () => {
+  // pdf-lib's `create()` already includes a page, so a genuinely page-less
+  // file has to be written by hand to exercise the guard.
+  const emptyPdf = new TextEncoder().encode(
+    "%PDF-1.7\n" +
+      "1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n" +
+      "2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\n" +
+      "trailer<</Root 1 0 R/Size 3>>\n"
+  );
+
+  const validation = await core.validateForPdfA(emptyPdf).catch(() => null);
+  if (validation) {
+    assert(!validation.convertible, "a page-less document must not be convertible");
+    assert(
+      validation.issues.some((issue) => issue.code === "no-pages"),
+      `expected a no-pages issue, got ${validation.issues.map((i) => i.code)}`
+    );
+  }
+
+  await assertRejects(
+    async () => core.convertToPdfA(emptyPdf),
+    /no pages|cannot be converted|damaged/i,
+    "page-less document"
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("OCR");
+
+await test("only offers languages whose models are vendored", async () => {
+  const codes = core.OCR_LANGUAGES.map((entry) => entry.code);
+  for (const code of ["eng", "hin", "fra", "deu", "spa"]) {
+    assert(codes.includes(code), `expected ${code} to be offered`);
+  }
+});
+
+await test("normalises language selections", async () => {
+  assert(core.normalizeLanguages(["eng"]) === "eng", "single language");
+  // Several models are joined so a page can mix scripts.
+  assert(core.normalizeLanguages(["eng", "hin"]) === "eng+hin", "combined languages");
+  // Unknown codes must not reach Tesseract, which would fail to load them.
+  assert(core.normalizeLanguages(["klingon"]) === "eng", "unknown code falls back to English");
+  assert(core.normalizeLanguages([]) === "eng", "empty selection falls back to English");
+  assert(core.normalizeLanguages(undefined) === "eng", "missing selection falls back to English");
+});
+
+await test("the vendored language models and engine are present", async () => {
+  // OCR must work offline, so the assets have to ship with the app.
+  const { access } = await import("node:fs/promises");
+  const required = [
+    "public/tesseract/worker.min.js",
+    "public/tesseract/core/tesseract-core-simd-lstm.wasm",
+    "public/tesseract/lang/eng.traineddata.gz",
+    "public/tesseract/lang/hin.traineddata.gz",
+  ];
+  for (const path of required) {
+    await access(path).catch(() => {
+      throw new Error(`missing OCR asset: ${path}`);
+    });
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+
 suite("Round trips");
 
 await test("PDF to Word to PDF keeps the text intact", async () => {

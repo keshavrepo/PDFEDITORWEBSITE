@@ -17,6 +17,10 @@ coverage/
 # Conversion test artifacts (fixtures are generated on demand)
 .conversion-test-build/
 scripts/fixtures/generated/
+# Tesseract unpacks language data beside the working directory when a model is
+# fetched at runtime; the vendored copies under public/tesseract are the ones
+# that ship.
+/*.traineddata
 
 # Runtime-generated local blog uploads
 public/uploads/blog/*
