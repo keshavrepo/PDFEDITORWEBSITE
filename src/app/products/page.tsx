@@ -6,8 +6,14 @@ import { Footer } from "@/components/footer";
 import { ProductCard } from "@/components/product-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ArrowRight, Layers } from "lucide-react";
-import { activeProducts, platform, products, upcomingProducts } from "@/lib/products";
+import { ArrowRight, Layers, Tag } from "lucide-react";
+import {
+  activeProducts,
+  platform,
+  productCategories,
+  products,
+  upcomingProducts,
+} from "@/lib/products";
 import { getAppUrl } from "@/lib/env";
 import { tools } from "@/lib/tools";
 
@@ -96,6 +102,16 @@ export default async function ProductsPage() {
               {activeProducts.length} available · {upcomingProducts.length} coming soon
             </div>
             <h1 className="text-4xl md:text-5xl font-bold mb-4">Products</h1>
+            <div className="flex flex-wrap gap-2 mb-5">
+              {productCategories().map((category) => (
+                <span
+                  key={category}
+                  className="rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground"
+                >
+                  {category}
+                </span>
+              ))}
+            </div>
             <p className="text-lg text-muted-foreground">
               {platform.name} is built as a suite of focused modules that share one account and
               the same privacy-first approach. PDFPilot is live today; the rest are listed here so
@@ -122,6 +138,59 @@ export default async function ProductsPage() {
               <ProductCard key={product.id} product={product} />
             ))}
           </ul>
+        </section>
+
+        {/* Release notes for everything that has shipped. */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-6">
+            Release notes
+          </h2>
+          <div className="space-y-6">
+            {activeProducts.map((product) => (
+              <Card key={product.id} className="p-6">
+                <div className="flex flex-wrap items-center gap-3 mb-5">
+                  <h3 className="font-semibold">{product.name}</h3>
+                  <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                    v{product.version}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <Tag className="h-3 w-3" aria-hidden="true" />
+                    {product.category}
+                  </span>
+                </div>
+
+                <ol className="space-y-5">
+                  {product.releaseNotes.map((release) => (
+                    <li key={release.version} className="border-l-2 border-border/60 pl-4">
+                      <div className="flex flex-wrap items-baseline gap-2 mb-1.5">
+                        <span className="text-sm font-medium">v{release.version}</span>
+                        <time
+                          dateTime={release.date}
+                          className="text-xs text-muted-foreground"
+                        >
+                          {new Date(release.date).toLocaleDateString(undefined, {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })}
+                        </time>
+                      </div>
+                      <ul className="space-y-1">
+                        {release.changes.map((change) => (
+                          <li
+                            key={change}
+                            className="text-sm text-muted-foreground leading-relaxed"
+                          >
+                            {change}
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ol>
+              </Card>
+            ))}
+          </div>
         </section>
 
         <section className="border-t bg-muted/30 py-16">

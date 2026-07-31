@@ -14,6 +14,26 @@ the products page and the footer. Launching a new module is a matter of adding
 its entry and flipping the status, with no changes needed in the surrounding
 navigation or layout.
 
+## Platform services
+
+Shared services live in `src/lib/platform` and are used by every product, so a
+new module inherits them rather than reimplementing them:
+
+- **Global search** (`search.ts`) indexes products, tools and documentation in
+  memory and merges published blog articles from the database. Open it
+  anywhere with `Cmd`/`Ctrl`+`K`.
+- **File manager** (`files.ts`) is one shared history. Files carry a
+  `productId`, so listing, searching, renaming, favouriting, downloading and
+  deleting work the same for every product. Deletes are soft, which keeps the
+  related processing history intact.
+- **Activity and notifications** (`activity.ts`) merge conversions, uploads and
+  audit-log events into one timeline, and back the notification centre.
+  Products report work by posting to `/api/activity`.
+- **Usage statistics** (`usage.ts`) derive dashboard figures from the user's
+  own rows; when nothing has run the numbers are genuinely zero.
+- **Preferences** (`preferences.ts`) store theme and per-category notification
+  settings on the account.
+
 ## Platform routes
 
 | Route | Purpose |
@@ -23,6 +43,9 @@ navigation or layout.
 | `/products/pdfpilot` | PDFPilot product overview |
 | `/tools` | PDFPilot tool directory (unchanged) |
 | `/tools/*` | Individual PDF tools (unchanged) |
+| `/files` | Unified file manager, shared by every product |
+| `/dashboard` | Storage, files, activity, favourites and usage |
+| `/docs` | Documentation, with guides authored in the blog CMS |
 
 Existing PDFPilot URLs are preserved exactly; `/pdfpilot` and `/product/pdfpilot`
 are added as convenience aliases that redirect into the platform routes.

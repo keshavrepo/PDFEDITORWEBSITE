@@ -9,6 +9,24 @@
 
 export type ProductStatus = "active" | "coming-soon";
 
+export type ProductCategory =
+  | "Documents"
+  | "Media"
+  | "Developer"
+  | "Web"
+  | "Finance"
+  | "AI";
+
+/** A dated entry in a product's changelog. */
+export interface ReleaseNote {
+  /** Semantic version this note describes. */
+  version: string;
+  /** ISO date, rendered in the user's locale. */
+  date: string;
+  /** What shipped, written for users rather than as commit messages. */
+  changes: string[];
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -16,12 +34,17 @@ export interface Product {
   tagline: string;
   description: string;
   status: ProductStatus;
+  category: ProductCategory;
+  /** Current version. Only meaningful once a product is active. */
+  version: string;
   /** Landing route. Only set for products that are live. */
   href?: string;
   /** Tailwind accent classes, kept inside the existing palette. */
   accent: string;
   /** Representative capabilities shown on the product card. */
   highlights: string[];
+  /** Newest first. Empty until a product ships. */
+  releaseNotes: ReleaseNote[];
 }
 
 export const products: Product[] = [
@@ -32,9 +55,57 @@ export const products: Product[] = [
     description:
       "Convert, organise, optimise, edit and secure PDFs without uploading them. Twenty-eight tools covering Word, Excel, PowerPoint, images, OCR, forms, redaction and archival PDF/A.",
     status: "active",
+    category: "Documents",
+    version: "1.4.0",
     href: "/tools",
     accent: "text-primary",
-    highlights: ["28 tools", "Runs in your browser", "No file uploads"],
+    highlights: ["27 tools", "Runs in your browser", "No file uploads"],
+    releaseNotes: [
+      {
+        version: "1.4.0",
+        date: "2026-07-31",
+        changes: [
+          "Added OCR for scanned PDFs with searchable output in five languages",
+          "Added Scan to PDF with edge detection, auto-crop and auto-rotate",
+          "Added Compare PDF with page alignment and word-level differences",
+          "Added PDF/A conversion with validation before export",
+        ],
+      },
+      {
+        version: "1.3.0",
+        date: "2026-07-31",
+        changes: [
+          "Added fillable form detection and completion",
+          "Added page numbering with header and footer placement",
+          "Added cropping with a live preview and white-margin removal",
+          "Added permanent redaction that removes text from the file itself",
+        ],
+      },
+      {
+        version: "1.2.0",
+        date: "2026-07-31",
+        changes: [
+          "Added PDF to Excel and Excel to PDF, including legacy .xls",
+          "Added PDF to JPG or PNG with selectable resolution",
+          "Added JPG or PNG to PDF with reordering and layout options",
+        ],
+      },
+      {
+        version: "1.1.0",
+        date: "2026-07-31",
+        changes: [
+          "Detect unreadable PDFs and report when OCR is required",
+          "Added a pluggable conversion engine architecture",
+        ],
+      },
+      {
+        version: "1.0.0",
+        date: "2026-07-31",
+        changes: [
+          "Added PDF to Word, Word to PDF, PDF to PowerPoint and PowerPoint to PDF",
+        ],
+      },
+    ],
   },
   {
     id: "imagepilot",
@@ -43,8 +114,11 @@ export const products: Product[] = [
     description:
       "Resize, convert, compress and clean up images in bulk, with the same privacy-first browser processing as PDFPilot.",
     status: "coming-soon",
+    category: "Media",
+    version: "0.0.0",
     accent: "text-muted-foreground",
     highlights: ["Bulk conversion", "Smart compression", "Background removal"],
+    releaseNotes: [],
   },
   {
     id: "devpilot",
@@ -53,8 +127,11 @@ export const products: Product[] = [
     description:
       "Formatters, validators, encoders and generators for the tasks developers reach for a dozen times a day.",
     status: "coming-soon",
+    category: "Developer",
+    version: "0.0.0",
     accent: "text-muted-foreground",
     highlights: ["JSON and YAML tools", "Encoding helpers", "Diff and validate"],
+    releaseNotes: [],
   },
   {
     id: "officepilot",
@@ -63,8 +140,11 @@ export const products: Product[] = [
     description:
       "Create and transform Word, Excel and PowerPoint files directly in the browser, building on the OOXML engine behind PDFPilot.",
     status: "coming-soon",
+    category: "Documents",
+    version: "0.0.0",
     accent: "text-muted-foreground",
     highlights: ["Office formats", "Templates", "Batch processing"],
+    releaseNotes: [],
   },
   {
     id: "webpilot",
@@ -73,8 +153,11 @@ export const products: Product[] = [
     description:
       "Audit performance, inspect metadata and generate the assets a site needs before it ships.",
     status: "coming-soon",
+    category: "Web",
+    version: "0.0.0",
     accent: "text-muted-foreground",
     highlights: ["SEO audits", "Metadata tools", "Asset generation"],
+    releaseNotes: [],
   },
   {
     id: "financepilot",
@@ -83,8 +166,11 @@ export const products: Product[] = [
     description:
       "Generate invoices, reconcile statements and extract structured data from financial paperwork.",
     status: "coming-soon",
+    category: "Finance",
+    version: "0.0.0",
     accent: "text-muted-foreground",
     highlights: ["Invoice builder", "Statement parsing", "Exports"],
+    releaseNotes: [],
   },
   {
     id: "aipilot",
@@ -93,8 +179,11 @@ export const products: Product[] = [
     description:
       "Summarise, translate and question your documents, with on-device processing wherever the model allows.",
     status: "coming-soon",
+    category: "AI",
+    version: "0.0.0",
     accent: "text-muted-foreground",
     highlights: ["Summaries", "Translation", "Document Q&A"],
+    releaseNotes: [],
   },
 ];
 
@@ -103,6 +192,11 @@ export const upcomingProducts = products.filter((product) => product.status === 
 
 export function getProduct(id: string): Product | undefined {
   return products.find((product) => product.id === id);
+}
+
+/** Every category that has at least one product, in registry order. */
+export function productCategories(): ProductCategory[] {
+  return [...new Set(products.map((product) => product.category))];
 }
 
 /** Platform-level identity, distinct from the per-product branding. */

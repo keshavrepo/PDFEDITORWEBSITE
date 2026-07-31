@@ -31,6 +31,7 @@ import {
   buildOutputName,
   type ConversionToolConfig,
 } from "@/lib/conversion/tool-config";
+import { recordActivity } from "@/lib/platform/record-activity";
 
 interface DocumentConverterProps {
   tool: ConversionToolConfig;
@@ -225,14 +226,33 @@ export function DocumentConverter({ tool }: DocumentConverterProps) {
       if (controller.signal.aborted) return;
 
       const blob = new Blob([output as unknown as BlobPart], { type: tool.outputMimeType });
-      setResult({ blob, name: buildOutputName(file.name, tool) });
+      const outputName = buildOutputName(file.name, tool);
+      setResult({ blob, name: outputName });
       setElapsed((performance.now() - startedAt) / 1000);
       setPhase("done");
+
+      // Report to the platform so the file manager, timeline and dashboard
+      // reflect the work. Only the name and size are sent.
+      void recordActivity({
+        toolName: tool.name,
+        fileName: outputName,
+        fileSize: blob.size,
+        mimeType: tool.outputMimeType,
+        inputFileSize: file.size,
+        processingTime: Math.round(performance.now() - startedAt),
+      });
     } catch (conversionError) {
       if (controller.signal.aborted) return;
-      setError(toConversionMessage(conversionError));
+      const message = toConversionMessage(conversionError);
+      setError(message);
       setPhase("ready");
       setProgress(null);
+      void recordActivity({
+        toolName: tool.name,
+        status: "failed",
+        inputFileSize: file.size,
+        errorMessage: message,
+      });
     } finally {
       abortRef.current = null;
     }

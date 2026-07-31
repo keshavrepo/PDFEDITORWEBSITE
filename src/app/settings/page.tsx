@@ -6,6 +6,8 @@ import { users } from "@/db/schema";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { SettingsForms } from "@/components/settings-forms";
+import { PreferencesForm } from "@/components/preferences-form";
+import { parsePreferences } from "@/lib/platform/preferences";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +20,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
   if (!user) redirect("/login");
 
   const [account] = await db
-    .select({ passwordHash: users.passwordHash })
+    .select({ passwordHash: users.passwordHash, preferences: users.preferences })
     .from(users)
     .where(eq(users.id, user.id))
     .limit(1);
@@ -33,11 +35,14 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           <h1 className="text-3xl md:text-4xl font-bold">Settings</h1>
         </section>
         <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
-          <SettingsForms
-            user={user}
-            hasPassword={Boolean(account.passwordHash)}
-            billingStatus={(await searchParams).billing}
-          />
+          <div className="space-y-10">
+            <SettingsForms
+              user={user}
+              hasPassword={Boolean(account.passwordHash)}
+              billingStatus={(await searchParams).billing}
+            />
+            <PreferencesForm initial={parsePreferences(account.preferences)} />
+          </div>
         </section>
       </main>
       <Footer />

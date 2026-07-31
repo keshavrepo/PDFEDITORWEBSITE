@@ -9,7 +9,8 @@ export function Footer() {
       { label: "Products", href: "/products" },
       { label: "Features", href: "/features" },
       { label: "Pricing", href: "/pricing" },
-      { label: "API", href: "/api-docs" },
+      { label: "Dashboard", href: "/dashboard" },
+      { label: "Files", href: "/files" },
     ],
     Company: [
       { label: "About", href: "/about" },
@@ -22,6 +23,7 @@ export function Footer() {
       { label: "Help Center", href: "/help" },
       { label: "Community", href: "/community" },
       { label: "Status", href: "/status" },
+      { label: "API", href: "/api-docs" },
     ],
     Legal: [
       { label: "Privacy", href: "/privacy" },

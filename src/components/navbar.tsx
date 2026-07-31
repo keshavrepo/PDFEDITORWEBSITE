@@ -18,6 +18,8 @@ import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/logo";
 import { platform } from "@/lib/products";
+import { GlobalSearch } from "@/components/global-search";
+import { NotificationCenter } from "@/components/notification-center";
 import { signOut, useSession } from "next-auth/react";
 
 interface NavbarProps {
@@ -113,6 +115,10 @@ export function Navbar({ user: serverUser }: NavbarProps) {
 
           {/* Right Side Actions */}
           <div className="hidden md:flex items-center space-x-3">
+            <GlobalSearch />
+
+            {user && <NotificationCenter />}
+
             <Button
               variant="ghost"
               size="icon"
@@ -153,6 +159,9 @@ export function Navbar({ user: serverUser }: NavbarProps) {
                     <Link href="/dashboard">Dashboard</Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
+                    <Link href="/files">Files</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
                     <Link href="/settings">Settings</Link>
                   </DropdownMenuItem>
                   {user.role === "admin" && (
@@ -180,17 +189,22 @@ export function Navbar({ user: serverUser }: NavbarProps) {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden p-2 rounded-xl hover:bg-accent transition-colors"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            {mobileMenuOpen ? (
-              <X className="w-5 h-5" />
-            ) : (
-              <Menu className="w-5 h-5" />
-            )}
-          </button>
+          {/* Mobile actions */}
+          <div className="flex items-center gap-1 md:hidden">
+            <GlobalSearch />
+            {user && <NotificationCenter />}
+            <button
+              className="p-2 rounded-xl hover:bg-accent transition-colors"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            >
+              {mobileMenuOpen ? (
+                <X className="w-5 h-5" />
+              ) : (
+                <Menu className="w-5 h-5" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -234,6 +248,13 @@ export function Navbar({ user: serverUser }: NavbarProps) {
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Dashboard
+                  </Link>
+                  <Link
+                    href="/files"
+                    className="block px-4 py-3 text-sm rounded-2xl hover:bg-accent"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Files
                   </Link>
                   <Link
                     href="/settings"

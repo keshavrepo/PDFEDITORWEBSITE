@@ -54,6 +54,17 @@ export function ProductCard({ product }: { product: Product }) {
         </span>
       </div>
 
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+          {product.category}
+        </span>
+        {isActive && (
+          <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            v{product.version}
+          </span>
+        )}
+      </div>
+
       <p className="text-sm font-medium mb-2">{product.tagline}</p>
       <p className="text-sm text-muted-foreground leading-relaxed mb-5 flex-1">
         {product.description}

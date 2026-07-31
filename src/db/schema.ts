@@ -85,26 +85,43 @@ export const accounts = pgTable(
   ]
 );
 
-// User files with ownership
-export const files = pgTable("files", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  filename: text("filename").notNull(),
-  originalName: text("original_name").notNull(),
-  size: integer("size").notNull(),
-  mimeType: varchar("mime_type", { length: 100 }),
-  status: varchar("status", { length: 50 }).default("pending").notNull(),
-  storagePath: text("storage_path"),
-  temporaryPath: text("temporary_path"),
-  downloadCount: integer("download_count").default(0).notNull(),
-  expiresAt: timestamp("expires_at"), // For free tier auto-delete
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+// User files with ownership.
+//
+// Shared by every LaunchStack product: `productId` records which module wrote
+// the entry, so the file manager stays a single implementation as products are
+// added rather than each one keeping its own history.
+export const files = pgTable(
+  "files",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    productId: varchar("product_id", { length: 50 }).default("pdfpilot").notNull(),
+    filename: text("filename").notNull(),
+    originalName: text("original_name").notNull(),
+    size: integer("size").notNull(),
+    mimeType: varchar("mime_type", { length: 100 }),
+    status: varchar("status", { length: 50 }).default("pending").notNull(),
+    storagePath: text("storage_path"),
+    temporaryPath: text("temporary_path"),
+    downloadCount: integer("download_count").default(0).notNull(),
+    isFavorite: boolean("is_favorite").default(false).notNull(),
+    // Soft delete keeps processing history intact when a file is removed.
+    deletedAt: timestamp("deleted_at"),
+    expiresAt: timestamp("expires_at"), // For free tier auto-delete
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("files_user_created_idx").on(table.userId, table.createdAt),
+    index("files_user_product_idx").on(table.userId, table.productId),
+  ]
+);
 
 // Processing history per user
 export const processingHistory = pgTable("processing_history", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  productId: varchar("product_id", { length: 50 }).default("pdfpilot").notNull(),
   toolName: varchar("tool_name", { length: 100 }).notNull(),
   fileId: uuid("file_id").references(() => files.id, { onDelete: "set null" }),
   inputFileSize: integer("input_file_size"),
@@ -116,17 +133,45 @@ export const processingHistory = pgTable("processing_history", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// User favorites
+// User favorites.
+//
+// `toolName` predates the platform and is kept as the identifier column;
+// `kind` widens it so products can be favourited alongside tools without a
+// second table or a breaking rename.
 export const favorites = pgTable(
   "favorites",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
     toolName: varchar("tool_name", { length: 100 }).notNull(),
+    kind: varchar("kind", { length: 20 }).default("tool").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex("favorites_user_tool_unique").on(table.userId, table.toolName),
+  ]
+);
+
+// Notification centre entries, written by any product on the platform.
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    productId: varchar("product_id", { length: 50 }).default("launchstack").notNull(),
+    // conversion, upload, subscription, account, system
+    category: varchar("category", { length: 30 }).default("system").notNull(),
+    // info, success, warning, error
+    level: varchar("level", { length: 20 }).default("info").notNull(),
+    title: varchar("title", { length: 200 }).notNull(),
+    body: text("body"),
+    href: text("href"),
+    readAt: timestamp("read_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("notifications_user_created_idx").on(table.userId, table.createdAt),
+    index("notifications_user_read_idx").on(table.userId, table.readAt),
   ]
 );
 
