@@ -13,6 +13,7 @@ export type ConversionErrorCode =
   | "encrypted"
   | "unsupported-format"
   | "no-content"
+  | "ocr-required"
   | "processing-failed";
 
 export class ConversionError extends Error {
@@ -53,6 +54,16 @@ export const conversionErrors = {
     new ConversionError(
       "no-content",
       `This ${expected} file contains no readable content to convert.`
+    ),
+  /**
+   * Raised instead of emitting a document full of glyph garbage. The wording is
+   * fixed because it is shown verbatim to users.
+   */
+  ocrRequired: (detail?: string) =>
+    new ConversionError(
+      "ocr-required",
+      "This PDF uses embedded or legacy fonts that cannot be converted directly into editable text. OCR is required for accurate conversion.",
+      { cause: detail }
     ),
   processingFailed: (cause?: unknown) =>
     new ConversionError(

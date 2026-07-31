@@ -47,6 +47,10 @@ export async function openPdf(data: Uint8Array): Promise<LoadedPdf> {
       // Style/width fidelity depends on real font programs being available.
       useSystemFonts: false,
       disableFontFace: true,
+      // Exposes `toUnicode`, `isSymbolicFont` and encoding details on font
+      // objects. Text-quality detection needs these to tell genuine Unicode
+      // text apart from legacy glyph-encoded fonts such as Kruti Dev.
+      fontExtraProperties: true,
       // pdf.js resolves these relative to its own module URL when omitted,
       // which breaks under bundlers.
       standardFontDataUrl: resolveStandardFontUrl(),

@@ -9,7 +9,7 @@
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, PDFName, StandardFonts, rgb } from "pdf-lib";
 import {
   AlignmentType,
   BorderStyle,
@@ -149,6 +149,186 @@ async function buildRotatedPdf() {
   rotated.drawText("Rotated page content", { x: 56, y: 780, size: 16, font });
   rotated.setRotation({ type: "degrees", angle: 90 });
 
+  return pdf.save();
+}
+
+/* -------------------------------------------------------------------------- */
+/* Text-quality fixtures                                                      */
+/* -------------------------------------------------------------------------- */
+
+const HINDI_LINES = [
+  "भारत सरकार",
+  "राजस्व विभाग कार्यालय",
+  "यह हिंदी यूनिकोड दस्तावेज़ है।",
+  "आवेदन संख्या 12345",
+];
+
+const toHex = (value) => value.toString(16).padStart(4, "0").toUpperCase();
+
+/**
+ * Proper Unicode Hindi PDF: an Identity-H composite font carrying a real
+ * ToUnicode CMap, exactly as a modern Word or LaTeX export produces. Text is
+ * fully recoverable, so this must convert natively.
+ */
+async function buildUnicodeHindiPdf() {
+  const characters = [...new Set(HINDI_LINES.join("").split(""))];
+  const cids = new Map(characters.map((character, index) => [character, index + 1]));
+
+  const bfChar = [...cids]
+    .map(([character, cid]) => `<${toHex(cid)}> <${toHex(character.codePointAt(0))}>`)
+    .join("\n");
+
+  const cmap = `/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CMapName /PDFPilot-H def
+/CMapType 2 def
+/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def
+1 begincodespacerange
+<0000> <FFFF>
+endcodespacerange
+${cids.size} beginbfchar
+${bfChar}
+endbfchar
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end`;
+
+  const pdf = await PDFDocument.create();
+  const context = pdf.context;
+  const page = pdf.addPage([595.28, 841.89]);
+
+  const descriptor = context.obj({
+    Type: "FontDescriptor",
+    FontName: "NotoSansDevanagari",
+    Flags: 4,
+    ItalicAngle: 0,
+    Ascent: 1069,
+    Descent: -293,
+    CapHeight: 714,
+    StemV: 80,
+    FontBBox: context.obj([-1000, -500, 2000, 1100]),
+  });
+  const descendant = context.obj({
+    Type: "Font",
+    Subtype: "CIDFontType2",
+    BaseFont: "NotoSansDevanagari",
+    CIDSystemInfo: context.obj({ Registry: "Adobe", Ordering: "Identity", Supplement: 0 }),
+    FontDescriptor: context.register(descriptor),
+    DW: 600,
+  });
+  const font = context.obj({
+    Type: "Font",
+    Subtype: "Type0",
+    BaseFont: "NotoSansDevanagari",
+    Encoding: "Identity-H",
+    DescendantFonts: context.obj([context.register(descendant)]),
+    ToUnicode: context.register(context.flateStream(cmap)),
+  });
+  page.node.set(PDFName.of("Resources"), context.obj({ Font: context.obj({ F1: context.register(font) }) }));
+
+  const encode = (line) => [...line].map((character) => toHex(cids.get(character))).join("");
+  let y = 780;
+  const operations = HINDI_LINES.map((line, index) => {
+    const size = index === 0 ? 22 : 14;
+    const operation = `BT /F1 ${size} Tf 56 ${y} Td <${encode(line)}> Tj ET`;
+    y -= 40;
+    return operation;
+  });
+  page.node.set(PDFName.of("Contents"), context.register(context.flateStream(operations.join("\n"))));
+
+  return pdf.save();
+}
+
+/**
+ * Government-style legacy PDF: a symbolic TrueType font named Kruti Dev with no
+ * embedded font program and no ToUnicode map.
+ *
+ * The bytes spell "Hkkjr ljdkj", which renders as "भारत सरकार" only because the
+ * font remaps glyphs. Extraction yields valid ASCII that means nothing, which
+ * is precisely the case the quality gate must catch.
+ */
+async function buildLegacyGovernmentPdf() {
+  const pdf = await PDFDocument.create();
+  const context = pdf.context;
+  const page = pdf.addPage([595.28, 841.89]);
+
+  const font = context.obj({
+    Type: "Font",
+    Subtype: "TrueType",
+    BaseFont: "ABCDEF+KrutiDev010",
+    FirstChar: 32,
+    LastChar: 255,
+    Widths: context.obj(Array.from({ length: 224 }, () => 500)),
+    Encoding: "WinAnsiEncoding",
+    FontDescriptor: context.obj({
+      Type: "FontDescriptor",
+      FontName: "ABCDEF+KrutiDev010",
+      // Flag 4 marks the font symbolic: its encoding is font-specific.
+      Flags: 4,
+      ItalicAngle: 0,
+      Ascent: 750,
+      Descent: -250,
+      CapHeight: 700,
+      StemV: 80,
+      FontBBox: context.obj([-100, -250, 1000, 750]),
+    }),
+  });
+  page.node.set(PDFName.of("Resources"), context.obj({ Font: context.obj({ F1: context.register(font) }) }));
+
+  const lines = [
+    "BT /F1 18 Tf 56 780 Td (Hkkjr ljdkj) Tj ET",
+    "BT /F1 14 Tf 56 750 Td (jktLo foHkkx dk;kZy;) Tj ET",
+    "BT /F1 12 Tf 56 720 Td (vkosnu i= la[;k 12345) Tj ET",
+    "BT /F1 12 Tf 56 690 Td (fnukad 15@08@2026 dks tkjh fd;k x;k) Tj ET",
+    "BT /F1 12 Tf 56 660 Td (izek.k i= la[;k RJ&2026&8871) Tj ET",
+  ];
+  page.node.set(PDFName.of("Contents"), context.register(context.flateStream(lines.join("\n"))));
+
+  return pdf.save();
+}
+
+/**
+ * Scanned document: full-page raster images and no text layer at all, the way
+ * a flatbed scanner or phone camera capture arrives.
+ */
+async function buildScannedPdf(pageCount = 2) {
+  const width = 850;
+  const height = 1100;
+  const rgba = new Uint8Array(width * height * 4).fill(255);
+
+  const ink = (x0, y0, w, h) => {
+    for (let y = y0; y < y0 + h; y++) {
+      for (let x = x0; x < x0 + w; x++) {
+        const index = (y * width + x) * 4;
+        rgba[index] = 30;
+        rgba[index + 1] = 30;
+        rgba[index + 2] = 30;
+      }
+    }
+  };
+  // Draw text-like bars so the page looks like a scan of a written document.
+  for (let line = 0; line < 24; line++) {
+    let x = 90;
+    const y = 120 + line * 38;
+    for (let word = 0; word < 7 + ((line * 3) % 5); word++) {
+      const wordWidth = 22 + ((line * 7 + word * 13) % 46);
+      ink(x, y, wordWidth, 10);
+      x += wordWidth + 12;
+      if (x > width - 140) break;
+    }
+  }
+
+  const { encodePng } = await loadConversionCore();
+  const png = Buffer.from(await encodePng(rgba, width, height));
+
+  const pdf = await PDFDocument.create();
+  const image = await pdf.embedPng(png);
+  for (let index = 0; index < pageCount; index++) {
+    const page = pdf.addPage([612, 792]);
+    page.drawImage(image, { x: 0, y: 0, width: 612, height: 792 });
+  }
   return pdf.save();
 }
 
@@ -557,6 +737,9 @@ export async function generateFixtures() {
     "large.pdf": await buildLargePdf(),
     "rotated.pdf": await buildRotatedPdf(),
     "blank.pdf": await buildEmptyContentPdf(),
+    "hindi-unicode.pdf": await buildUnicodeHindiPdf(),
+    "gov-legacy-hindi.pdf": await buildLegacyGovernmentPdf(),
+    "scanned.pdf": await buildScannedPdf(),
     "corrupted.pdf": buildCorruptedPdf(simplePdf),
     "rich.docx": richDocx,
     "landscape.docx": await buildLandscapeDocx(),

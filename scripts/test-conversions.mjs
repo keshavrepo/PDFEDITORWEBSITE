@@ -530,6 +530,239 @@ await test("converts a 40-slide deck with every slide present", async () => {
 
 /* -------------------------------------------------------------------------- */
 
+suite("Text quality detection");
+
+await test("normal English PDF is detected as natively convertible", async () => {
+  const analysis = await core.analyzePdfForConversion(await read("simple.pdf"));
+  assert(analysis.badge === "native", `expected native badge, got ${analysis.badge}`);
+  assert(analysis.canConvertNatively, "English PDF must convert natively");
+  assert(analysis.engine?.id === "native-pdf", `expected native engine, got ${analysis.engine?.id}`);
+  assert(analysis.quality.issues.length === 0, `unexpected issues: ${analysis.quality.issues}`);
+  assert(analysis.quality.confidence >= 0.8, `low confidence: ${analysis.quality.confidence}`);
+});
+
+await test("Unicode Hindi PDF is detected as natively convertible", async () => {
+  const analysis = await core.analyzePdfForConversion(await read("hindi-unicode.pdf"));
+  assert(analysis.badge === "native", `expected native badge, got ${analysis.badge}`);
+  assert(analysis.canConvertNatively, "Unicode Hindi must convert natively");
+  assert(
+    analysis.quality.issues.length === 0,
+    `Devanagari text must not be flagged: ${analysis.quality.issues}`
+  );
+});
+
+await test("Unicode Hindi PDF converts with Devanagari text intact", async () => {
+  const output = await core.convertPdfToWord(await read("hindi-unicode.pdf"));
+  await assertValidPackage(output, ["word/document.xml"]);
+  const summary = await summarizeDocx(output);
+  assertIncludes(summary.text, "भारत सरकार", "Hindi heading");
+  assertIncludes(summary.text, "आवेदन", "Hindi body text");
+  assert(
+    !/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(summary.text),
+    "output must not contain XML-illegal control characters"
+  );
+});
+
+await test("Government legacy-font PDF is detected as requiring OCR", async () => {
+  const analysis = await core.analyzePdfForConversion(await read("gov-legacy-hindi.pdf"));
+  assert(analysis.badge === "ocr-required", `expected ocr-required, got ${analysis.badge}`);
+  assert(!analysis.canConvertNatively, "legacy-font PDF must not convert natively");
+  assert(analysis.engine === null, "no engine should accept a legacy-font PDF yet");
+  assert(
+    analysis.quality.issues.includes("legacy-encoded-font"),
+    `expected legacy-encoded-font, got ${analysis.quality.issues}`
+  );
+  assert(
+    analysis.quality.legacyFonts.some((font) => /kruti/i.test(font)),
+    `expected Kruti Dev to be named, got ${analysis.quality.legacyFonts}`
+  );
+});
+
+await test("Government legacy-font PDF shows the exact required message", async () => {
+  const analysis = await core.analyzePdfForConversion(await read("gov-legacy-hindi.pdf"));
+  assert(
+    analysis.blockedReason === core.OCR_REQUIRED_MESSAGE,
+    `unexpected message: ${analysis.blockedReason}`
+  );
+  assert(
+    core.OCR_REQUIRED_MESSAGE ===
+      "This PDF uses embedded or legacy fonts that cannot be converted directly into editable text. OCR is required for accurate conversion.",
+    "the user-facing message must match the agreed wording exactly"
+  );
+});
+
+await test("scanned PDF is detected as requiring OCR", async () => {
+  const analysis = await core.analyzePdfForConversion(await read("scanned.pdf"));
+  assert(analysis.badge === "ocr-required", `expected ocr-required, got ${analysis.badge}`);
+  assert(analysis.quality.looksScanned, "scanned document must be recognised as scanned");
+  assert(
+    analysis.quality.issues.includes("scanned-document"),
+    `expected scanned-document, got ${analysis.quality.issues}`
+  );
+});
+
+await test("no broken document is generated for legacy or scanned PDFs", async () => {
+  // The guard lives inside the converters, so even a direct API call refuses.
+  for (const name of ["gov-legacy-hindi.pdf", "scanned.pdf"]) {
+    await assertRejects(
+      async () => core.convertPdfToWord(await read(name)),
+      /OCR is required for accurate conversion/,
+      `${name} to Word`
+    );
+    await assertRejects(
+      async () => core.convertPdfToPowerPoint(await read(name)),
+      /OCR is required for accurate conversion/,
+      `${name} to PowerPoint`
+    );
+  }
+});
+
+await test("existing English and image PDFs are never falsely flagged", async () => {
+  for (const name of ["simple.pdf", "images.pdf", "large.pdf", "rotated.pdf"]) {
+    const analysis = await core.analyzePdfForConversion(await read(name));
+    assert(
+      analysis.badge === "native",
+      `${name} was wrongly flagged as ${analysis.badge} (${analysis.quality.issues})`
+    );
+  }
+});
+
+await test("legacy font names are recognised across vendors and subset tags", async () => {
+  const legacy = [
+    "KrutiDev010", "ABCDEF+Kruti Dev 010", "DevLys 010", "Chanakya",
+    "Shree-Lipi", "Shivaji01", "AkrutiDev Priya", "DV-TTYogesh", "Millennium",
+  ];
+  for (const font of legacy) {
+    assert(core.isLegacyEncodedFont(font), `${font} should be recognised as legacy`);
+  }
+
+  const modern = [
+    "Arial", "Times New Roman", "Calibri", "Noto Sans Devanagari",
+    "Mangal", "Nirmala UI", "Helvetica", "Georgia", "Courier New",
+  ];
+  for (const font of modern) {
+    assert(!core.isLegacyEncodedFont(font), `${font} must not be treated as legacy`);
+  }
+});
+
+await test("glyph-garbage scoring separates legacy output from English prose", async () => {
+  const garbage = "Hkkjr ljdkj jktLo foHkkx dk;kZy; vkosnu i= la[;k izek.k";
+  const english =
+    "The quarterly report summarises revenue growth across every region and highlights the outlook.";
+
+  assert(core.scoreGlyphGarbage(garbage) > 0.5, "legacy output should score high");
+  assert(core.scoreGlyphGarbage(english) < 0.2, "English prose should score low");
+  // Real Devanagari must never be treated as garbage.
+  assert(
+    core.scoreGlyphGarbage("भारत सरकार राजस्व विभाग कार्यालय आवेदन संख्या") === 0,
+    "Unicode Devanagari must score zero"
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Conversion engine architecture");
+
+await test("native engine is registered and reports its capabilities", async () => {
+  const engine = core.getEngine("native-pdf");
+  assert(engine, "native engine must be registered");
+  assert(await engine.isAvailable(), "native engine must be available");
+  assert(engine.capabilities.privacyPreserving, "native engine runs on-device");
+  assert(!engine.capabilities.opticalCharacterRecognition, "native engine is not an OCR engine");
+  assert(engine.capabilities.outputs.includes("docx"), "native engine must support docx");
+});
+
+await test("native engine declines documents that need OCR", async () => {
+  const engine = core.getEngine("native-pdf");
+  const good = { strategy: "native", issues: [] };
+  const bad = { strategy: "ocr-required", issues: ["legacy-encoded-font"] };
+
+  assert(engine.canHandle({ output: "docx", quality: good }), "should accept readable text");
+  assert(!engine.canHandle({ output: "docx", quality: bad }), "should decline unreadable text");
+  assert(!engine.canHandle({ output: "pdf", quality: good }), "should decline unsupported output");
+});
+
+await test("a future OCR engine can be plugged in without UI changes", async () => {
+  // Proves the registry contract: registering an OCR engine makes previously
+  // blocked documents convertible, with no change to the calling code.
+  const calls = [];
+  core.registerEngine({
+    id: "tesseract-ocr",
+    name: "Tesseract OCR",
+    description: "Test double",
+    environment: "browser",
+    capabilities: {
+      outputs: ["docx", "pptx"],
+      opticalCharacterRecognition: true,
+      privacyPreserving: true,
+      relativeSpeed: "slow",
+    },
+    async isAvailable() {
+      return true;
+    },
+    canHandle({ output }) {
+      return output === "docx" || output === "pptx";
+    },
+    async convert({ output }) {
+      calls.push(output);
+      return { data: new Uint8Array([1, 2, 3]), engine: "tesseract-ocr" };
+    },
+  });
+
+  try {
+    const analysis = await core.analyzePdfForConversion(await read("gov-legacy-hindi.pdf"));
+    // The badge still reports OCR, but an engine is now available for it.
+    assert(analysis.badge === "ocr-required", "badge should still report OCR");
+    assert(analysis.engine?.id === "tesseract-ocr", `expected OCR engine, got ${analysis.engine?.id}`);
+
+    const result = await analysis.engine.convert({ data: new Uint8Array(), output: "docx" });
+    assert(result.engine === "tesseract-ocr", "OCR engine should have run");
+    assert(calls.length === 1, "engine convert should be invoked once");
+
+    // Readable PDFs must still prefer the faster native engine.
+    const readable = await core.analyzePdfForConversion(await read("simple.pdf"));
+    assert(
+      readable.engine?.id === "native-pdf",
+      `readable PDFs must stay native, got ${readable.engine?.id}`
+    );
+  } finally {
+    // Restore the registry so later assertions see the shipped configuration.
+    core.registerEngine({
+      id: "tesseract-ocr",
+      name: "Tesseract OCR",
+      description: "Not installed",
+      environment: "browser",
+      capabilities: {
+        outputs: [],
+        opticalCharacterRecognition: true,
+        privacyPreserving: true,
+        relativeSpeed: "slow",
+      },
+      async isAvailable() {
+        return false;
+      },
+      canHandle() {
+        return false;
+      },
+      async convert() {
+        throw new Error("not installed");
+      },
+    });
+  }
+});
+
+await test("quality analysis stays fast on scanned documents", async () => {
+  // Analysis must not decode page pixels; a slow pre-flight would be a
+  // regression users feel on every upload.
+  const started = Date.now();
+  await core.analyzePdfForConversion(await read("scanned.pdf"));
+  const seconds = (Date.now() - started) / 1000;
+  assert(seconds < 5, `analysis took ${seconds.toFixed(1)}s, expected well under 5s`);
+  console.log(`      (${seconds.toFixed(2)}s)`);
+});
+
+/* -------------------------------------------------------------------------- */
+
 suite("Round trips");
 
 await test("PDF to Word to PDF keeps the text intact", async () => {

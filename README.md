@@ -84,6 +84,36 @@ the same modules power the browser tools and the Node test suite. PDF pages are
 parsed into positioned text and images, analysed into paragraphs, headings,
 lists and tables, then written as real OOXML or laid out onto PDF pages.
 
+### Text quality detection
+
+Not every PDF has text that can be read. Government forms, revenue records and
+older Hindi documents often draw text with legacy 8-bit fonts (Kruti Dev,
+DevLys, Chanakya) that map byte values to glyph shapes: "भारत सरकार" is stored
+as `Hkkjr ljdkj`. Those bytes are valid ASCII, so a naive validity check passes
+and a converter would emit a document full of garbage.
+
+Every PDF conversion therefore runs a pre-flight check (`analyze-pdf.ts`) that
+combines several independent signals — known legacy font families, missing
+embedded font programs, absent ToUnicode maps, glyph-garbage word shapes,
+invalid Unicode ratios and image-only pages. The result drives a badge in the
+UI:
+
+- **✓ Native Conversion** — the text layer is readable; the fast in-browser
+  converter runs.
+- **OCR Required** — the text cannot be trusted. Conversion is blocked and the
+  user is told OCR is needed, instead of receiving a broken file.
+
+The same gate is enforced inside the converters themselves, so no caller can
+produce a corrupted document.
+
+### Pluggable conversion engines
+
+`src/lib/conversion/engines` defines a `ConversionEngine` interface and a
+registry. The UI only ever asks the registry which engine to use, so OCR
+backends (Tesseract, PaddleOCR, Google Vision, Azure) can be added later
+without touching any UI code. Selection prefers privacy-preserving engines
+first, then the fastest, which keeps readable PDFs on the fast native path.
+
 pdf.js standard fonts and CMaps are vendored into `public/pdfjs` so embedded
 and CJK fonts resolve correctly without network access.
 

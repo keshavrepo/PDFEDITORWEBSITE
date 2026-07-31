@@ -65,6 +65,11 @@ export interface ExtractedPage {
 export interface ExtractedPdf {
   pages: ExtractedPage[];
   metadata: DocumentMetadata;
+  /**
+   * Encoding characteristics keyed by resolved font family, used by the text
+   * quality analyser to decide between native conversion and OCR.
+   */
+  fontEncodings: Map<string, FontEncodingInfo>;
 }
 
 export interface PdfExtractionOptions {
@@ -72,10 +77,30 @@ export interface PdfExtractionOptions {
   includeImages?: boolean;
   /** Longest edge, in pixels, for embedded images. Larger images are downscaled. */
   maxImagePixels?: number;
+  /**
+   * Record image position and size but skip pixel decoding entirely.
+   *
+   * Used by pre-flight analysis, which only needs to know how much of a page
+   * is covered by images. Decoding and re-encoding the pixels of a scanned
+   * page is by far the most expensive part of extraction, so skipping it turns
+   * a multi-second check into a near-instant one.
+   */
+  imageGeometryOnly?: boolean;
   signal?: AbortSignal;
 }
 
 const DEFAULT_MAX_IMAGE_PIXELS = 1600;
+
+/**
+ * Zero-byte stand-in used when only image geometry is required. It is never
+ * embedded into output because geometry-only extraction is analysis-only.
+ */
+const PLACEHOLDER_IMAGE: RasterImage = {
+  data: new Uint8Array(0),
+  format: "png",
+  pixelWidth: 0,
+  pixelHeight: 0,
+};
 /** Images below this size are almost always rules, bullets or spacers. */
 const MIN_IMAGE_POINTS = 8;
 
@@ -122,6 +147,24 @@ interface FontDescriptor {
   fallbackName?: string;
   ascent?: number;
   descent?: number;
+  /** True when pdf.js found no embedded font program for this font. */
+  missingFile?: boolean;
+  /** Font declares a symbolic (non-standard) encoding. */
+  isSymbolicFont?: boolean;
+  /** Present only when `fontExtraProperties` is enabled on the document. */
+  toUnicode?: unknown;
+  composite?: boolean;
+  type?: string;
+}
+
+/**
+ * Encoding characteristics of a font, used to judge whether its text can be
+ * decoded into meaningful Unicode.
+ */
+export interface FontEncodingInfo {
+  missingFile: boolean;
+  symbolic: boolean;
+  hasUnicodeMap: boolean;
 }
 
 /**
@@ -182,6 +225,14 @@ async function readOperatorList(
         if (!includeImages) break;
         const placement = imagePlacement(transform, pageHeight);
         if (!placement) break;
+
+        // Pre-flight analysis only needs to know that an image covers this
+        // area, so skip the expensive decode/re-encode entirely.
+        if (options.imageGeometryOnly) {
+          images.push({ image: PLACEHOLDER_IMAGE, ...placement });
+          break;
+        }
+
         const objectId = typeof args[0] === "string" ? (args[0] as string) : null;
         const inlineData = fn === OPS.paintInlineImageXObject ? args[0] : null;
         const extracted = await resolveImage(
@@ -325,6 +376,49 @@ function getPageObject(page: PDFPageProxy, id: string): Promise<unknown> {
   });
 }
 
+/**
+ * True when a font exposes a ToUnicode CMap with real mappings.
+ *
+ * pdf.js always materialises a `toUnicode` object, so its presence alone means
+ * nothing; only a populated map proves the glyph codes can be turned back into
+ * characters.
+ */
+function hasUsableUnicodeMap(toUnicode: unknown): boolean {
+  if (!toUnicode) return false;
+
+  // pdf.js exposes either a sparse array or an object with an internal map.
+  const candidate = toUnicode as { _map?: unknown; length?: number };
+  const map = candidate._map ?? toUnicode;
+
+  if (Array.isArray(map)) {
+    let filled = 0;
+    for (const entry of map) {
+      if (typeof entry === "string" && entry.length > 0) filled++;
+      if (filled > 1) return true;
+    }
+    return false;
+  }
+
+  if (typeof map === "object") {
+    let filled = 0;
+    for (const value of Object.values(map as Record<string, unknown>)) {
+      if (typeof value === "string" && value.length > 0) filled++;
+      if (filled > 1) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Removes characters that XML 1.0 forbids.
+ *
+ * Legal: tab, LF, CR, and everything from U+0020 up, excluding surrogates that
+ * are not part of a valid pair and the noncharacters U+FFFE/U+FFFF.
+ */
+function stripInvalidXmlCharacters(text: string): string {
+  return text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, "");
+}
+
 /** Reads a resolved font descriptor, tolerating unresolved entries. */
 function readFontDescriptor(page: PDFPageProxy, fontName: string): FontDescriptor | null {
   try {
@@ -341,7 +435,8 @@ function readFontDescriptor(page: PDFPageProxy, fontName: string): FontDescripto
 
 async function extractPage(
   page: PDFPageProxy,
-  options: PdfExtractionOptions
+  options: PdfExtractionOptions,
+  fontEncodings: Map<string, FontEncodingInfo>
 ): Promise<ExtractedPage> {
   const viewport = page.getViewport({ scale: 1 });
   const pageWidth = viewport.width;
@@ -379,8 +474,13 @@ async function extractPage(
       fontName: string;
       hasEOL: boolean;
     };
+    // Strip characters that are illegal in XML 1.0. Broken CMaps in the wild
+    // map glyphs to NUL or other control codes, which would otherwise be
+    // written into the DOCX/PPTX and make the file unopenable.
+    const cleanedText = stripInvalidXmlCharacters(item.str);
+
     // Preserve inter-word gaps in layout, but never emit whitespace-only runs.
-    if (!item.str.trim()) continue;
+    if (!cleanedText.trim()) continue;
 
     const color = colorsAligned ? colors[showTextIndex] || fallbackColor : fallbackColor;
     showTextIndex++;
@@ -397,12 +497,22 @@ async function extractPage(
       fallback: style?.fontFamily || descriptor?.fallbackName,
     });
 
+    // Record how this font encodes text. The first observation wins; the same
+    // family resolved from different PDF fonts shares its encoding character.
+    if (descriptor && !fontEncodings.has(font.family)) {
+      fontEncodings.set(font.family, {
+        missingFile: descriptor.missingFile === true,
+        symbolic: descriptor.isSymbolicFont === true,
+        hasUnicodeMap: hasUsableUnicodeMap(descriptor.toUnicode),
+      });
+    }
+
     const ascent = (descriptor?.ascent ?? style?.ascent ?? 0.75) * fontSize;
     const descent = Math.abs(descriptor?.descent ?? style?.descent ?? -0.25) * fontSize;
 
     const position = rotatePoint(e, f, pageWidth, pageHeight, rotation);
     items.push({
-      text: item.str,
+      text: cleanedText,
       x: position.x,
       baseline: position.y,
       width: item.width,
@@ -526,6 +636,7 @@ export async function extractPdf(
 
     const metadata = await readMetadata(document);
     const pages: ExtractedPage[] = [];
+    const fontEncodings = new Map<string, FontEncodingInfo>();
 
     for (let pageNumber = 1; pageNumber <= pageCount; pageNumber++) {
       throwIfAborted(options.signal);
@@ -537,14 +648,14 @@ export async function extractPdf(
 
       const page = await document.getPage(pageNumber);
       try {
-        pages.push(await extractPage(page, options));
+        pages.push(await extractPage(page, options, fontEncodings));
       } finally {
         page.cleanup();
       }
     }
 
     onProgress?.({ stage: "Pages read", progress: pageCount, total: pageCount });
-    return { pages, metadata };
+    return { pages, metadata, fontEncodings };
   } finally {
     await destroy();
   }

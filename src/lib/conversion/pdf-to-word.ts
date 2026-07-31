@@ -30,11 +30,17 @@ import { extractPdf, type ExtractedImage, type ExtractedPage } from "./pdf/pdf-e
 import { analyzePage, lineToRuns, type AnalyzedBlock, type AnalyzedParagraph, type AnalyzedTable } from "./pdf/layout-analyzer";
 import { pointsToTwips, pointsToHalfPoints, pointsToPixels } from "./constants";
 import { conversionErrors } from "./errors";
+import { analyzeTextQuality, buildFontSignals } from "./text-quality";
 import type { ConversionProgressCallback, HorizontalAlignment, TextRunModel } from "./types";
 
 export interface PdfToWordOptions {
   /** Embed images found in the PDF. Enabled by default. */
   includeImages?: boolean;
+  /**
+   * Skip the text-quality gate. Only used by diagnostics; production callers
+   * must leave this off so unreadable PDFs never yield a garbage document.
+   */
+  skipQualityCheck?: boolean;
   signal?: AbortSignal;
 }
 
@@ -282,6 +288,17 @@ export async function convertPdfToWord(
   const hasContent = extracted.pages.some((page) => page.items.length > 0 || page.images.length > 0);
   if (!hasContent) {
     throw conversionErrors.noContent("PDF");
+  }
+
+  // Refuse to emit a document whose text cannot be read. This guard lives in
+  // the converter itself so no caller — UI, API or script — can bypass it.
+  if (!options.skipQualityCheck) {
+    const items = extracted.pages.flatMap((page) => page.items);
+    const quality = analyzeTextQuality({
+      pages: extracted.pages,
+      fontSignals: buildFontSignals(items, extracted.fontEncodings),
+    });
+    if (quality.strategy !== "native") throw conversionErrors.ocrRequired(quality.summary);
   }
 
   const sections = extracted.pages.map((page, pageIndex) => {

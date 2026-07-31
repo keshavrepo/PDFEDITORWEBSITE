@@ -17,11 +17,17 @@ import {
 } from "./pdf/layout-analyzer";
 import { pointsToInches } from "./constants";
 import { conversionErrors } from "./errors";
+import { analyzeTextQuality, buildFontSignals } from "./text-quality";
 import type { ConversionProgressCallback, HorizontalAlignment, TextRunModel } from "./types";
 
 export interface PdfToPowerPointOptions {
   /** Embed images found in the PDF. Enabled by default. */
   includeImages?: boolean;
+  /**
+   * Skip the text-quality gate. Only used by diagnostics; production callers
+   * must leave this off so unreadable PDFs never yield a garbage deck.
+   */
+  skipQualityCheck?: boolean;
   signal?: AbortSignal;
 }
 
@@ -101,6 +107,16 @@ export async function convertPdfToPowerPoint(
     (page) => page.items.length > 0 || page.images.length > 0
   );
   if (!hasContent) throw conversionErrors.noContent("PDF");
+
+  // Same guard as PDF to Word: never emit slides full of glyph garbage.
+  if (!options.skipQualityCheck) {
+    const items = extracted.pages.flatMap((page) => page.items);
+    const quality = analyzeTextQuality({
+      pages: extracted.pages,
+      fontSignals: buildFontSignals(items, extracted.fontEncodings),
+    });
+    if (quality.strategy !== "native") throw conversionErrors.ocrRequired(quality.summary);
+  }
 
   const presentation = new PptxGenJS();
   presentation.author = extracted.metadata.author || "PDFPilot";

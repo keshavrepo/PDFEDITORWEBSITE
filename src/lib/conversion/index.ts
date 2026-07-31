@@ -45,6 +45,47 @@ export {
   readImageSize,
 } from "./image-codec";
 
+export {
+  OCR_REQUIRED_MESSAGE,
+  analyzePdfForConversion,
+  type AnalyzePdfOptions,
+  type ConversionBadge,
+  type PdfAnalysis,
+} from "./analyze-pdf";
+
+export {
+  analyzeTextQuality,
+  buildFontSignals,
+  isLegacyEncodedFont,
+  normalizeFontName,
+  scoreGlyphGarbage,
+  scoreInvalidUnicode,
+  type ConversionStrategy,
+  type FontQualitySignal,
+  type QualityIssue,
+  type TextQualityReport,
+} from "./text-quality";
+
+export {
+  getEngine,
+  listEngines,
+  registerEngine,
+  selectEngine,
+  type EngineSelection,
+} from "./engines/registry";
+
+export { nativePdfEngine } from "./engines/native-engine";
+
+export type {
+  ConversionEngine,
+  EngineCapabilities,
+  EngineConversionRequest,
+  EngineConversionResult,
+  EngineId,
+  ExecutionEnvironment,
+  OutputFormat,
+} from "./engines/types";
+
 export type {
   ConversionProgress,
   ConversionProgressCallback,

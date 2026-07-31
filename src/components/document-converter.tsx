@@ -9,6 +9,7 @@ import {
   Download,
   FileText,
   Loader2,
+  ScanLine,
   Shield,
   Upload,
   X,
@@ -24,6 +25,7 @@ import {
   validateConversionInput,
   validateSelection,
   type ConversionProgress,
+  type PdfAnalysis,
 } from "@/lib/conversion";
 import {
   buildOutputName,
@@ -55,6 +57,7 @@ export function DocumentConverter({ tool }: DocumentConverterProps) {
   const [warning, setWarning] = useState<string | null>(null);
   const [result, setResult] = useState<{ blob: Blob; name: string } | null>(null);
   const [elapsed, setElapsed] = useState<number | null>(null);
+  const [analysis, setAnalysis] = useState<PdfAnalysis | null>(null);
 
   // Release any object URL created for the result on unmount.
   useEffect(
@@ -76,6 +79,7 @@ export function DocumentConverter({ tool }: DocumentConverterProps) {
     setWarning(null);
     setResult(null);
     setElapsed(null);
+    setAnalysis(null);
   }, []);
 
   const selectFile = useCallback(
@@ -92,6 +96,7 @@ export function DocumentConverter({ tool }: DocumentConverterProps) {
       setResult(null);
       setProgress(null);
       setElapsed(null);
+      setAnalysis(null);
 
       const quick = validateSelection(selected, tool.input);
       if (!quick.valid) {
@@ -113,9 +118,29 @@ export function DocumentConverter({ tool }: DocumentConverterProps) {
       if (selected.size > 25 * 1024 * 1024) {
         setWarning("Large file detected. Conversion may take a minute to complete.");
       }
+
+      // PDF sources get a pre-flight text-quality check so the user learns up
+      // front whether the document can be converted natively or needs OCR.
+      // Nothing is generated until this passes.
+      if (tool.input === "pdf") {
+        try {
+          const { analyzePdfForConversion } = await import("@/lib/conversion");
+          const report = await analyzePdfForConversion(
+            new Uint8Array(await selected.arrayBuffer()),
+            { output: tool.output === "pptx" ? "pptx" : "docx" }
+          );
+          if (sequence !== validationSequence.current) return;
+          setAnalysis(report);
+        } catch {
+          // A failed pre-flight must not block conversion; the converter runs
+          // the same quality gate and will report any real problem.
+          if (sequence !== validationSequence.current) return;
+        }
+      }
+
       setPhase("ready");
     },
-    [tool.input]
+    [tool.input, tool.output]
   );
 
   const handleFilesSelected = useCallback(
@@ -130,6 +155,9 @@ export function DocumentConverter({ tool }: DocumentConverterProps) {
 
   const convert = useCallback(async () => {
     if (!file || phase !== "ready") return;
+    // Defence in depth: the button is replaced in this state, but never start a
+    // conversion that is known to produce unreadable output.
+    if (analysis && !analysis.canConvertNatively) return;
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -186,12 +214,16 @@ export function DocumentConverter({ tool }: DocumentConverterProps) {
     } finally {
       abortRef.current = null;
     }
-  }, [file, phase, tool]);
+  }, [analysis, file, phase, tool]);
 
   const percent = progress
     ? Math.min(100, Math.round((progress.progress / Math.max(progress.total, 1)) * 100))
     : 0;
   const isBusy = phase === "validating" || phase === "converting";
+  // Conversion is blocked whenever pre-flight found no engine able to read the
+  // document. The button is swapped rather than merely disabled so the next
+  // action is obvious.
+  const blockedByQuality = Boolean(analysis && !analysis.canConvertNatively);
 
   return (
     <main className="pt-16 min-h-screen bg-gradient-to-b from-background to-muted/30">
@@ -234,7 +266,11 @@ export function DocumentConverter({ tool }: DocumentConverterProps) {
               ? `Converting. ${progress?.stage || ""} ${percent} percent complete.`
               : phase === "done"
                 ? "Conversion complete. Your file is ready to download."
-                : ""}
+                : blockedByQuality
+                  ? "This PDF requires OCR. It uses embedded or legacy fonts that cannot be converted directly into editable text."
+                  : analysis?.badge === "native"
+                    ? "Native conversion available. A readable text layer was detected."
+                    : ""}
         </p>
 
         {phase === "done" && result ? (
@@ -349,6 +385,64 @@ export function DocumentConverter({ tool }: DocumentConverterProps) {
               <span className="uppercase text-primary">{tool.outputExtension}</span>
             </div>
 
+            {analysis && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+                    analysis.badge === "native"
+                      ? "bg-primary/10 text-primary"
+                      : "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+                  }`}
+                >
+                  {analysis.badge === "native" ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                      Native Conversion
+                    </>
+                  ) : (
+                    <>
+                      <ScanLine className="h-3.5 w-3.5" aria-hidden="true" />
+                      OCR Required
+                    </>
+                  )}
+                </span>
+                {analysis.badge === "native" && (
+                  <span className="text-xs text-muted-foreground">
+                    Readable text layer detected
+                  </span>
+                )}
+              </div>
+            )}
+
+            {analysis && !analysis.canConvertNatively && (
+              <div
+                role="alert"
+                className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm"
+              >
+                <div className="flex items-start gap-3">
+                  <ScanLine
+                    className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5"
+                    aria-hidden="true"
+                  />
+                  <div className="space-y-2">
+                    <p className="font-medium text-amber-900 dark:text-amber-200">
+                      This PDF uses embedded or legacy fonts that cannot be converted directly
+                      into editable text. OCR is required for accurate conversion.
+                    </p>
+                    {analysis.quality.summary && (
+                      <p className="text-amber-800/90 dark:text-amber-300/90">
+                        {analysis.quality.summary}
+                      </p>
+                    )}
+                    <p className="text-xs text-amber-800/80 dark:text-amber-300/80">
+                      Converting anyway would produce unreadable text, so PDFPilot has stopped
+                      here rather than give you a broken document. OCR support is coming soon.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {progress && phase === "converting" && (
               <div>
                 <div className="flex justify-between text-xs mb-2">
@@ -388,19 +482,25 @@ export function DocumentConverter({ tool }: DocumentConverterProps) {
               </div>
             )}
 
-            <Button
-              size="lg"
-              className="w-full"
-              onClick={() => void convert()}
-              disabled={isBusy || phase !== "ready"}
-            >
-              {isBusy && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
-              {phase === "validating"
-                ? "Checking file..."
-                : phase === "converting"
-                  ? "Converting..."
-                  : `Convert to ${tool.outputExtension.toUpperCase()}`}
-            </Button>
+            {blockedByQuality ? (
+              <Button size="lg" variant="outline" className="w-full" onClick={reset}>
+                Choose a different file
+              </Button>
+            ) : (
+              <Button
+                size="lg"
+                className="w-full"
+                onClick={() => void convert()}
+                disabled={isBusy || phase !== "ready"}
+              >
+                {isBusy && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+                {phase === "validating"
+                  ? "Checking file..."
+                  : phase === "converting"
+                    ? "Converting..."
+                    : `Convert to ${tool.outputExtension.toUpperCase()}`}
+              </Button>
+            )}
           </Card>
         )}
       </section>
