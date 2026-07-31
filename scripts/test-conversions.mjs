@@ -1122,6 +1122,421 @@ await test("rejects a corrupted PDF", async () => {
 
 /* -------------------------------------------------------------------------- */
 
+suite("PDF forms");
+
+await test("detects every fillable field type", async () => {
+  const report = await core.inspectPdfForm(await read("form.pdf"));
+  assert(report.hasForm, "the fixture must expose a form");
+  assert(!report.isXfa, "the fixture is a standard AcroForm");
+
+  const byName = new Map(report.fields.map((field) => [field.name, field]));
+  const expected = {
+    "applicant.name": "text",
+    "applicant.notes": "text",
+    "applicant.reference": "text",
+    "prefs.subscribe": "checkbox",
+    "prefs.employment": "radio",
+    "applicant.country": "dropdown",
+    "applicant.skills": "optionlist",
+    "applicant.signature": "signature",
+  };
+  for (const [name, type] of Object.entries(expected)) {
+    const field = byName.get(name);
+    assert(field, `missing field ${name}`);
+    assert(field.type === type, `${name} should be ${type}, got ${field.type}`);
+  }
+});
+
+await test("reports options, read-only state and widget positions", async () => {
+  const report = await core.inspectPdfForm(await read("form.pdf"));
+  const byName = new Map(report.fields.map((field) => [field.name, field]));
+
+  assert(byName.get("applicant.country").options.length === 4, "dropdown options");
+  assert(byName.get("prefs.employment").options.length === 3, "radio options");
+  // A radio group has one widget per option.
+  assert(byName.get("prefs.employment").rects.length === 3, "radio widget count");
+  assert(byName.get("applicant.reference").readOnly, "reference field is read-only");
+  assert(byName.get("applicant.notes").multiline, "notes field is multiline");
+
+  const rect = byName.get("applicant.name").rects[0];
+  assert(rect.pageIndex === 0, "widget should resolve to page 1");
+  assert(rect.width > 200 && rect.height > 10, `unexpected widget size ${rect.width}x${rect.height}`);
+});
+
+await test("fills every field type and the values persist", async () => {
+  const filled = await core.fillPdfForm(await read("form.pdf"), {
+    "applicant.name": "Keshav Kumar",
+    "applicant.notes": "Line one\nLine two",
+    "prefs.subscribe": true,
+    "prefs.employment": "Contract",
+    "applicant.country": "India",
+    "applicant.skills": ["Rust", "Go"],
+  });
+
+  const report = await core.inspectPdfForm(filled);
+  const byName = new Map(report.fields.map((field) => [field.name, field]));
+
+  assert(byName.get("applicant.name").value === "Keshav Kumar", "text value");
+  assert(byName.get("applicant.notes").value.includes("Line two"), "multiline value");
+  assert(byName.get("prefs.subscribe").value === true, "checkbox value");
+  assert(byName.get("prefs.employment").value === "Contract", "radio value");
+  assert(byName.get("applicant.country").value === "India", "dropdown value");
+
+  const skills = byName.get("applicant.skills").value;
+  assert(
+    Array.isArray(skills) && skills.includes("Rust") && skills.includes("Go"),
+    `multi-select should keep both values, got ${JSON.stringify(skills)}`
+  );
+});
+
+await test("read-only fields are never modified", async () => {
+  const filled = await core.fillPdfForm(await read("form.pdf"), {
+    "applicant.reference": "TAMPERED",
+  });
+  const report = await core.inspectPdfForm(filled);
+  const reference = report.fields.find((field) => field.name === "applicant.reference");
+  assert(reference.value === "REF-2026-0001", `read-only field was changed to ${reference.value}`);
+});
+
+await test("invalid choices are ignored rather than throwing", async () => {
+  const filled = await core.fillPdfForm(await read("form.pdf"), {
+    "prefs.employment": "Not an option",
+    "applicant.skills": ["Cobol"],
+  });
+  const report = await core.inspectPdfForm(filled);
+  const byName = new Map(report.fields.map((field) => [field.name, field]));
+  assert(!byName.get("prefs.employment").value, "invalid radio choice should be ignored");
+});
+
+await test("flattening locks the values into the page", async () => {
+  const flattened = await core.fillPdfForm(
+    await read("form.pdf"),
+    { "applicant.name": "Flattened Name" },
+    { flatten: true }
+  );
+  const report = await core.inspectPdfForm(flattened);
+  // Only the signature field can survive, because it has no appearance stream.
+  const editable = report.fields.filter((field) => field.type !== "signature");
+  assert(editable.length === 0, `expected no editable fields, found ${editable.length}`);
+
+  const inspected = await inspectPdf(flattened);
+  assertIncludes(inspected.text, "Flattened Name", "flattened value must be drawn on the page");
+});
+
+await test("a PDF without a form reports no fields", async () => {
+  const report = await core.inspectPdfForm(await read("simple.pdf"));
+  assert(!report.hasForm, "simple.pdf has no form");
+  assert(report.fields.length === 0, "no fields expected");
+  await assertRejects(
+    async () => core.fillPdfForm(await read("simple.pdf"), { anything: "x" }),
+    /does not contain a fillable form/i,
+    "filling a form-less PDF"
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Page numbers");
+
+await test("numbers every page with real, searchable text", async () => {
+  const output = await core.addPageNumbers(await read("simple.pdf"), {});
+  const inspected = await inspectPdf(output);
+  assert(inspected.pageCount === 2, "page count must not change");
+  assertIncludes(inspected.pages[0].text, "1", "page 1 label");
+  assertIncludes(inspected.pages[1].text, "2", "page 2 label");
+});
+
+await test("supports the {n} of {total} format", async () => {
+  const output = await core.addPageNumbers(await read("simple.pdf"), {
+    format: "Page {n} of {total}",
+  });
+  const inspected = await inspectPdf(output);
+  assertIncludes(inspected.text, "Page 1 of 2", "formatted label");
+  assertIncludes(inspected.text, "Page 2 of 2", "formatted label");
+});
+
+await test("skips the first page when asked", async () => {
+  const output = await core.addPageNumbers(await read("simple.pdf"), {
+    format: "N{n}",
+    skipFirstPage: true,
+  });
+  const inspected = await inspectPdf(output);
+  assert(!inspected.pages[0].text.includes("N1"), "cover page must stay unnumbered");
+  assertIncludes(inspected.pages[1].text, "N1", "numbering restarts on page 2");
+});
+
+await test("honours a custom starting number", async () => {
+  const output = await core.addPageNumbers(await read("simple.pdf"), {
+    format: "N{n}",
+    startNumber: 7,
+  });
+  const inspected = await inspectPdf(output);
+  assertIncludes(inspected.pages[0].text, "N7", "first label");
+  assertIncludes(inspected.pages[1].text, "N8", "second label");
+});
+
+await test("places the label at the requested position and alignment", async () => {
+  // The label is the only text on a blank page, so its coordinates are
+  // unambiguous and can be asserted directly.
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  async function labelPosition(options) {
+    const output = await core.addPageNumbers(await read("blank.pdf"), options);
+    const task = pdfjs.getDocument({ data: new Uint8Array(output), disableFontFace: true });
+    const document = await task.promise;
+    const page = await document.getPage(1);
+    const viewport = page.getViewport({ scale: 1 });
+    const content = await page.getTextContent();
+    const item = content.items.find((entry) => entry.str.trim());
+    const position = item
+      ? { x: item.transform[4], y: item.transform[5], width: viewport.width, height: viewport.height }
+      : null;
+    await task.destroy();
+    return position;
+  }
+
+  const topLeft = await labelPosition({ position: "top", alignment: "left" });
+  assert(topLeft && topLeft.y > topLeft.height / 2, "top labels belong in the upper half");
+  assert(topLeft.x < topLeft.width / 3, "left alignment");
+
+  const bottomRight = await labelPosition({ position: "bottom", alignment: "right" });
+  assert(bottomRight && bottomRight.y < bottomRight.height / 2, "bottom labels belong in the lower half");
+  assert(bottomRight.x > bottomRight.width / 2, "right alignment");
+});
+
+await test("accepts every font family and a custom size and colour", async () => {
+  for (const fontFamily of ["helvetica", "times", "courier"]) {
+    const output = await core.addPageNumbers(await read("simple.pdf"), {
+      fontFamily,
+      fontSize: 18,
+      color: "CC0000",
+      format: "P{n}",
+    });
+    const inspected = await inspectPdf(output);
+    assertIncludes(inspected.text, "P1", `${fontFamily} label`);
+  }
+});
+
+await test("rejects settings that would number nothing", async () => {
+  await assertRejects(
+    async () => core.addPageNumbers(await read("blank.pdf"), { startPage: 99 }),
+    /no pages are left to number/i,
+    "start page beyond the document"
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Crop PDF");
+
+await test("reads page geometry", async () => {
+  const info = await core.readCropInfo(await read("simple.pdf"));
+  assert(info.length === 2, `expected 2 pages, found ${info.length}`);
+  assert(Math.abs(info[0].width - 595.28) < 1, `unexpected width ${info[0].width}`);
+  assert(info[0].crop.top === 0, "an uncropped page has no existing crop");
+});
+
+await test("crops every page by the requested margins", async () => {
+  const output = await core.cropPdf(await read("simple.pdf"), {
+    top: 60,
+    right: 40,
+    bottom: 60,
+    left: 40,
+  });
+  const inspected = await inspectPdf(output);
+  assert(
+    Math.abs(inspected.pages[0].width - (595.28 - 80)) < 1,
+    `unexpected cropped width ${inspected.pages[0].width}`
+  );
+  assert(
+    Math.abs(inspected.pages[0].height - (841.89 - 120)) < 1,
+    `unexpected cropped height ${inspected.pages[0].height}`
+  );
+});
+
+await test("crops only the selected pages", async () => {
+  const output = await core.cropPdf(
+    await read("simple.pdf"),
+    { top: 100, right: 0, bottom: 0, left: 0 },
+    { pageIndices: [1] }
+  );
+  const inspected = await inspectPdf(output);
+  assert(Math.abs(inspected.pages[0].height - 841.89) < 1, "page 1 must be untouched");
+  assert(Math.abs(inspected.pages[1].height - (841.89 - 100)) < 1, "page 2 must be cropped");
+});
+
+await test("clamps impossible margins instead of collapsing the page", async () => {
+  const output = await core.cropPdf(await read("simple.pdf"), {
+    top: 9999,
+    right: 9999,
+    bottom: 9999,
+    left: 9999,
+  });
+  const inspected = await inspectPdf(output);
+  assert(inspected.pages[0].width >= 20 && inspected.pages[0].height >= 20, "page must stay usable");
+});
+
+await test("cropped output still opens and keeps its text", async () => {
+  const output = await core.cropPdf(await read("simple.pdf"), {
+    top: 30,
+    right: 20,
+    bottom: 30,
+    left: 20,
+  });
+  const inspected = await inspectPdf(output);
+  assertIncludes(inspected.text, "Quarterly Report 2026", "content survives cropping");
+});
+
+await test("detects the content bounds of a page with wide margins", async () => {
+  // Simulates the rasterised page the browser passes to the detector.
+  const width = 200;
+  const height = 300;
+  const rgba = new Uint8Array(width * height * 4).fill(255);
+  const paint = (x0, y0, w, h) => {
+    for (let y = y0; y < y0 + h; y++) {
+      for (let x = x0; x < x0 + w; x++) {
+        const index = (y * width + x) * 4;
+        rgba[index] = 10;
+        rgba[index + 1] = 10;
+        rgba[index + 2] = 10;
+      }
+    }
+  };
+  paint(50, 90, 100, 120);
+
+  const bounds = core.detectContentBounds(rgba, width, height);
+  assert(bounds, "content should be found");
+  assert(Math.abs(bounds.left - 50) <= 1, `left ${bounds.left}`);
+  assert(Math.abs(bounds.top - 90) <= 1, `top ${bounds.top}`);
+  assert(Math.abs(bounds.right - 49) <= 2, `right ${bounds.right}`);
+  assert(Math.abs(bounds.bottom - 89) <= 2, `bottom ${bounds.bottom}`);
+
+  const margins = core.boundsToMargins(bounds, width, height, 400, 600);
+  assert(Math.abs(margins.left - 100) <= 3, `scaled left margin ${margins.left}`);
+});
+
+await test("reports a blank page as having no detectable content", async () => {
+  const rgba = new Uint8Array(40 * 40 * 4).fill(255);
+  assert(core.detectContentBounds(rgba, 40, 40) === null, "a white page has no bounds");
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Redact PDF");
+
+await test("permanently removes the text inside a redacted area", async () => {
+  const output = await core.redactPdf(await read("simple.pdf"), [
+    { pageIndex: 0, x: 50, y: 45, width: 300, height: 30 },
+  ]);
+  assert(output.removedTextOperations > 0, "expected text operations to be removed");
+
+  const inspected = await inspectPdf(output.data);
+  assert(
+    !inspected.text.includes("Quarterly Report 2026"),
+    "redacted text must not be extractable"
+  );
+});
+
+await test("redacted text is absent from the raw file bytes", async () => {
+  // The strongest guarantee: the characters are gone from the file, so no tool
+  // can recover them by reading the content stream directly.
+  const output = await core.redactPdf(await read("simple.pdf"), [
+    { pageIndex: 0, x: 50, y: 45, width: 300, height: 30 },
+  ]);
+  const raw = new TextDecoder("latin1").decode(output.data);
+  // "Quarterly" as stored in the fixture's hex-encoded content stream.
+  assert(!raw.includes("517561727465726C79"), "hex-encoded text must be gone");
+  assert(!raw.includes("Quarterly Report 2026"), "literal text must be gone");
+});
+
+await test("content outside the redacted area is preserved", async () => {
+  const output = await core.redactPdf(await read("simple.pdf"), [
+    { pageIndex: 0, x: 50, y: 45, width: 300, height: 30 },
+  ]);
+  const inspected = await inspectPdf(output.data);
+  for (const value of ["Region", "North", "Second Page Heading"]) {
+    assertIncludes(inspected.text, value, "untouched content");
+  }
+});
+
+await test("draws an opaque box over each redacted area", async () => {
+  const output = await core.redactPdf(await read("simple.pdf"), [
+    { pageIndex: 0, x: 50, y: 45, width: 300, height: 30 },
+    { pageIndex: 1, x: 50, y: 45, width: 200, height: 20 },
+  ]);
+  assert(output.areasApplied === 2, `expected 2 boxes, applied ${output.areasApplied}`);
+
+  // pdf-lib emits rectangles as an explicit path (m/l/h) closed with a fill,
+  // rather than the `re` shorthand, so the decoded stream is checked directly.
+  const { PDFDocument, PDFArray, PDFRawStream, decodePDFRawStream } = await import("pdf-lib");
+  const pdf = await PDFDocument.load(output.data);
+  const page = pdf.getPage(0);
+  const contents = page.node.Contents();
+  const streams =
+    contents instanceof PDFArray
+      ? Array.from({ length: contents.size() }, (_, index) => contents.lookup(index))
+      : [contents];
+
+  let decoded = "";
+  for (const stream of streams) {
+    if (stream instanceof PDFRawStream) {
+      decoded += new TextDecoder("latin1").decode(decodePDFRawStream(stream).decode());
+    }
+  }
+
+  assert(/0 0 0 rg/.test(decoded), "expected an opaque black fill colour");
+  assert(/\bh\s*\nf\b/.test(decoded), "expected a closed path filled with `f`");
+  assert(/300 30 l/.test(decoded), "expected the box to match the requested size");
+});
+
+await test("strips document metadata", async () => {
+  const output = await core.redactPdf(await read("simple.pdf"), [
+    { pageIndex: 0, x: 50, y: 45, width: 300, height: 30 },
+  ]);
+  const raw = new TextDecoder("latin1").decode(output.data);
+  assert(!/\/Title\s*\([^)]+\)/.test(raw), "title must be cleared");
+  assert(!/\/Author\s*\([^)]+\)/.test(raw), "author must be cleared");
+});
+
+await test("metadata can be kept when the caller opts out", async () => {
+  const output = await core.redactPdf(
+    await read("simple.pdf"),
+    [{ pageIndex: 0, x: 50, y: 45, width: 300, height: 30 }],
+    { removeMetadata: false }
+  );
+  const inspected = await inspectPdf(output.data);
+  assert(inspected.pageCount === 2, "document should still be readable");
+});
+
+await test("redacting an area with no text still produces a valid file", async () => {
+  const output = await core.redactPdf(await read("simple.pdf"), [
+    { pageIndex: 0, x: 50, y: 700, width: 100, height: 40 },
+  ]);
+  const inspected = await inspectPdf(output.data);
+  assert(inspected.pageCount === 2, "page count must not change");
+  assertIncludes(inspected.text, "Quarterly Report 2026", "unrelated text stays");
+});
+
+await test("requires at least one area", async () => {
+  await assertRejects(
+    async () => core.redactPdf(await read("simple.pdf"), []),
+    /select at least one area/i,
+    "empty redaction request"
+  );
+});
+
+await test("the operator rewriter only drops the targeted operations", async () => {
+  const content = "BT (keep me) Tj ET BT (remove me) Tj ET BT (also keep) Tj ET";
+  const { output, removed } = core.removeTextOperations(content, new Set([1]));
+  assert(removed === 1, `expected 1 removal, got ${removed}`);
+  assert(output.includes("keep me"), "first string must survive");
+  assert(output.includes("also keep"), "third string must survive");
+  assert(!output.includes("remove me"), "targeted string must be gone");
+  // Surrounding operators must remain so the page still renders.
+  assert((output.match(/BT/g) || []).length === 3, "text blocks must be intact");
+});
+
+/* -------------------------------------------------------------------------- */
+
 suite("Round trips");
 
 await test("PDF to Word to PDF keeps the text intact", async () => {

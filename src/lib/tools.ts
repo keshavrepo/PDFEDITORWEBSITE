@@ -28,9 +28,13 @@ export const tools: ToolDefinition[] = [
   { id: "delete-pages", name: "Delete Pages", description: "Remove selected pages", href: "/tools/delete-pages", category: "Organize" },
   { id: "compress-pdf", name: "Compress PDF", description: "Reduce file size losslessly", href: "/tools/compress-pdf", category: "Optimize" },
   { id: "repair-pdf", name: "Repair PDF", description: "Recover and rebuild PDF structure", href: "/tools/repair-pdf", category: "Optimize" },
+  { id: "pdf-forms", name: "Fill PDF Forms", description: "Detect and complete fillable fields", href: "/tools/pdf-forms", category: "Edit" },
+  { id: "page-numbers", name: "Page Numbers", description: "Add headers or footers with numbering", href: "/tools/page-numbers", category: "Edit" },
+  { id: "crop-pdf", name: "Crop PDF", description: "Trim margins with a live preview", href: "/tools/crop-pdf", category: "Edit" },
   { id: "edit-pdf", name: "Edit PDF", description: "Add text to a page", href: "/tools/edit-pdf", category: "Edit" },
   { id: "sign-pdf", name: "Sign PDF", description: "Add a visual signature", href: "/tools/sign-pdf", category: "Edit" },
   { id: "watermark-pdf", name: "Watermark", description: "Add a text watermark", href: "/tools/watermark-pdf", category: "Edit" },
+  { id: "redact-pdf", name: "Redact PDF", description: "Permanently remove sensitive text", href: "/tools/redact-pdf", category: "Security" },
   { id: "protect-pdf", name: "Protect PDF", description: "Encrypt with a password", href: "/tools/protect-pdf", category: "Security" },
   { id: "unlock-pdf", name: "Unlock PDF", description: "Remove password encryption", href: "/tools/unlock-pdf", category: "Security" },
 ];

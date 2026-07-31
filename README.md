@@ -82,6 +82,10 @@ Four converters run entirely in the browser, so documents are never uploaded:
 | Excel to PDF | `/tools/excel-to-pdf` |
 | PDF to JPG or PNG | `/tools/pdf-to-image` |
 | JPG or PNG to PDF | `/tools/image-to-pdf` |
+| Fill PDF Forms | `/tools/pdf-forms` |
+| Page Numbers | `/tools/page-numbers` |
+| Crop PDF | `/tools/crop-pdf` |
+| Redact PDF | `/tools/redact-pdf` |
 
 The conversion core in `src/lib/conversion` is deliberately free of DOM APIs so
 the same modules power the browser tools and the Node test suite. PDF pages are
@@ -109,6 +113,15 @@ UI:
 
 The same gate is enforced inside the converters themselves, so no caller can
 produce a corrupted document.
+
+### Redaction
+
+Redaction is implemented as a genuine removal, not a visual cover-up. For every
+marked area PDFPilot locates the glyphs with pdf.js, rewrites the page content
+stream with those text-showing operators deleted, draws an opaque box, flattens
+interactive content and strips document metadata. The redacted characters are
+gone from the file itself, so they cannot be copied out or recovered by reading
+the raw stream — a property the test suite asserts against the output bytes.
 
 ### Pluggable conversion engines
 

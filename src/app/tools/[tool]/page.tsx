@@ -18,6 +18,10 @@ const dedicatedRoutes = new Set<string>([
   "compress-pdf",
   "pdf-to-image",
   "image-to-pdf",
+  "pdf-forms",
+  "page-numbers",
+  "crop-pdf",
+  "redact-pdf",
   ...conversionToolMap.keys(),
 ]);
 

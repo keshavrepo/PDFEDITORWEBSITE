@@ -6,6 +6,41 @@
  */
 
 export { convertPdfToWord, type PdfToWordOptions } from "./pdf-to-word";
+export {
+  fillPdfForm,
+  inspectPdfForm,
+  type FillFormOptions,
+  type FormFieldDescriptor,
+  type FormFieldRect,
+  type FormFieldType,
+  type FormInspection,
+  type FormValues,
+} from "./pdf-forms";
+export {
+  addPageNumbers,
+  formatPageLabel,
+  type NumberAlignment,
+  type NumberFontFamily,
+  type NumberPosition,
+  type PageNumberOptions,
+} from "./pdf-page-numbers";
+export {
+  boundsToMargins,
+  cropPdf,
+  detectContentBounds,
+  readCropInfo,
+  type CropMargins,
+  type CropOptions,
+  type CropPageInfo,
+  type DetectedMargins,
+} from "./pdf-crop";
+export {
+  redactPdf,
+  removeTextOperations,
+  type RedactOptions,
+  type RedactionArea,
+  type RedactionResult,
+} from "./pdf-redact";
 export { convertExcelToPdf, type ExcelToPdfOptions } from "./excel-to-pdf";
 export { convertPdfToExcel, type PdfToExcelOptions } from "./pdf-to-excel";
 export { writeXlsx, columnName } from "./spreadsheet/xlsx-writer";

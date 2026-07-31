@@ -9,7 +9,7 @@
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { PDFDocument, PDFName, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, PDFName, PDFString, StandardFonts, rgb } from "pdf-lib";
 import {
   AlignmentType,
   BorderStyle,
@@ -708,6 +708,85 @@ async function buildTablePdf() {
   return pdf.save();
 }
 
+/**
+ * A fillable AcroForm covering every field type the tool supports, including a
+ * signature field added at the object level because pdf-lib has no helper for
+ * creating one.
+ */
+async function buildFormPdf() {
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const page = pdf.addPage([595.28, 841.89]);
+  const form = pdf.getForm();
+
+  page.drawText("Employment Application", { x: 56, y: 780, size: 18, font: bold });
+
+  page.drawText("Full name", { x: 56, y: 735, size: 11, font });
+  form.createTextField("applicant.name").addToPage(page, { x: 56, y: 710, width: 300, height: 22 });
+
+  page.drawText("Notes", { x: 56, y: 675, size: 11, font });
+  const notes = form.createTextField("applicant.notes");
+  notes.enableMultiline();
+  notes.addToPage(page, { x: 56, y: 605, width: 400, height: 60 });
+
+  page.drawText("Reference (read-only)", { x: 56, y: 575, size: 11, font });
+  const reference = form.createTextField("applicant.reference");
+  reference.setText("REF-2026-0001");
+  reference.enableReadOnly();
+  reference.addToPage(page, { x: 56, y: 550, width: 200, height: 22 });
+
+  page.drawText("Subscribe", { x: 80, y: 512, size: 11, font });
+  form.createCheckBox("prefs.subscribe").addToPage(page, { x: 56, y: 509, width: 16, height: 16 });
+
+  page.drawText("Employment type", { x: 56, y: 478, size: 11, font });
+  const radio = form.createRadioGroup("prefs.employment");
+  ["Full-time", "Part-time", "Contract"].forEach((option, index) => {
+    radio.addOptionToPage(option, page, { x: 56 + index * 120, y: 451, width: 14, height: 14 });
+    page.drawText(option, { x: 76 + index * 120, y: 453, size: 10, font });
+  });
+
+  page.drawText("Country", { x: 56, y: 418, size: 11, font });
+  const country = form.createDropdown("applicant.country");
+  country.addOptions(["India", "United States", "United Kingdom", "Germany"]);
+  country.addToPage(page, { x: 56, y: 393, width: 200, height: 22 });
+
+  page.drawText("Skills", { x: 56, y: 360, size: 11, font });
+  const skills = form.createOptionList("applicant.skills");
+  skills.addOptions(["TypeScript", "Rust", "Go", "Python"]);
+  skills.addToPage(page, { x: 56, y: 290, width: 200, height: 60 });
+
+  page.drawText("Signature", { x: 56, y: 258, size: 11, font });
+
+  // A signature widget, registered directly because pdf-lib exposes no builder.
+  const context = pdf.context;
+  const signature = context.obj({
+    FT: PDFName.of("Sig"),
+    Type: PDFName.of("Annot"),
+    Subtype: PDFName.of("Widget"),
+    T: PDFString.of("applicant.signature"),
+    Rect: context.obj([56, 205, 300, 250]),
+    F: 4,
+    P: page.ref,
+  });
+  const signatureRef = context.register(signature);
+  page.node.Annots().push(signatureRef);
+  pdf.catalog.lookup(PDFName.of("AcroForm")).lookup(PDFName.of("Fields")).push(signatureRef);
+
+  return pdf.save();
+}
+
+/** A page with a wide white border, used to test white-margin detection. */
+async function buildMarginPdf() {
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const page = pdf.addPage([595.28, 841.89]);
+  // Content sits well inside the page so there is a clear margin to remove.
+  page.drawRectangle({ x: 150, y: 400, width: 300, height: 200, color: rgb(0.1, 0.2, 0.6) });
+  page.drawText("Content block", { x: 165, y: 610, size: 14, font });
+  return pdf.save();
+}
+
 /** Valid PDF structure containing no text or images at all. */
 async function buildEmptyContentPdf() {
   const pdf = await PDFDocument.create();
@@ -1117,6 +1196,8 @@ export async function generateFixtures() {
     "gov-legacy-hindi.pdf": await buildLegacyGovernmentPdf(),
     "scanned.pdf": await buildScannedPdf(),
     "tables.pdf": await buildTablePdf(),
+    "form.pdf": await buildFormPdf(),
+    "margins.pdf": await buildMarginPdf(),
     "sales.xlsx": await buildSalesXlsx(),
     "legacy.xls": buildLegacyXls(),
     "photo.jpg": await makeJpeg(),

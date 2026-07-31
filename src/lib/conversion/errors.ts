@@ -14,6 +14,7 @@ export type ConversionErrorCode =
   | "unsupported-format"
   | "no-content"
   | "ocr-required"
+  | "invalid-request"
   | "processing-failed";
 
 export class ConversionError extends Error {
@@ -71,6 +72,12 @@ export const conversionErrors = {
       "The document could not be converted. Try again, or use a different file.",
       { cause }
     ),
+  /**
+   * A failure the user can act on, where the specific wording matters more
+   * than a generic message. Unlike `processingFailed`, the text given here is
+   * what the user actually sees.
+   */
+  invalidRequest: (message: string) => new ConversionError("invalid-request", message),
 } as const;
 
 /** Normalises any thrown value into a user-safe message. */
