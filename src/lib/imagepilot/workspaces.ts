@@ -19,10 +19,23 @@ export type WorkspaceId =
   | "screenshot"
   | "watermark"
   | "passport"
-  | "compress";
+  | "compress"
+  | "background"
+  | "blur"
+  | "metadata"
+  | "convert";
 
 /** Right-hand inspector tabs a workspace can expose. */
-export type PanelId = "properties" | "adjust" | "watermark" | "passport" | "compress";
+export type PanelId =
+  | "properties"
+  | "adjust"
+  | "watermark"
+  | "passport"
+  | "compress"
+  | "background"
+  | "blur"
+  | "metadata"
+  | "convert";
 
 export interface WorkspaceDefinition {
   id: WorkspaceId;
@@ -174,6 +187,104 @@ export const workspaces: WorkspaceDefinition[] = [
       "target file size",
     ],
     highlights: ["Quality or target size", "Before and after preview", "Batch compression"],
+  },
+  {
+    id: "background",
+    slug: "background-remover",
+    name: "Background Remover",
+    tagline: "Cut out a subject and drop in a new backdrop",
+    description:
+      "Removes a plain or gently graded background with soft-edge matting that preserves hair, then exports a transparent PNG or composites the subject onto a new colour or image.",
+    intro:
+      "Import a photo, refine the cut-out with the brush if needed, then export it transparent or over a new background. Everything runs on your device.",
+    // The brush lives in the panel, so the rail only needs navigation.
+    tools: ["move", "hand", "zoom"],
+    panels: ["background", "adjust"],
+    defaultFormat: "png",
+    autoImport: true,
+    keywords: [
+      "background remover",
+      "remove background",
+      "transparent png",
+      "cut out image",
+      "change background colour",
+      "product photo background",
+      "hair matting",
+    ],
+    highlights: ["Soft-edge matting", "Brush refinement", "Transparent PNG"],
+  },
+  {
+    id: "blur",
+    slug: "object-blur",
+    name: "Object Blur Studio",
+    tagline: "Hide faces, plates and anything private",
+    description:
+      "Draw regions over faces, licence plates or documents and obscure them with pixelation, blur or a solid block, with adjustable strength and feathering.",
+    intro:
+      "Drag a region over anything that should not be shared, pick how strongly to obscure it, then export. Pixelation destroys the detail rather than merely softening it.",
+    tools: ["move", "hand", "zoom"],
+    panels: ["blur", "properties"],
+    defaultFormat: "png",
+    autoImport: true,
+    keywords: [
+      "blur faces",
+      "blur licence plate",
+      "blur number plate",
+      "pixelate image",
+      "hide personal information",
+      "redact photo",
+      "anonymise photo",
+    ],
+    highlights: ["Face and plate presets", "Pixelate or blur", "Brush and drag regions"],
+  },
+  {
+    id: "metadata",
+    slug: "metadata-cleaner",
+    name: "Metadata Cleaner",
+    tagline: "Strip EXIF, GPS and camera data",
+    description:
+      "Shows exactly what personal data a photo carries — GPS coordinates, camera serial numbers, author fields — and removes the parts you choose without recompressing the image.",
+    intro:
+      "Photos routinely carry the location they were taken and the serial number of the camera. See what is in yours, then remove it losslessly.",
+    tools: ["move", "hand", "zoom"],
+    panels: ["metadata"],
+    defaultFormat: "jpeg",
+    autoImport: true,
+    keywords: [
+      "remove exif",
+      "metadata cleaner",
+      "strip gps from photo",
+      "remove location from image",
+      "exif viewer",
+      "privacy photo",
+      "remove camera information",
+    ],
+    highlights: ["See what is in the file", "Lossless removal", "Batch processing"],
+  },
+  {
+    id: "convert",
+    slug: "converter",
+    name: "Batch Converter",
+    tagline: "Convert, resize and rename in bulk",
+    description:
+      "Convert many images between JPG, PNG, WEBP, AVIF and BMP at once, resizing and renaming as you go, then download everything as a ZIP.",
+    intro:
+      "Drop in a folder of images, choose an output format and naming pattern, then download the lot as a ZIP. Nothing is uploaded.",
+    tools: ["move", "hand", "zoom"],
+    panels: ["convert"],
+    defaultFormat: "webp",
+    autoImport: true,
+    keywords: [
+      "batch convert images",
+      "image converter",
+      "png to jpg",
+      "jpg to webp",
+      "convert to avif",
+      "convert to bmp",
+      "bulk rename images",
+      "zip download",
+    ],
+    highlights: ["Five output formats", "Resize and rename", "ZIP download"],
   },
 ];
 

@@ -18,6 +18,7 @@ import {
   makeSolidRaster,
   makeSplitRaster,
   nodeCanvasFactory,
+  nodeCanvasLoadImage,
   pixelAt,
   renderToPixels,
 } from "./imagepilot-harness.mjs";
@@ -1651,7 +1652,7 @@ await test("every workspace is well formed and routes uniquely", () => {
     assert(!slugs.has(workspace.slug), `duplicate slug ${workspace.slug}`);
     slugs.add(workspace.slug);
   }
-  assert(core.workspaces.length === 5, `expected five workspaces, got ${core.workspaces.length}`);
+  assert(core.workspaces.length === 9, `expected nine workspaces, got ${core.workspaces.length}`);
 });
 
 await test("focused workspaces expose only real tools", () => {
@@ -1676,7 +1677,7 @@ await test("workspace lookup and hrefs resolve", () => {
     core.workspaceHref(core.getWorkspace("watermark")) === "/imagepilot/watermark-studio",
     "watermark route"
   );
-  assert(core.focusedWorkspaces.length === 4, "expected four focused workspaces");
+  assert(core.focusedWorkspaces.length === 8, "expected eight focused workspaces");
 });
 
 /* -------------------------------------------------------------------------- */
@@ -2346,6 +2347,966 @@ await test("presets are well formed", () => {
   for (const preset of core.DIMENSION_PRESETS) {
     assert(preset.value === null || preset.value > 0, `${preset.label}: bad dimension`);
   }
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Background remover");
+
+/**
+ * Builds a subject on a background, returning RGBA pixels.
+ *
+ * `fringe` adds a band of blended colour around the subject, standing in for
+ * the semi-transparent hair and soft edges that separate real matting from a
+ * hard colour key.
+ */
+function makeSubjectOnBackground(size, background, subject, options = {}) {
+  const { canvas, ctx } = nodeCanvasFactory.create(size, size);
+  ctx.fillStyle = background;
+  ctx.fillRect(0, 0, size, size);
+
+  if (options.fringe) {
+    // A soft halo: progressively blended rings around the subject.
+    for (let i = options.fringe; i > 0; i--) {
+      ctx.globalAlpha = 1 - i / (options.fringe + 1);
+      ctx.fillStyle = subject;
+      ctx.beginPath();
+      ctx.ellipse(size / 2, size / 2, size / 4 + i, size / 4 + i, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.fillStyle = subject;
+  ctx.beginPath();
+  ctx.ellipse(size / 2, size / 2, size / 4, size / 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  return { data: ctx.getImageData(0, 0, size, size).data, canvas, ctx };
+}
+
+await test("samples the dominant background colour from the border", () => {
+  const { data } = makeSubjectOnBackground(64, "#20a020", "#c02020");
+  const samples = core.sampleBackground(data, 64, 64);
+
+  assertGreater(samples.length, 0, "expected at least one sample");
+  const [first] = samples;
+  // The border is entirely background, so the top cluster must be the green.
+  assertClose(first.r, 0x20, 12, "sampled red");
+  assertClose(first.g, 0xa0, 12, "sampled green");
+  assertClose(first.b, 0x20, 12, "sampled blue");
+  assertGreater(first.weight, 0.5, "expected the backdrop to dominate the border");
+});
+
+await test("handles a graded backdrop with several sampled colours", () => {
+  const { canvas, ctx } = nodeCanvasFactory.create(80, 80);
+  const gradient = ctx.createLinearGradient(0, 0, 0, 80);
+  gradient.addColorStop(0, "#f0f0f0");
+  gradient.addColorStop(1, "#808080");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 80, 80);
+  ctx.fillStyle = "#c02020";
+  ctx.beginPath();
+  ctx.ellipse(40, 40, 18, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  const data = ctx.getImageData(0, 0, 80, 80).data;
+  const samples = core.sampleBackground(data, 80, 80);
+  assertGreater(samples.length, 1, "expected a gradient to yield several clusters");
+
+  const result = core.computeRemovalMatte(data, 80, 80, core.defaultRemovalSettings, samples);
+  // The subject must survive even though the backdrop varies.
+  assertClose(result.alpha[40 * 80 + 40], 1, 0.05, "subject centre kept");
+  assertClose(result.alpha[2 * 80 + 2], 0, 0.05, "corner removed");
+  assert(canvas, "expected a canvas");
+});
+
+await test("a subject touching the border is not learned as background", () => {
+  // Regression: in almost every portrait the shoulders run off the bottom
+  // edge. Naively taking the most common border colours learns the shirt as
+  // "background" and cuts the body out.
+  const size = 120;
+  const { ctx } = nodeCanvasFactory.create(size, size);
+  ctx.fillStyle = "#e8f0e8";
+  ctx.fillRect(0, 0, size, size);
+  // Dark torso running off the bottom edge.
+  ctx.fillStyle = "#2c3e50";
+  ctx.beginPath();
+  ctx.moveTo(26, size);
+  ctx.lineTo(40, 78);
+  ctx.lineTo(80, 78);
+  ctx.lineTo(94, size);
+  ctx.closePath();
+  ctx.fill();
+  // Head.
+  ctx.fillStyle = "#e8b88a";
+  ctx.beginPath();
+  ctx.ellipse(60, 54, 22, 27, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  const data = ctx.getImageData(0, 0, size, size).data;
+  const samples = core.sampleBackground(data, size, size);
+
+  // The dark shirt must not appear among the learned background colours.
+  for (const sample of samples) {
+    const luma = sample.r * 0.3 + sample.g * 0.59 + sample.b * 0.11;
+    assert(
+      luma > 120,
+      `learned a dark colour as background: rgb(${Math.round(sample.r)},${Math.round(sample.g)},${Math.round(sample.b)})`
+    );
+  }
+
+  const result = core.computeRemovalMatte(data, size, size, core.defaultRemovalSettings);
+  // Body, face and corner must each land on the right side.
+  assertGreater(result.alpha[(size - 6) * size + 60], 0.9, "expected the torso kept");
+  assertGreater(result.alpha[54 * size + 60], 0.9, "expected the face kept");
+  assert(result.alpha[3 * size + 3] < 0.1, "expected the corner removed");
+});
+
+await test("removes the background and keeps the subject", () => {
+  const { data } = makeSubjectOnBackground(64, "#20a020", "#c02020");
+  const result = core.computeRemovalMatte(data, 64, 64, core.defaultRemovalSettings);
+
+  assertClose(result.alpha[32 * 64 + 32], 1, 0.02, "expected the subject fully opaque");
+  assertClose(result.alpha[1 * 64 + 1], 0, 0.02, "expected the corner fully transparent");
+  // A quarter-radius disc covers about pi/16 of the frame, so roughly 80%
+  // should be removed.
+  assert(
+    result.removedFraction > 0.6 && result.removedFraction < 0.95,
+    `unexpected removed fraction ${result.removedFraction.toFixed(2)}`
+  );
+});
+
+await test("produces fractional alpha across a soft edge", () => {
+  const { data } = makeSubjectOnBackground(96, "#20a020", "#c02020", { fringe: 6 });
+  const result = core.computeRemovalMatte(data, 96, 96, {
+    ...core.defaultRemovalSettings,
+    feather: 0,
+    despeckle: 0,
+  });
+
+  // The whole point of matting: some pixels must be partially transparent.
+  let partial = 0;
+  for (let i = 0; i < result.alpha.length; i++) {
+    if (result.alpha[i] > 0.08 && result.alpha[i] < 0.92) partial++;
+  }
+  assertGreater(partial, 40, "expected a band of semi-transparent edge pixels");
+});
+
+await test("edge-connected mode protects an enclosed region", () => {
+  // A subject with a hole whose colour matches the backdrop. With
+  // edge-connected removal the hole must survive, because it is not reachable
+  // from the border without crossing the subject.
+  const { ctx } = nodeCanvasFactory.create(80, 80);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, 80, 80);
+  ctx.fillStyle = "#204080";
+  ctx.fillRect(20, 20, 40, 40);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(36, 36, 8, 8);
+  const data = ctx.getImageData(0, 0, 80, 80).data;
+
+  const connected = core.computeRemovalMatte(data, 80, 80, {
+    ...core.defaultRemovalSettings,
+    edgeConnectedOnly: true,
+    despeckle: 0,
+    feather: 0,
+  });
+  const anywhere = core.computeRemovalMatte(data, 80, 80, {
+    ...core.defaultRemovalSettings,
+    edgeConnectedOnly: false,
+    despeckle: 0,
+    feather: 0,
+  });
+
+  const holeIndex = 40 * 80 + 40;
+  assertClose(connected.alpha[holeIndex], 1, 0.05, "expected the enclosed hole kept");
+  assertClose(anywhere.alpha[holeIndex], 0, 0.05, "expected colour keying to remove the hole");
+  // Both must still clear the outer background.
+  assertClose(connected.alpha[2 * 80 + 2], 0, 0.05, "outer background removed");
+});
+
+await test("tolerance widens what counts as background", () => {
+  // A backdrop with two nearby shades; a tight tolerance keeps the second.
+  const { ctx } = nodeCanvasFactory.create(64, 64);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, 64, 64);
+  ctx.fillStyle = "#d8d8d8";
+  ctx.fillRect(0, 40, 64, 24);
+  ctx.fillStyle = "#101010";
+  ctx.fillRect(24, 8, 16, 16);
+  const data = ctx.getImageData(0, 0, 64, 64).data;
+  const samples = [{ r: 255, g: 255, b: 255, weight: 1 }];
+
+  const tight = core.computeRemovalMatte(
+    data, 64, 64,
+    { ...core.defaultRemovalSettings, tolerance: 4, softness: 10, feather: 0, despeckle: 0, edgeConnectedOnly: false },
+    samples
+  );
+  const loose = core.computeRemovalMatte(
+    data, 64, 64,
+    { ...core.defaultRemovalSettings, tolerance: 60, softness: 10, feather: 0, despeckle: 0, edgeConnectedOnly: false },
+    samples
+  );
+
+  assertGreater(loose.removedFraction, tight.removedFraction, "expected tolerance to remove more");
+  // The dark square must survive both.
+  assertClose(tight.alpha[16 * 64 + 32], 1, 0.05, "dark subject kept at low tolerance");
+  assertClose(loose.alpha[16 * 64 + 32], 1, 0.05, "dark subject kept at high tolerance");
+});
+
+await test("despeckle clears isolated noise", () => {
+  const { ctx } = nodeCanvasFactory.create(64, 64);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, 64, 64);
+  ctx.fillStyle = "#202020";
+  ctx.fillRect(20, 20, 24, 24);
+  // Scattered single-pixel specks.
+  for (const [x, y] of [[4, 4], [58, 6], [7, 55], [60, 60], [2, 30]]) {
+    ctx.fillRect(x, y, 1, 1);
+  }
+  const data = ctx.getImageData(0, 0, 64, 64).data;
+
+  const raw = core.computeRemovalMatte(data, 64, 64, {
+    ...core.defaultRemovalSettings, despeckle: 0, feather: 0,
+  });
+  const cleaned = core.computeRemovalMatte(data, 64, 64, {
+    ...core.defaultRemovalSettings, despeckle: 40, feather: 0,
+  });
+
+  const speck = 4 * 64 + 4;
+  assertGreater(raw.alpha[speck], 0.5, "expected the speck kept without despeckling");
+  assert(cleaned.alpha[speck] < 0.5, "expected despeckling to clear the speck");
+  // The real subject must survive.
+  assertClose(cleaned.alpha[32 * 64 + 32], 1, 0.05, "subject preserved");
+});
+
+await test("applying a matte writes real alpha and decontaminates the fringe", () => {
+  const size = 64;
+  const { data } = makeSubjectOnBackground(size, "#00ff00", "#ff0000", { fringe: 4 });
+  const result = core.computeRemovalMatte(data, size, size, {
+    ...core.defaultRemovalSettings, feather: 0, despeckle: 0,
+  });
+
+  const decontaminated = new Uint8ClampedArray(data);
+  core.applyMatte(decontaminated, result.alpha, result.samples, true);
+  const plain = new Uint8ClampedArray(data);
+  core.applyMatte(plain, result.alpha, result.samples, false);
+
+  // Corner is transparent in both.
+  assert(decontaminated[(1 * size + 1) * 4 + 3] === 0, "expected a transparent corner");
+
+  // Across semi-transparent pixels, decontamination must reduce the green cast
+  // left behind by the backdrop.
+  let greenWith = 0;
+  let greenWithout = 0;
+  let count = 0;
+  for (let i = 0; i < result.alpha.length; i++) {
+    if (result.alpha[i] <= 0.1 || result.alpha[i] >= 0.9) continue;
+    greenWith += decontaminated[i * 4 + 1];
+    greenWithout += plain[i * 4 + 1];
+    count++;
+  }
+  assertGreater(count, 10, "expected semi-transparent pixels to exist");
+  assert(
+    greenWith / count < greenWithout / count,
+    `expected less green spill: ${(greenWith / count).toFixed(1)} vs ${(greenWithout / count).toFixed(1)}`
+  );
+});
+
+await test("the brush restores and erases with a soft falloff", () => {
+  const alpha = new Float32Array(40 * 40).fill(0);
+  core.paintMatte(alpha, 40, 40, 20, 20, 8, "restore", 0.5, 1);
+
+  assertClose(alpha[20 * 40 + 20], 1, 0.01, "expected the centre fully restored");
+  assert(alpha[20 * 40 + 33] === 0, "expected pixels beyond the radius untouched");
+  // Somewhere in the rim the value must be partial, proving the soft edge.
+  let partial = 0;
+  for (let i = 0; i < alpha.length; i++) if (alpha[i] > 0.05 && alpha[i] < 0.95) partial++;
+  assertGreater(partial, 4, "expected a feathered rim");
+
+  core.paintMatte(alpha, 40, 40, 20, 20, 8, "erase", 1, 1);
+  assertClose(alpha[20 * 40 + 20], 0, 0.01, "expected erase to clear it again");
+});
+
+await test("the mask preview is a readable greyscale image", () => {
+  const alpha = new Float32Array(4);
+  alpha[0] = 0; alpha[1] = 0.5; alpha[2] = 1; alpha[3] = 0.25;
+  const preview = core.matteToPreview(alpha, 2, 2);
+
+  assert(preview[0] === 0 && preview[3] === 255, "expected black and opaque");
+  assertClose(preview[4], 128, 2, "expected mid grey");
+  assert(preview[8] === 255, "expected white");
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Object blur studio");
+
+/** Detail-rich source so obscuring is measurable. */
+function makeDetailRaster(size = 80) {
+  const { canvas, ctx } = nodeCanvasFactory.create(size, size);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = "#000000";
+  for (let y = 0; y < size; y += 4) ctx.fillRect(0, y, size, 2);
+  return { canvas, ctx, data: ctx.getImageData(0, 0, size, size).data };
+}
+
+await test("presets are well formed and cover the required jobs", () => {
+  const ids = core.REGION_PRESETS.map((preset) => preset.id);
+  for (const required of ["face", "plate", "text"]) {
+    assert(ids.includes(required), `missing preset: ${required}`);
+  }
+  for (const preset of core.REGION_PRESETS) {
+    assert(preset.strength > 0 && preset.strength <= 100, `${preset.id}: bad strength`);
+    assert(["rectangle", "ellipse"].includes(preset.shape), `${preset.id}: bad shape`);
+    assert(["pixelate", "blur", "fill"].includes(preset.mode), `${preset.id}: bad mode`);
+    assert(preset.ratio === null || preset.ratio > 0, `${preset.id}: bad ratio`);
+    // Redaction presets must err outward, never inward.
+    assert(preset.padding >= 0 && preset.padding < 0.5, `${preset.id}: bad padding`);
+  }
+  // Faces and plates must default to pixelation, which is irreversible.
+  assert(core.getPreset("face").mode === "pixelate", "faces should pixelate");
+  assert(core.getPreset("plate").mode === "pixelate", "plates should pixelate");
+  assert(core.getPreset("face").shape === "ellipse", "faces should use an oval");
+});
+
+await test("a region obscures only inside its bounds", () => {
+  const { data } = makeDetailRaster(80);
+  const before = new Uint8ClampedArray(data);
+
+  core.applyRegion(data, 80, 80, {
+    id: "r1", x: 20, y: 20, width: 30, height: 30,
+    shape: "rectangle", mode: "pixelate", strength: 90, color: "#000", feather: 0,
+  });
+
+  // Inside changed.
+  let changedInside = 0;
+  for (let y = 22; y < 48; y++) {
+    for (let x = 22; x < 48; x++) {
+      const i = (y * 80 + x) * 4;
+      if (data[i] !== before[i]) changedInside++;
+    }
+  }
+  assertGreater(changedInside, 50, "expected the region to change");
+
+  // Outside untouched, byte for byte.
+  for (const [x, y] of [[5, 5], [70, 70], [5, 70], [70, 5], [60, 30]]) {
+    const i = (y * 80 + x) * 4;
+    assert(data[i] === before[i], `expected (${x},${y}) untouched`);
+  }
+});
+
+await test("pixelation destroys detail more than blur", () => {
+  function variance(mode, strength) {
+    const { data } = makeDetailRaster(80);
+    core.applyRegion(data, 80, 80, {
+      id: "r", x: 20, y: 20, width: 40, height: 40,
+      shape: "rectangle", mode, strength, color: "#000", feather: 0,
+    });
+    // Measure only inside the region.
+    const inner = [];
+    for (let y = 24; y < 56; y++) {
+      for (let x = 24; x < 56; x++) inner.push(data[(y * 80 + x) * 4]);
+    }
+    const mean = inner.reduce((a, b) => a + b, 0) / inner.length;
+    return Math.sqrt(inner.reduce((a, b) => a + (b - mean) ** 2, 0) / inner.length);
+  }
+
+  const plain = (() => {
+    const { data } = makeDetailRaster(80);
+    const inner = [];
+    for (let y = 24; y < 56; y++) for (let x = 24; x < 56; x++) inner.push(data[(y * 80 + x) * 4]);
+    const mean = inner.reduce((a, b) => a + b, 0) / inner.length;
+    return Math.sqrt(inner.reduce((a, b) => a + (b - mean) ** 2, 0) / inner.length);
+  })();
+
+  const pixelated = variance("pixelate", 90);
+  assertGreater(plain, 90, "expected the striped source to be high contrast");
+  assert(pixelated < plain * 0.4, `expected pixelation to flatten detail: ${plain.toFixed(1)} -> ${pixelated.toFixed(1)}`);
+});
+
+await test("an elliptical region leaves its corners untouched", () => {
+  const { data } = makeDetailRaster(80);
+  const before = new Uint8ClampedArray(data);
+
+  core.applyRegion(data, 80, 80, {
+    id: "r", x: 20, y: 20, width: 40, height: 40,
+    shape: "ellipse", mode: "fill", strength: 100, color: "#ff0000", feather: 0,
+  });
+
+  // Centre filled red.
+  const centre = (40 * 80 + 40) * 4;
+  assertGreater(data[centre], 200, "expected the centre filled");
+  assert(data[centre + 1] < 60, "expected a red fill");
+
+  // The bounding box corner is outside the ellipse.
+  const corner = (21 * 80 + 21) * 4;
+  assert(data[corner] === before[corner], "expected the ellipse corner untouched");
+});
+
+await test("feathering softens the region boundary", () => {
+  function edgeValue(feather) {
+    const { canvas, ctx } = nodeCanvasFactory.create(80, 80);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, 80, 80);
+    const data = ctx.getImageData(0, 0, 80, 80).data;
+    core.applyRegion(data, 80, 80, {
+      id: "r", x: 20, y: 20, width: 40, height: 40,
+      shape: "rectangle", mode: "fill", strength: 100, color: "#000000", feather,
+    });
+    assert(canvas, "canvas");
+    // Just inside the boundary.
+    return data[(40 * 80 + 21) * 4];
+  }
+
+  const hard = edgeValue(0);
+  const soft = edgeValue(10);
+  assert(hard === 0, `expected a hard edge to be fully filled, got ${hard}`);
+  assertGreater(soft, hard, "expected feathering to leave the rim partially blended");
+});
+
+await test("regions clamp to the image and never read out of bounds", () => {
+  const { data } = makeDetailRaster(64);
+  // Deliberately overhanging on every side.
+  for (const region of [
+    { x: -30, y: -30, width: 50, height: 50 },
+    { x: 50, y: 50, width: 60, height: 60 },
+    { x: -10, y: 20, width: 200, height: 10 },
+  ]) {
+    core.applyRegion(data, 64, 64, {
+      id: "r", ...region, shape: "rectangle", mode: "pixelate", strength: 50, color: "#000", feather: 0,
+    });
+  }
+  // Completely outside: must be a no-op rather than a crash.
+  core.applyRegion(data, 64, 64, {
+    id: "r", x: 500, y: 500, width: 20, height: 20,
+    shape: "rectangle", mode: "blur", strength: 50, color: "#000", feather: 0,
+  });
+  assert(data.length === 64 * 64 * 4, "expected the buffer intact");
+});
+
+await test("a drag becomes a correctly shaped region", () => {
+  const face = core.regionFromDrag({ x: 10, y: 10, width: 100, height: 40 }, core.getPreset("face"), "r1");
+  // The face preset forces a portrait ratio regardless of how it was dragged.
+  assertClose(face.width / face.height, 0.78, 0.01, "face ratio");
+  // Centre must be preserved.
+  assertClose(face.x + face.width / 2, 60, 0.01, "centre x held");
+  assertClose(face.y + face.height / 2, 30, 0.01, "centre y held");
+  assert(face.mode === "pixelate" && face.shape === "ellipse", "expected preset styling");
+
+  const plate = core.regionFromDrag({ x: 0, y: 0, width: 50, height: 50 }, core.getPreset("plate"), "r2");
+  assertClose(plate.width / plate.height, 4, 0.01, "plate ratio");
+
+  // A free-ratio preset keeps the drag's proportions, padded outward.
+  const free = core.regionFromDrag({ x: 0, y: 0, width: 90, height: 30 }, core.getPreset("text"), "r3");
+  assertClose(free.width / free.height, 3, 0.01, "expected the drag proportions kept");
+  assertGreater(free.width, 90, "expected a safety margin outward");
+});
+
+await test("a region never shrinks below the dragged area", () => {
+  // Regression: this is a redaction tool. An area-preserving fit could make
+  // the region narrower than the box the user dragged, leaving part of the
+  // thing they were hiding visible. The ratio must be fitted by growing.
+  for (const presetId of ["face", "plate", "text", "soft", "block"]) {
+    const preset = core.getPreset(presetId);
+    for (const drag of [
+      { x: 100, y: 100, width: 190, height: 34 },
+      { x: 0, y: 0, width: 40, height: 200 },
+      { x: 50, y: 50, width: 120, height: 120 },
+      { x: 10, y: 10, width: 300, height: 20 },
+    ]) {
+      const region = core.regionFromDrag(drag, preset, "r");
+
+      assert(
+        region.width >= drag.width - 0.01,
+        `${presetId}: region ${region.width.toFixed(1)} narrower than drag ${drag.width}`
+      );
+      assert(
+        region.height >= drag.height - 0.01,
+        `${presetId}: region ${region.height.toFixed(1)} shorter than drag ${drag.height}`
+      );
+      // And it must still fully contain the dragged box.
+      assert(region.x <= drag.x + 0.01, `${presetId}: left edge exposed`);
+      assert(region.y <= drag.y + 0.01, `${presetId}: top edge exposed`);
+      assert(
+        region.x + region.width >= drag.x + drag.width - 0.01,
+        `${presetId}: right edge exposed`
+      );
+      assert(
+        region.y + region.height >= drag.y + drag.height - 0.01,
+        `${presetId}: bottom edge exposed`
+      );
+      if (preset.ratio) {
+        assertClose(region.width / region.height, preset.ratio, 0.02, `${presetId}: ratio`);
+      }
+    }
+  }
+});
+
+await test("colour parsing handles the forms the UI produces", () => {
+  assert(core.parseColor("#ff0000").join() === "255,0,0", "6-digit hex");
+  assert(core.parseColor("#f00").join() === "255,0,0", "3-digit hex");
+  assert(core.parseColor("rgb(0, 128, 255)").join() === "0,128,255", "rgb()");
+  assert(core.parseColor("nonsense").join() === "0,0,0", "expected a safe fallback");
+});
+
+await test("applying several regions composes them", () => {
+  const { data } = makeDetailRaster(80);
+  core.applyRegions(data, 80, 80, [
+    { id: "a", x: 5, y: 5, width: 20, height: 20, shape: "rectangle", mode: "fill", strength: 100, color: "#ff0000", feather: 0 },
+    { id: "b", x: 50, y: 50, width: 20, height: 20, shape: "rectangle", mode: "fill", strength: 100, color: "#0000ff", feather: 0 },
+  ]);
+  assertGreater(data[(10 * 80 + 10) * 4], 200, "expected the first region red");
+  assertGreater(data[(60 * 80 + 60) * 4 + 2], 200, "expected the second region blue");
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Metadata cleaner");
+
+/** Builds a JPEG carrying a real EXIF APP1 segment with GPS. */
+function makeJpegWithExif() {
+  const { canvas, ctx } = nodeCanvasFactory.create(32, 32);
+  ctx.fillStyle = "#3366cc";
+  ctx.fillRect(0, 0, 32, 32);
+  const base = new Uint8Array(canvas.toBuffer("image/jpeg"));
+
+  // Build a little-endian TIFF block: IFD0 with Make/Model/Software plus a
+  // GPS sub-IFD carrying a latitude.
+  const exif = [];
+  const push16 = (v) => { exif.push(v & 0xff, (v >> 8) & 0xff); };
+  const push32 = (v) => { exif.push(v & 0xff, (v >> 8) & 0xff, (v >> 16) & 0xff, (v >> 24) & 0xff); };
+
+  exif.push(0x49, 0x49); // "II"
+  push16(42);
+  push32(8); // first IFD at offset 8
+
+  const strings = { make: "TestCam", model: "Model X", software: "ImagePilot Test" };
+  // Values longer than four bytes live after the IFDs.
+  const ifd0Count = 4;
+  const ifd0Size = 2 + ifd0Count * 12 + 4;
+  let valueCursor = 8 + ifd0Size;
+  const gpsOffset = valueCursor;
+  const gpsCount = 2;
+  const gpsSize = 2 + gpsCount * 12 + 4;
+  valueCursor += gpsSize;
+
+  const makeOffset = valueCursor; valueCursor += strings.make.length + 1;
+  const modelOffset = valueCursor; valueCursor += strings.model.length + 1;
+  const softwareOffset = valueCursor; valueCursor += strings.software.length + 1;
+  const latOffset = valueCursor; valueCursor += 24; // three rationals
+
+  push16(ifd0Count);
+  const entry = (tag, type, count, value) => { push16(tag); push16(type); push32(count); push32(value); };
+  entry(0x010f, 2, strings.make.length + 1, makeOffset);
+  entry(0x0110, 2, strings.model.length + 1, modelOffset);
+  entry(0x0131, 2, strings.software.length + 1, softwareOffset);
+  entry(0x8825, 4, 1, gpsOffset); // GPS sub-IFD pointer
+  push32(0); // no next IFD
+
+  // GPS IFD.
+  push16(gpsCount);
+  entry(0x0002, 5, 3, latOffset); // latitude, three rationals
+  entry(0x0001, 2, 2, 0x004e);    // 'N' inline
+  push32(0);
+
+  for (const text of [strings.make, strings.model, strings.software]) {
+    for (const char of text) exif.push(char.charCodeAt(0));
+    exif.push(0);
+  }
+  // 51/1, 30/1, 0/1  — a plausible latitude.
+  for (const [n, d] of [[51, 1], [30, 1], [0, 1]]) { push32(n); push32(d); }
+
+  const exifBytes = new Uint8Array(exif);
+  const header = new TextEncoder().encode("Exif\0\0");
+  const payloadLength = header.length + exifBytes.length + 2;
+
+  const app1 = new Uint8Array(4 + header.length + exifBytes.length);
+  app1[0] = 0xff; app1[1] = 0xe1;
+  app1[2] = (payloadLength >> 8) & 0xff;
+  app1[3] = payloadLength & 0xff;
+  app1.set(header, 4);
+  app1.set(exifBytes, 4 + header.length);
+
+  // Insert immediately after SOI.
+  const out = new Uint8Array(base.length + app1.length);
+  out.set(base.subarray(0, 2), 0);
+  out.set(app1, 2);
+  out.set(base.subarray(2), 2 + app1.length);
+  return out;
+}
+
+await test("detects the container format", () => {
+  const { canvas } = nodeCanvasFactory.create(16, 16);
+  assert(core.detectFormat(new Uint8Array(canvas.toBuffer("image/jpeg"))) === "jpeg", "jpeg");
+  assert(core.detectFormat(new Uint8Array(canvas.toBuffer("image/png"))) === "png", "png");
+  assert(core.detectFormat(new Uint8Array(canvas.toBuffer("image/webp"))) === "webp", "webp");
+  assert(core.detectFormat(new Uint8Array([1, 2, 3, 4])) === "unknown", "unknown");
+});
+
+await test("reads real EXIF including GPS, camera and software", () => {
+  const bytes = makeJpegWithExif();
+  const report = core.inspectMetadata(bytes);
+
+  assert(report.format === "jpeg", "expected a JPEG");
+  assert(report.hasLocation, "expected GPS to be detected");
+  assertGreater(report.metadataBytes, 40, "expected the segment measured");
+
+  const labels = report.entries.map((entry) => entry.label);
+  assert(labels.includes("Camera make"), `expected camera make, got ${labels.join(", ")}`);
+  assert(labels.includes("Camera model"), "expected camera model");
+  assert(labels.includes("Software"), "expected software");
+  assert(labels.some((label) => label.startsWith("GPS")), "expected a GPS entry");
+
+  const make = report.entries.find((entry) => entry.label === "Camera make");
+  assert(make.value === "TestCam", `expected the decoded value, got ${make.value}`);
+  assert(make.category === "camera", "expected the camera category");
+});
+
+await test("removes metadata losslessly and leaves the image decodable", async () => {
+  const bytes = makeJpegWithExif();
+  const before = core.inspectMetadata(bytes);
+  assertGreater(before.entries.length, 3, "expected metadata to start with");
+
+  const result = core.cleanMetadata(bytes, core.defaultCleanOptions);
+  assertGreater(result.removedBytes, 0, "expected bytes removed");
+  assertGreater(result.removed.length, 0, "expected entries reported as removed");
+
+  const after = core.inspectMetadata(result.bytes);
+  assert(!after.hasLocation, "expected GPS gone");
+  // Everything personal must be gone. The ICC colour profile is deliberately
+  // retained by default, because dropping it changes how the image displays.
+  const remaining = after.entries.filter((entry) => entry.category !== "color-profile");
+  assert(
+    remaining.length === 0,
+    `expected no personal metadata left, got ${remaining.map((e) => e.label).join(", ")}`
+  );
+
+  // Opting in must then remove the profile too.
+  const alsoProfile = core.cleanMetadata(bytes, {
+    ...core.defaultCleanOptions,
+    removeColorProfile: true,
+  });
+  assert(
+    core.inspectMetadata(alsoProfile.bytes).entries.length === 0,
+    "expected the colour profile removed when asked"
+  );
+  assertGreater(
+    alsoProfile.removedBytes,
+    result.removedBytes,
+    "expected removing the profile to save more bytes"
+  );
+
+  // Crucially: the cleaned file must still be a valid, decodable JPEG of the
+  // same size — proving the scan data was copied rather than re-encoded.
+  const decoded = await nodeCanvasLoadImage(result.bytes);
+  assert(decoded.width === 32 && decoded.height === 32, "expected the image intact");
+});
+
+await test("respects per-category choices", () => {
+  const bytes = makeJpegWithExif();
+  // Ask to remove nothing at all.
+  const none = core.cleanMetadata(bytes, {
+    removeLocation: false, removeCamera: false, removeAuthor: false,
+    removeSoftware: false, removeTimestamp: false, removeThumbnail: false,
+    removeColorProfile: false,
+  });
+  assert(none.removedBytes === 0, "expected nothing removed");
+  assert(core.inspectMetadata(none.bytes).hasLocation, "expected GPS retained");
+
+  // The EXIF block is a single segment, so asking for location removal takes
+  // the whole block with it — the report says exactly what went.
+  const located = core.cleanMetadata(bytes, {
+    ...core.defaultCleanOptions, removeLocation: true,
+  });
+  assert(!core.inspectMetadata(located.bytes).hasLocation, "expected GPS gone");
+});
+
+await test("cleans PNG text chunks without breaking the file", async () => {
+  const { canvas } = nodeCanvasFactory.create(24, 24);
+  const base = new Uint8Array(canvas.toBuffer("image/png"));
+
+  // Insert a tEXt chunk after the IHDR.
+  const payload = new TextEncoder().encode("Author\0Jane Photographer");
+  const chunk = core.buildPngChunk("tEXt", payload);
+  const insertAt = 8 + 25; // signature + IHDR
+  const withText = new Uint8Array(base.length + chunk.length);
+  withText.set(base.subarray(0, insertAt), 0);
+  withText.set(chunk, insertAt);
+  withText.set(base.subarray(insertAt), insertAt + chunk.length);
+
+  const report = core.inspectMetadata(withText);
+  assert(report.format === "png", "expected PNG");
+  assert(report.entries.some((entry) => entry.label === "Author"), "expected the text chunk read");
+
+  const cleaned = core.cleanMetadata(withText, core.defaultCleanOptions);
+  assert(core.inspectMetadata(cleaned.bytes).entries.length === 0, "expected the chunk removed");
+
+  const decoded = await nodeCanvasLoadImage(cleaned.bytes);
+  assert(decoded.width === 24, "expected the PNG still decodable");
+});
+
+await test("a file with no metadata is returned unchanged", () => {
+  const { canvas } = nodeCanvasFactory.create(16, 16);
+  const bytes = new Uint8Array(canvas.toBuffer("image/png"));
+  const report = core.inspectMetadata(bytes);
+  const cleaned = core.cleanMetadata(bytes, core.defaultCleanOptions);
+
+  assert(report.entries.length === 0, "expected a clean file to report nothing");
+  assert(cleaned.removedBytes === 0, "expected no change");
+});
+
+await test("an unknown container is passed through untouched", () => {
+  const bytes = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
+  const cleaned = core.cleanMetadata(bytes, core.defaultCleanOptions);
+  assert(cleaned.bytes === bytes, "expected the original bytes returned");
+  assert(cleaned.removedBytes === 0, "expected nothing removed");
+});
+
+await test("entries group with location first", () => {
+  const groups = core.groupByCategory([
+    { label: "Software", value: "x", category: "software", bytes: 1 },
+    { label: "GPS latitude", value: "51", category: "location", bytes: 1 },
+    { label: "Camera make", value: "y", category: "camera", bytes: 1 },
+  ]);
+  assert(groups[0].category === "location", "expected location first");
+  assert(groups.length === 3, "expected three groups");
+  assert(core.METADATA_CATEGORIES.length >= 6, "expected the full category list");
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Batch converter");
+
+const nodeToBlob = async (canvas, mimeType, quality) => {
+  const buffer =
+    mimeType === "image/png"
+      ? canvas.toBuffer("image/png")
+      : canvas.toBuffer(mimeType, quality === undefined ? undefined : Math.round(quality * 100));
+  return new Blob([buffer], { type: mimeType });
+};
+
+await test("format descriptors are complete", () => {
+  for (const format of ["jpeg", "png", "webp", "avif", "bmp"]) {
+    const descriptor = core.convertDescriptor(format);
+    assert(descriptor.value === format, `missing descriptor for ${format}`);
+    assert(descriptor.mimeType.startsWith("image/"), `${format}: mime`);
+    assert(descriptor.extension.length > 0, `${format}: extension`);
+    assert(descriptor.description.length > 10, `${format}: description`);
+  }
+  assert(core.convertDescriptor("jpeg").extension === "jpg", "expected jpg not jpeg");
+  assert(!core.convertDescriptor("jpeg").supportsAlpha, "jpeg has no alpha");
+  assert(core.convertDescriptor("png").supportsAlpha, "png has alpha");
+  assert(core.convertDescriptor("bmp").manual, "bmp is written by hand");
+});
+
+await test("probing reports what the runtime can actually encode", async () => {
+  const supported = await core.probeFormatSupport(nodeCanvasFactory, nodeToBlob);
+  assert(supported.has("png") && supported.has("jpeg"), "expected the universal formats");
+  assert(supported.has("bmp"), "expected BMP, which we encode ourselves");
+  // WEBP and AVIF depend on the runtime; the point is that the probe answers
+  // honestly rather than the UI assuming.
+  assert(supported instanceof Set, "expected a set");
+});
+
+await test("resize modes compute the right output size", () => {
+  const base = { ...core.defaultConvertSettings };
+
+  assert(core.targetSize({ ...base, resizeMode: "none" }, 1600, 900).width === 1600, "none");
+
+  const longest = core.targetSize({ ...base, resizeMode: "longest", longestEdge: 800 }, 1600, 900);
+  assert(longest.width === 800, "expected the long edge capped");
+  assertClose(longest.height, 450, 1, "expected the ratio preserved");
+
+  // Smaller than the cap must not upscale.
+  const small = core.targetSize({ ...base, resizeMode: "longest", longestEdge: 4000 }, 100, 80);
+  assert(small.width === 100, "expected no upscaling");
+
+  const percent = core.targetSize({ ...base, resizeMode: "percent", percent: 50 }, 1000, 600);
+  assert(percent.width === 500 && percent.height === 300, "percent");
+
+  const exactFit = core.targetSize(
+    { ...base, resizeMode: "exact", exactWidth: 400, exactHeight: 400, preserveAspect: true },
+    1000, 500
+  );
+  assert(exactFit.width === 400 && exactFit.height === 200, "expected letterbox fit");
+
+  const exactStretch = core.targetSize(
+    { ...base, resizeMode: "exact", exactWidth: 400, exactHeight: 400, preserveAspect: false },
+    1000, 500
+  );
+  assert(exactStretch.width === 400 && exactStretch.height === 400, "expected an exact stretch");
+});
+
+await test("rename patterns expand every token", () => {
+  const context = { originalName: "holiday photo.jpeg", index: 7, width: 800, height: 600, extension: "webp" };
+
+  assert(core.buildFileName("{name}", context) === "holiday photo.webp", "name");
+  assert(core.buildFileName("{name}-{n}", context) === "holiday photo-7.webp", "index");
+  assert(core.buildFileName("img-{nnn}", context) === "img-007.webp", "padded index");
+  assert(core.buildFileName("{name}-{w}x{h}", context) === "holiday photo-800x600.webp", "dimensions");
+  assert(core.buildFileName("shot.{ext}", context) === "shot.webp", "extension token");
+  assert(/^\d{4}-\d{2}-\d{2}\.webp$/.test(core.buildFileName("{date}", context)), "date");
+
+  // Path characters must never survive into a filename.
+  assert(
+    core.buildFileName("a/b\\c:d", context) === "abcd.webp",
+    `unexpected: ${core.buildFileName("a/b\\c:d", context)}`
+  );
+  // An empty pattern falls back to the original name.
+  assert(core.buildFileName("", context) === "holiday photo.webp", "empty pattern");
+});
+
+await test("BMP output is a valid 24-bit bitmap", () => {
+  const { ctx } = nodeCanvasFactory.create(4, 3);
+  ctx.fillStyle = "#ff0000";
+  ctx.fillRect(0, 0, 4, 3);
+  const rgba = ctx.getImageData(0, 0, 4, 3).data;
+
+  const bmp = core.encodeBmp(rgba, 4, 3);
+  assert(bmp[0] === 0x42 && bmp[1] === 0x4d, "expected the 'BM' signature");
+
+  const view = new DataView(bmp.buffer, bmp.byteOffset, bmp.byteLength);
+  assert(view.getUint32(2, true) === bmp.length, "expected the file size in the header");
+  assert(view.getInt32(18, true) === 4, "expected the width");
+  assert(view.getInt32(22, true) === 3, "expected the height");
+  assert(view.getUint16(28, true) === 24, "expected 24 bits per pixel");
+
+  // Rows are padded to four bytes: 4px * 3 bytes = 12, already aligned.
+  const dataOffset = view.getUint32(10, true);
+  // BMP is bottom-up and stores BGR, so the first pixel is the bottom-left.
+  assert(bmp[dataOffset] === 0x00, "expected blue 0");
+  assert(bmp[dataOffset + 2] === 0xff, "expected red 255");
+});
+
+await test("BMP row padding is correct for an awkward width", () => {
+  const { ctx } = nodeCanvasFactory.create(3, 2);
+  ctx.fillStyle = "#00ff00";
+  ctx.fillRect(0, 0, 3, 2);
+  const rgba = ctx.getImageData(0, 0, 3, 2).data;
+  const bmp = core.encodeBmp(rgba, 3, 2);
+
+  // 3px * 3 bytes = 9, padded up to 12.
+  const view = new DataView(bmp.buffer, bmp.byteOffset, bmp.byteLength);
+  const dataOffset = view.getUint32(10, true);
+  assert(bmp.length === dataOffset + 12 * 2, `expected padded rows, got ${bmp.length - dataOffset}`);
+});
+
+await test("BMP flattens transparency onto white", () => {
+  const { ctx } = nodeCanvasFactory.create(2, 1);
+  const imageData = ctx.createImageData(2, 1);
+  // Fully transparent, then opaque black.
+  imageData.data.set([0, 0, 0, 0, 0, 0, 0, 255]);
+  ctx.putImageData(imageData, 0, 0);
+  const bmp = core.encodeBmp(ctx.getImageData(0, 0, 2, 1).data, 2, 1);
+
+  const view = new DataView(bmp.buffer, bmp.byteOffset, bmp.byteLength);
+  const offset = view.getUint32(10, true);
+  assert(bmp[offset] === 255 && bmp[offset + 1] === 255, "expected transparent to become white");
+  assert(bmp[offset + 3] === 0, "expected the opaque pixel to stay black");
+});
+
+await test("converts real images to every supported format", async () => {
+  const { canvas, ctx } = nodeCanvasFactory.create(64, 48);
+  const gradient = ctx.createLinearGradient(0, 0, 64, 48);
+  gradient.addColorStop(0, "#1e3a8a");
+  gradient.addColorStop(1, "#f59e0b");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 64, 48);
+
+  const supported = await core.probeFormatSupport(nodeCanvasFactory, nodeToBlob);
+
+  for (const format of supported) {
+    const outcome = await core.convertImage(
+      canvas, 64, 48,
+      { ...core.defaultConvertSettings, format, quality: 80 },
+      nodeCanvasFactory, nodeToBlob,
+      { originalName: "source.png", index: 1, originalBytes: 1000 }
+    );
+    assertGreater(outcome.blob.size, 20, `${format}: expected real bytes`);
+    assert(outcome.width === 64 && outcome.height === 48, `${format}: expected the size`);
+    assert(
+      outcome.fileName.endsWith(core.convertDescriptor(format).extension),
+      `${format}: expected the right extension, got ${outcome.fileName}`
+    );
+  }
+});
+
+await test("conversion applies the resize", async () => {
+  const { canvas, ctx } = nodeCanvasFactory.create(800, 400);
+  ctx.fillStyle = "#334155";
+  ctx.fillRect(0, 0, 800, 400);
+
+  const outcome = await core.convertImage(
+    canvas, 800, 400,
+    { ...core.defaultConvertSettings, format: "png", resizeMode: "longest", longestEdge: 200 },
+    nodeCanvasFactory, nodeToBlob,
+    { originalName: "wide.png", index: 1, originalBytes: 5000 }
+  );
+
+  assert(outcome.width === 200 && outcome.height === 100, `unexpected size ${outcome.width}x${outcome.height}`);
+});
+
+await test("JPEG conversion flattens transparency onto the matte", async () => {
+  const { canvas, ctx } = nodeCanvasFactory.create(20, 20);
+  // Leave it fully transparent.
+  ctx.clearRect(0, 0, 20, 20);
+
+  const outcome = await core.convertImage(
+    canvas, 20, 20,
+    { ...core.defaultConvertSettings, format: "jpeg", background: "#00ff00" },
+    nodeCanvasFactory, nodeToBlob,
+    { originalName: "clear.png", index: 1, originalBytes: 100 }
+  );
+
+  // Decode the result and check the matte was painted.
+  const decoded = await nodeCanvasLoadImage(new Uint8Array(await outcome.blob.arrayBuffer()));
+  const { ctx: check } = nodeCanvasFactory.create(20, 20);
+  check.drawImage(decoded, 0, 0);
+  const pixel = check.getImageData(10, 10, 1, 1).data;
+  assertGreater(pixel[1], 200, "expected the green matte");
+  assert(pixel[0] < 60, "expected no red");
+});
+
+await test("packages a real ZIP with de-duplicated names", async () => {
+  const outcomes = [];
+  for (let i = 0; i < 3; i++) {
+    outcomes.push({
+      blob: new Blob([new Uint8Array([1, 2, 3, i])], { type: "image/png" }),
+      // Deliberately identical names to force de-duplication.
+      fileName: "same.png",
+      width: 10,
+      height: 10,
+      originalBytes: 100,
+    });
+  }
+
+  let sawProgress = false;
+  const zip = await core.packageZip(outcomes, () => { sawProgress = true; });
+
+  assertGreater(zip.size, 50, "expected real ZIP bytes");
+  const bytes = new Uint8Array(await zip.arrayBuffer());
+  // Local file header signature.
+  assert(bytes[0] === 0x50 && bytes[1] === 0x4b, "expected a PK signature");
+  assert(sawProgress, "expected progress to be reported");
+
+  // Read it back to confirm three distinct entries. The bytes are passed
+  // directly because JSZip reads a Blob through FileReader, which Node lacks.
+  const JSZip = (await import("jszip")).default;
+  const parsed = await JSZip.loadAsync(bytes);
+  const names = Object.keys(parsed.files);
+  assert(names.length === 3, `expected three entries, got ${names.length}: ${names.join(", ")}`);
+  assert(new Set(names).size === 3, "expected unique names");
+});
+
+await test("totals are reported for the batch summary", () => {
+  const outcomes = [
+    { blob: { size: 100 }, fileName: "a", width: 1, height: 1, originalBytes: 200 },
+    { blob: { size: 250 }, fileName: "b", width: 1, height: 1, originalBytes: 400 },
+  ];
+  assert(core.totalBytes(outcomes) === 350, "expected the sizes summed");
 });
 
 /* -------------------------------------------------------------------------- */

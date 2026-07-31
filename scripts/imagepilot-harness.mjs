@@ -92,6 +92,16 @@ export async function renderToPixels(doc, rasters, options = {}) {
   return { canvas, ctx, data: imageData.data, width, height };
 }
 
+/**
+ * Decodes encoded image bytes back into a drawable image.
+ *
+ * Used to prove that a cleaned or converted file is still valid: if the bytes
+ * were corrupted, this throws.
+ */
+export async function nodeCanvasLoadImage(bytes) {
+  return nodeCanvas.loadImage(Buffer.from(bytes));
+}
+
 /** Reads one pixel as `[r, g, b, a]`. */
 export function pixelAt(pixels, width, x, y) {
   const index = (Math.floor(y) * width + Math.floor(x)) * 4;

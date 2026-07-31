@@ -30,6 +30,10 @@ const CATEGORY_BY_WORKSPACE: Record<string, ImageToolCategory> = {
   watermark: "Create",
   passport: "Create",
   compress: "Enhance",
+  background: "Edit",
+  blur: "Edit",
+  metadata: "Enhance",
+  convert: "Enhance",
 };
 
 export const imageTools: ImageToolDefinition[] = workspaces.map((workspace) => ({

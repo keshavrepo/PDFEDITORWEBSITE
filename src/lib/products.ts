@@ -112,14 +112,24 @@ export const products: Product[] = [
     name: "ImagePilot",
     tagline: "A professional image editor in your browser",
     description:
-      "Layers, non-destructive adjustments, text, shapes, crop and transform tools, plus focused studios for screenshots, watermarks, passport photos and compression. Everything runs on your device.",
+      "Layers, non-destructive adjustments, text, shapes, crop and transform tools, plus focused studios for screenshots, watermarks, passport photos, background removal, redaction, metadata and batch conversion. Everything runs on your device.",
     status: "active",
     category: "Media",
-    version: "1.1.0",
+    version: "1.2.0",
     href: "/imagepilot",
     accent: "text-primary",
-    highlights: ["Layer-based editing", "18 image operations", "Five focused tools"],
+    highlights: ["Layer-based editing", "18 image operations", "Nine focused tools"],
     releaseNotes: [
+      {
+        version: "1.2.0",
+        date: "2026-08-01",
+        changes: [
+          "Added the Background Remover with soft-edge matting, a refinement brush and colour or image backdrops",
+          "Added the Object Blur Studio with face and licence-plate presets, pixelation, blur and solid blocks",
+          "Added the Metadata Cleaner, which reports EXIF, GPS and camera data then removes it without recompressing",
+          "Added the Batch Converter for JPG, PNG, WEBP, AVIF and BMP with resizing, renaming and ZIP download",
+        ],
+      },
       {
         version: "1.1.0",
         date: "2026-08-01",

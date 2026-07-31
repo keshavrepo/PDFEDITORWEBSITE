@@ -48,6 +48,7 @@ import {
   zoomAtPoint,
   type EditorDocument,
   type Layer,
+  type Point,
   type Rect,
   type ShapeKind,
   type SnapGuide,
@@ -84,7 +85,8 @@ type DragKind =
   | { kind: "rotate"; layerId: string; origin: Layer; startAngle: number; pointerAngle: number }
   | { kind: "marquee"; startDoc: { x: number; y: number } }
   | { kind: "crop"; startDoc: { x: number; y: number }; handle: TransformHandle | null; origin: Rect }
-  | { kind: "draw"; shape: ShapeKind; startDoc: { x: number; y: number } };
+  | { kind: "draw"; shape: ShapeKind; startDoc: { x: number; y: number } }
+  | { kind: "overlay"; startDoc: { x: number; y: number }; lastDoc: { x: number; y: number } };
 
 interface EditorCanvasProps {
   state: EditorState;
@@ -95,6 +97,26 @@ interface EditorCanvasProps {
   rasterVersion: number;
   cropRatio: number | null;
   onRequestTextEdit: (layerId: string) => void;
+  /**
+   * Optional workspace-specific pointer behaviour.
+   *
+   * When supplied it takes precedence over the normal move/select handling for
+   * the duration of the gesture. This is how the background remover's brush
+   * and the blur studio's region drags reuse the canvas rather than each one
+   * needing its own surface.
+   */
+  overlay?: {
+    /** "brush" paints continuously; "drag" reports a rectangle on release. */
+    mode: "brush" | "drag";
+    cursor?: string;
+    /** Screen-space radius drawn as a ring, for the brush. */
+    brushRadius?: number;
+    onStart?: (point: Point) => void;
+    onMove?: (point: Point) => void;
+    onEnd?: (rect: Rect, start: Point, end: Point) => void;
+  };
+  /** Rectangles drawn over the canvas, e.g. obscure regions. */
+  overlayRects?: Array<{ id: string; rect: Rect; selected: boolean; ellipse: boolean }>;
 }
 
 export function EditorCanvas({
@@ -105,6 +127,8 @@ export function EditorCanvas({
   rasterVersion,
   cropRatio,
   onRequestTextEdit,
+  overlay,
+  overlayRects,
 }: EditorCanvasProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<HTMLCanvasElement>(null);
@@ -114,6 +138,8 @@ export function EditorCanvas({
   const spaceRef = useRef(false);
   /** Live document during a drag, so the scene reflects the gesture. */
   const previewRef = useRef<EditorDocument | null>(null);
+  /** Rectangle being dragged by a workspace overlay. */
+  const previewRectRef = useRef<Rect | null>(null);
 
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [cursor, setCursor] = useState("default");
@@ -395,6 +421,57 @@ export function EditorCanvas({
       ctx.restore();
     }
 
+    // Workspace overlay rectangles, e.g. obscure regions.
+    if (overlayRects?.length) {
+      for (const entry of overlayRects) {
+        const topLeft = toScreen(entry.rect.x, entry.rect.y);
+        const w = entry.rect.width * viewport.zoom;
+        const h = entry.rect.height * viewport.zoom;
+
+        ctx.save();
+        ctx.strokeStyle = entry.selected ? "#2563eb" : "rgba(37,99,235,0.55)";
+        ctx.lineWidth = entry.selected ? 2 : 1.5;
+        ctx.setLineDash(entry.selected ? [] : [5, 4]);
+        if (entry.ellipse) {
+          ctx.beginPath();
+          ctx.ellipse(topLeft.x + w / 2, topLeft.y + h / 2, Math.abs(w / 2), Math.abs(h / 2), 0, 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          ctx.strokeRect(topLeft.x, topLeft.y, w, h);
+        }
+        ctx.restore();
+      }
+    }
+
+    // Rectangle being dragged right now.
+    if (previewRectRef.current) {
+      const rect = previewRectRef.current;
+      const topLeft = toScreen(rect.x, rect.y);
+      ctx.save();
+      ctx.strokeStyle = "#2563eb";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 4]);
+      ctx.strokeRect(topLeft.x, topLeft.y, rect.width * viewport.zoom, rect.height * viewport.zoom);
+      ctx.fillStyle = "rgba(37,99,235,0.1)";
+      ctx.fillRect(topLeft.x, topLeft.y, rect.width * viewport.zoom, rect.height * viewport.zoom);
+      ctx.restore();
+    }
+
+    // Brush ring, so the user can see the size before painting.
+    if (overlay?.mode === "brush" && overlay.brushRadius && pointerDoc) {
+      const centre = toScreen(pointerDoc.x, pointerDoc.y);
+      ctx.save();
+      ctx.strokeStyle = "#2563eb";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(centre.x, centre.y, overlay.brushRadius * viewport.zoom, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,0.8)";
+      ctx.lineWidth = 0.75;
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Selection boxes and transform handles.
     if (!crop && tool !== "crop") {
       const selected = active.layers.filter((layer) => selection.includes(layer.id));
@@ -458,7 +535,7 @@ export function EditorCanvas({
         }
       }
     }
-  }, [crop, doc, inset, marquee, selection, size, tool, viewport]);
+  }, [crop, doc, inset, marquee, overlay, overlayRects, pointerDoc, selection, size, tool, viewport]);
 
   useEffect(() => {
     paintScene();
@@ -554,6 +631,14 @@ export function EditorCanvas({
       // Middle mouse, the hand tool and held space all pan.
       if (event.button === 1 || tool === "hand" || spaceRef.current) {
         beginPan(event);
+        return;
+      }
+
+      // A workspace overlay owns the gesture when one is active.
+      if (overlay) {
+        dragRef.current = { kind: "overlay", startDoc: point, lastDoc: point };
+        overlay.onStart?.(point);
+        if (overlay.mode === "brush") overlay.onMove?.(point);
         return;
       }
 
@@ -682,6 +767,7 @@ export function EditorCanvas({
       doc,
       handleAt,
       onRequestTextEdit,
+      overlay,
       selection,
       tool,
       toWorkspace,
@@ -699,6 +785,11 @@ export function EditorCanvas({
 
       if (drag.kind === "none") {
         // Idle: reflect what a click would do.
+        if (overlay) {
+          setCursor(overlay.cursor ?? "crosshair");
+          if (overlay.mode === "brush") paintOverlay();
+          return;
+        }
         if (tool === "hand" || spaceRef.current) setCursor("grab");
         else if (tool === "zoom") setCursor("zoom-in");
         else if (tool === "crop") {
@@ -870,6 +961,19 @@ export function EditorCanvas({
           break;
         }
 
+        case "overlay": {
+          drag.lastDoc = point;
+          if (overlay?.mode === "brush") {
+            overlay.onMove?.(point);
+          } else {
+            overlay?.onMove?.(point);
+            // Live rectangle feedback while dragging a region.
+            previewRectRef.current = rectFromPoints(drag.startDoc, point);
+            paintOverlay();
+          }
+          break;
+        }
+
         case "draw": {
           let rect = rectFromPoints(drag.startDoc, point);
           // Shift constrains to a square/circle, which is what the modifier
@@ -910,6 +1014,7 @@ export function EditorCanvas({
       dispatch,
       doc,
       handleAt,
+      overlay,
       paintOverlay,
       paintScene,
       selection,
@@ -1009,6 +1114,13 @@ export function EditorCanvas({
           break;
         }
 
+        case "overlay": {
+          previewRectRef.current = null;
+          const rect = rectFromPoints(drag.startDoc, point);
+          overlay?.onEnd?.(rect, drag.startDoc, point);
+          break;
+        }
+
         case "pan":
           setCursor(tool === "hand" ? "grab" : "default");
           break;
@@ -1017,7 +1129,7 @@ export function EditorCanvas({
       paintScene();
       paintOverlay();
     },
-    [crop, dispatch, doc.layers, paintOverlay, paintScene, tool, toWorkspace, viewport]
+    [crop, dispatch, doc.layers, overlay, paintOverlay, paintScene, tool, toWorkspace, viewport]
   );
 
   const onDoubleClick = useCallback(

@@ -19,3 +19,7 @@ export * from "./workspaces";
 export * from "./watermark";
 export * from "./passport";
 export * from "./compress";
+export * from "./segmentation";
+export * from "./regions";
+export * from "./metadata";
+export * from "./convert";

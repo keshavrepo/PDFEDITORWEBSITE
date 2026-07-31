@@ -88,6 +88,16 @@ export const documentationSections: DocumentationSection[] = [
       "photo",
       "editor",
       "layers",
+      "background remover",
+      "remove background",
+      "transparent png",
+      "blur faces",
+      "pixelate",
+      "exif",
+      "gps",
+      "metadata",
+      "convert",
+      "batch",
       "crop",
       "resize",
       "rotate",
@@ -148,6 +158,30 @@ export const documentationSections: DocumentationSection[] = [
         description:
           "Reduce file size by quality or to a target size, with a before-and-after preview and batch processing.",
         href: "/imagepilot/compressor",
+      },
+      {
+        label: "Remove a background",
+        description:
+          "Cut a subject out with soft-edge matting that keeps hair, refine it with the brush, then export a transparent PNG or drop in a new backdrop.",
+        href: "/imagepilot/background-remover",
+      },
+      {
+        label: "Hide faces and plates",
+        description:
+          "Drag regions over anything private and obscure them with pixelation, which destroys the detail, rather than a blur, which can sometimes be reversed.",
+        href: "/imagepilot/object-blur",
+      },
+      {
+        label: "Strip EXIF and GPS",
+        description:
+          "See exactly what a photo records about you — location, camera serial numbers, author fields — then remove it without recompressing the image.",
+        href: "/imagepilot/metadata-cleaner",
+      },
+      {
+        label: "Convert in bulk",
+        description:
+          "Convert many images between JPG, PNG, WEBP, AVIF and BMP at once, resizing and renaming as you go, and download the lot as a ZIP.",
+        href: "/imagepilot/converter",
       },
     ],
   },

@@ -26,6 +26,7 @@ import {
   Check,
   Crop as CropIcon,
   Download,
+  EyeOff,
   FileArchive,
   FlipHorizontal,
   FlipVertical,
@@ -42,10 +43,13 @@ import {
   PanelRight,
   Plus,
   Redo2,
+  Repeat,
   Ruler,
   ScanFace,
+  Scissors,
   Scaling,
   Slash,
+  ShieldCheck,
   Sparkles,
   SquareDashed,
   Stamp,
@@ -108,6 +112,33 @@ import {
   type Layer,
   type PanelId,
   type WatermarkSettings,
+  computeRemovalMatte,
+  applyMatte,
+  paintMatte,
+  matteToPreview,
+  defaultRemovalSettings,
+  applyRegions,
+  regionFromDrag,
+  getPreset,
+  REGION_PRESETS,
+  inspectMetadata,
+  cleanMetadata,
+  defaultCleanOptions,
+  detectFormat,
+  probeFormatSupport,
+  convertImage,
+  packageZip,
+  convertDescriptor,
+  defaultConvertSettings,
+  CONVERT_INPUT_ACCEPT,
+  totalBytes,
+  type BrushMode,
+  type CleanOptions,
+  type ConvertFormat,
+  type ConvertSettings,
+  type MetadataReport,
+  type ObscureRegion,
+  type RemovalSettings,
   type WorkspaceDefinition,
 } from "@/lib/imagepilot/core";
 import {
@@ -139,6 +170,10 @@ import { AdjustmentsPanel } from "./adjustments-panel";
 import { WatermarkPanel } from "./watermark-panel";
 import { PassportPanel } from "./passport-panel";
 import { CompressPanel, type BatchEntry } from "./compress-panel";
+import { BackgroundPanel, type BackdropMode } from "./background-panel";
+import { BlurPanel } from "./blur-panel";
+import { MetadataPanel } from "./metadata-panel";
+import { ConvertPanel } from "./convert-panel";
 import { NumberField, SegmentedControl, SliderField, ToggleField, ToolbarButton } from "./editor-controls";
 
 /** Icons for the tool rail, keyed by tool id. */
@@ -166,6 +201,10 @@ const PANEL_TABS: Record<PanelId, { label: string; icon: React.ReactNode }> = {
   watermark: { label: "Watermark", icon: <Stamp className="h-3.5 w-3.5" /> },
   passport: { label: "Photo", icon: <ScanFace className="h-3.5 w-3.5" /> },
   compress: { label: "Compress", icon: <FileArchive className="h-3.5 w-3.5" /> },
+  background: { label: "Cut out", icon: <Scissors className="h-3.5 w-3.5" /> },
+  blur: { label: "Regions", icon: <EyeOff className="h-3.5 w-3.5" /> },
+  metadata: { label: "Metadata", icon: <ShieldCheck className="h-3.5 w-3.5" /> },
+  convert: { label: "Convert", icon: <Repeat className="h-3.5 w-3.5" /> },
 };
 
 function formatBytes(bytes: number): string {
@@ -244,12 +283,109 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
   /** Files queued for a batch run, shared by the watermark and compress tools. */
   const [batch, setBatch] = useState<Array<{ file: File; entry: BatchEntry }>>([]);
   /** Which picker the hidden file input is currently serving. */
-  const pickerModeRef = useRef<"import" | "logo" | "batch">("import");
+  const pickerModeRef = useRef<"import" | "logo" | "batch" | "backdrop">("import");
 
   const passportSpec = useMemo(
     () => PASSPORT_SPECS.find((entry) => entry.id === passportSpecId) ?? PASSPORT_SPECS[0],
     [passportSpecId]
   );
+
+  /* ---------------------------------------------------------------------- */
+  /* Batch 3 workspace state                                                */
+  /* ---------------------------------------------------------------------- */
+
+  /** Background remover. */
+  const [removal, setRemoval] = useState<RemovalSettings>(defaultRemovalSettings);
+  const [backdrop, setBackdrop] = useState<BackdropMode>("transparent");
+  const [backdropColor, setBackdropColor] = useState("#ffffff");
+  const [backdropSourceId, setBackdropSourceId] = useState<string | null>(null);
+  const [brushMode, setBrushMode] = useState<BrushMode>("restore");
+  const [brushSize, setBrushSize] = useState(40);
+  const [brushActive, setBrushActive] = useState(false);
+  const [showMask, setShowMask] = useState(false);
+  const [compareBefore, setCompareBefore] = useState(false);
+  const [matteInfo, setMatteInfo] = useState<{ removed: number } | null>(null);
+  const [matteWorking, setMatteWorking] = useState(false);
+  /**
+   * Bridge to `commitMatte`, which is declared further down.
+   *
+   * Import needs to trigger the first detection, but the committer depends on
+   * state that is set up later in the component. A ref keeps the ordering
+   * honest without hoisting either declaration.
+   */
+  const commitMatteRef = useRef<((alpha: Float32Array) => void) | null>(null);
+  /**
+   * Geometry of the photo the matte and regions apply to.
+   *
+   * Mirrored into state because the overlay needs it *during render* to
+   * convert region coordinates back into document space; the pixel buffers
+   * themselves stay in the ref, where their size does not cost a re-render.
+   */
+  const [matteFrame, setMatteFrame] = useState<{
+    width: number;
+    height: number;
+    layerId: string;
+  } | null>(null);
+  /**
+   * The live matte plus the pixels it was computed from.
+   *
+   * Held in a ref rather than state because a brush stroke mutates it dozens
+   * of times a second; the canvas is refreshed through `rasterVersion`.
+   */
+  const matteRef = useRef<{
+    alpha: Float32Array;
+    base: Uint8ClampedArray;
+    width: number;
+    height: number;
+    samples: ReturnType<typeof computeRemovalMatte>["samples"];
+    sourceId: string;
+    layerId: string;
+  } | null>(null);
+
+  /** Object blur studio. */
+  const [regionPreset, setRegionPreset] = useState(REGION_PRESETS[0].id);
+  const [regions, setRegions] = useState<ObscureRegion[]>([]);
+  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
+
+  /** Metadata cleaner. */
+  const [metaReport, setMetaReport] = useState<MetadataReport | null>(null);
+  const [cleanOptions, setCleanOptions] = useState<CleanOptions>(defaultCleanOptions);
+  /** Original encoded bytes, needed to rewrite the container losslessly. */
+  const originalBytesRef = useRef<{ bytes: Uint8Array; name: string } | null>(null);
+
+  /** Batch converter. */
+  const [convertSettings, setConvertSettings] =
+    useState<ConvertSettings>(defaultConvertSettings);
+  const [supportedFormats, setSupportedFormats] = useState<Set<ConvertFormat>>(
+    () => new Set<ConvertFormat>(["png", "jpeg", "bmp"])
+  );
+  const [convertProgress, setConvertProgress] = useState<number | null>(null);
+  const [lastConvertRun, setLastConvertRun] = useState<{
+    count: number;
+    bytes: number;
+    originalBytes: number;
+  } | null>(null);
+
+  /**
+   * Asks the browser which formats it can encode.
+   *
+   * Runs once; the answer cannot change during a session.
+   */
+  useEffect(() => {
+    if (workspace.id !== "convert") return;
+    let cancelled = false;
+    void probeFormatSupport(browserCanvasFactory, canvasToBlob).then((supported) => {
+      if (cancelled) return;
+      setSupportedFormats(supported);
+      // Fall back if the preferred default is unavailable here.
+      setConvertSettings((current) =>
+        supported.has(current.format) ? current : { ...current, format: "png" }
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspace.id]);
 
   /**
    * Tools this workspace exposes.
@@ -384,6 +520,51 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
           setSourceFile({ name: first.name, bytes: first.size, mime: first.type });
         }
 
+        /*
+         * Workspaces that operate on the *pixels of one photo* — background
+         * removal and region obscuring — keep an untouched copy of those
+         * pixels. Every recomputation starts from this copy, so adjusting a
+         * setting or deleting a region restores what was underneath instead of
+         * compounding the previous result.
+         */
+        if ((workspace.id === "background" || workspace.id === "blur") && newIds.length) {
+          const layer = workingDoc.layers.find(
+            (entry): entry is Extract<Layer, { type: "image" }> => entry.id === newIds[0]
+          );
+          const source = layer ? rasters.get(layer.sourceId) : undefined;
+          if (layer && source) {
+            const buffer = browserCanvasFactory.create(source.width, source.height);
+            buffer.ctx.drawImage(source.image, 0, 0, source.width, source.height);
+            const base = buffer.ctx.getImageData(0, 0, source.width, source.height).data;
+
+            matteRef.current = {
+              alpha: new Float32Array(source.width * source.height).fill(1),
+              base,
+              width: source.width,
+              height: source.height,
+              samples: [],
+              sourceId: layer.sourceId,
+              layerId: layer.id,
+            };
+            setMatteFrame({ width: source.width, height: source.height, layerId: layer.id });
+            setRegions([]);
+            setSelectedRegion(null);
+            setMatteInfo(null);
+          }
+        }
+
+        // The metadata cleaner works on the encoded bytes, not the pixels, so
+        // that removal is lossless.
+        if (workspace.id === "metadata" && first) {
+          try {
+            const bytes = new Uint8Array(await first.arrayBuffer());
+            originalBytesRef.current = { bytes, name: first.name };
+            setMetaReport(inspectMetadata(bytes));
+          } catch {
+            setMetaReport(null);
+          }
+        }
+
         // A passport photo is staged straight into its specification, which
         // saves the user a manual resize before they can even see the guides.
         if (workspace.id === "passport" && newIds.length === 1) {
@@ -429,6 +610,20 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
         dispatch({ type: "select", ids: newIds });
         notify(`Imported ${newIds.length} image${newIds.length === 1 ? "" : "s"}.`);
         setTimeout(fitToWindow, 0);
+
+        // Run the first background detection straight away: an empty result
+        // would leave the user staring at an unchanged photo wondering whether
+        // the tool did anything.
+        if (workspace.id === "background" && matteRef.current) {
+          setTimeout(() => {
+            const matte = matteRef.current;
+            if (!matte) return;
+            const result = computeRemovalMatte(matte.base, matte.width, matte.height, removal);
+            matte.alpha = result.alpha;
+            matte.samples = result.samples;
+            commitMatteRef.current?.(result.alpha);
+          }, 0);
+        }
       } finally {
         setBusy(null);
       }
@@ -443,6 +638,7 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
       passportGuides,
       passportSpec,
       rasters,
+      removal,
       state,
       workspace.id,
     ]
@@ -779,6 +975,72 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
       }
     },
     [notify, rasters]
+  );
+
+  /**
+   * Loads a replacement background and places it beneath the subject.
+   *
+   * Added as a real layer rather than a document property so it can be moved
+   * and scaled with the ordinary move tool.
+   */
+  const loadBackdrop = useCallback(
+    async (file: File) => {
+      const problem = validateImageFile(file);
+      if (problem) {
+        notify(problem, "error");
+        return;
+      }
+      setBusy("Loading background…");
+      try {
+        const decoded = await decodeImage(file);
+        const sourceId = `backdrop_${Math.random().toString(36).slice(2, 10)}`;
+        rasters.set({
+          id: sourceId,
+          width: decoded.width,
+          height: decoded.height,
+          image: decoded.image,
+        });
+
+        const current = editorDocument(state);
+        // Cover the canvas without distorting.
+        const scale = Math.max(
+          current.width / decoded.width,
+          current.height / decoded.height
+        );
+        const width = decoded.width * scale;
+        const height = decoded.height * scale;
+
+        const layer = makeImageLayer(
+          "Background",
+          sourceId,
+          {
+            x: (current.width - width) / 2,
+            y: (current.height - height) / 2,
+            width,
+            height,
+          },
+          { width: decoded.width, height: decoded.height }
+        );
+
+        // Remove any previous backdrop, then insert at the very bottom.
+        const withoutOld = current.layers.filter((entry) => entry.name !== "Background");
+        dispatch({
+          type: "commit",
+          document: { ...current, layers: [layer, ...withoutOld] },
+          label: "Add background",
+        });
+
+        setBackdropSourceId(sourceId);
+        setBackdrop("image");
+        setRasterVersion((version) => version + 1);
+        notify("Background added.");
+      } catch {
+        notify("That image could not be decoded.", "error");
+      } finally {
+        setBusy(null);
+      }
+    },
+    [notify, rasters, state]
   );
 
   /* ---------------------------------------------------------------------- */
@@ -1225,6 +1487,480 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
   }, [batch, compression, encoder, notify]);
 
   /* ---------------------------------------------------------------------- */
+  /* Workspace: background remover                                          */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Writes the current matte into a new raster and points the layer at it.
+   *
+   * A fresh id is used each time so the browser cannot serve a cached bitmap,
+   * and `rasterVersion` tells the canvas to repaint.
+   */
+  const commitMatte = useCallback(
+    (alpha: Float32Array) => {
+      const matte = matteRef.current;
+      if (!matte) return;
+
+      const pixels = new Uint8ClampedArray(matte.base);
+      applyMatte(pixels, alpha, matte.samples, removal.decontaminate);
+
+      const buffer = browserCanvasFactory.create(matte.width, matte.height);
+      const imageData = buffer.ctx.createImageData(matte.width, matte.height);
+      imageData.data.set(showMask ? matteToPreview(alpha, matte.width, matte.height) : pixels);
+      buffer.ctx.putImageData(imageData, 0, 0);
+
+      const sourceId = `cut_${Math.random().toString(36).slice(2, 10)}`;
+      rasters.set({
+        id: sourceId,
+        width: matte.width,
+        height: matte.height,
+        image: buffer.canvas,
+      });
+      matte.sourceId = sourceId;
+
+      dispatch({
+        type: "update-layer",
+        id: matte.layerId,
+        patch: { sourceId } as Partial<Layer>,
+        label: "Remove background",
+        mergeKey: `matte:${matte.layerId}`,
+      });
+      setRasterVersion((version) => version + 1);
+
+      let removed = 0;
+      for (let i = 0; i < alpha.length; i++) removed += 1 - alpha[i];
+      setMatteInfo({ removed: Math.round((removed / alpha.length) * 100) });
+    },
+    [rasters, removal.decontaminate, showMask]
+  );
+
+  // Keep the import path's bridge pointing at the current committer.
+  useEffect(() => {
+    commitMatteRef.current = commitMatte;
+  }, [commitMatte]);
+
+  /**
+   * Recomputes the matte from the original pixels.
+   *
+   * Debounced: every slider fires continuously and a full matte on a large
+   * image is expensive.
+   */
+  useEffect(() => {
+    if (workspace.id !== "background") return;
+    const matte = matteRef.current;
+    if (!matte) return;
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setMatteWorking(true);
+      try {
+        const result = computeRemovalMatte(matte.base, matte.width, matte.height, removal);
+        if (cancelled) return;
+        matte.alpha = result.alpha;
+        matte.samples = result.samples;
+        commitMatte(result.alpha);
+      } finally {
+        if (!cancelled) setMatteWorking(false);
+      }
+    }, 180);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // Recomputing must not depend on `commitMatte`'s identity, which changes
+    // with every raster version.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [removal, workspace.id, showMask]);
+
+  /**
+   * Before/after comparison.
+   *
+   * Swaps the layer between the cut-out raster and one holding the original
+   * pixels. Doing it by swapping sources keeps the comparison honest: it is
+   * the real before and the real after, not a reconstruction.
+   */
+  useEffect(() => {
+    if (workspace.id !== "background") return;
+    const matte = matteRef.current;
+    if (!matte) return;
+
+    const timer = setTimeout(() => {
+      const current = editorDocument(state);
+      const layer = current.layers.find((entry) => entry.id === matte.layerId);
+      if (!layer || layer.type !== "image") return;
+
+      if (compareBefore) {
+        const buffer = browserCanvasFactory.create(matte.width, matte.height);
+        const imageData = buffer.ctx.createImageData(matte.width, matte.height);
+        imageData.data.set(matte.base);
+        buffer.ctx.putImageData(imageData, 0, 0);
+        const beforeId = `before_${Math.random().toString(36).slice(2, 10)}`;
+        rasters.set({ id: beforeId, width: matte.width, height: matte.height, image: buffer.canvas });
+        dispatch({
+          type: "update-layer",
+          id: matte.layerId,
+          patch: { sourceId: beforeId } as Partial<Layer>,
+          label: "Show original",
+          mergeKey: "compare",
+        });
+      } else {
+        commitMatteRef.current?.(matte.alpha);
+      }
+      setRasterVersion((version) => version + 1);
+    }, 0);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compareBefore, workspace.id]);
+
+  /** Re-runs detection from scratch, e.g. after replacing the photo. */
+  const recomputeMatte = useCallback(() => {
+    const matte = matteRef.current;
+    if (!matte) {
+      notify("Import a photo first.", "error");
+      return;
+    }
+    setMatteWorking(true);
+    try {
+      const result = computeRemovalMatte(matte.base, matte.width, matte.height, removal);
+      matte.alpha = result.alpha;
+      matte.samples = result.samples;
+      commitMatte(result.alpha);
+      notify(`Background detected — ${Math.round(result.removedFraction * 100)}% removed.`);
+    } finally {
+      setMatteWorking(false);
+    }
+  }, [commitMatte, notify, removal]);
+
+  /** Applies one brush dab, in document coordinates. */
+  const paintBrush = useCallback(
+    (docX: number, docY: number) => {
+      const matte = matteRef.current;
+      if (!matte) return;
+      const layer = editorDocument(state).layers.find((entry) => entry.id === matte.layerId);
+      if (!layer) return;
+
+      // Convert document space into the matte's own pixel grid, which is the
+      // photo's natural resolution rather than the layer's on-canvas size.
+      const scaleX = matte.width / Math.max(1, layer.width);
+      const scaleY = matte.height / Math.max(1, layer.height);
+      const x = (docX - layer.x) * scaleX;
+      const y = (docY - layer.y) * scaleY;
+      const radius = (brushSize / 2) * Math.max(scaleX, scaleY);
+
+      paintMatte(matte.alpha, matte.width, matte.height, x, y, radius, brushMode);
+      commitMatte(matte.alpha);
+    },
+    [brushMode, brushSize, commitMatte, state]
+  );
+
+  /** Discards manual strokes by recomputing from the settings. */
+  const resetBrushStrokes = useCallback(() => {
+    const matte = matteRef.current;
+    if (!matte) return;
+    const result = computeRemovalMatte(matte.base, matte.width, matte.height, removal);
+    matte.alpha = result.alpha;
+    matte.samples = result.samples;
+    commitMatte(result.alpha);
+    notify("Brush strokes discarded.");
+  }, [commitMatte, notify, removal]);
+
+  /**
+   * Keeps the document background in step with the chosen backdrop.
+   *
+   * Colour and transparency are document properties; an image backdrop is a
+   * real layer beneath the subject, so it can be moved and scaled.
+   */
+  useEffect(() => {
+    if (workspace.id !== "background") return;
+    const current = editorDocument(state);
+    if (!current.layers.length) return;
+
+    const wanted = backdrop === "colour" ? backdropColor : null;
+    if (current.background === wanted) return;
+
+    dispatch({
+      type: "commit",
+      document: { ...current, background: wanted },
+      label: "Background",
+      mergeKey: "backdrop",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backdrop, backdropColor, workspace.id]);
+
+  /* ---------------------------------------------------------------------- */
+  /* Workspace: object blur                                                 */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Re-renders the obscured image whenever the regions change.
+   *
+   * Regions are applied to a copy of the untouched original every time, so
+   * moving or deleting one restores what was underneath rather than stacking
+   * effects on top of each other.
+   */
+  useEffect(() => {
+    if (workspace.id !== "blur") return;
+    const matte = matteRef.current;
+    if (!matte) return;
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      if (cancelled) return;
+      const pixels = new Uint8ClampedArray(matte.base);
+      applyRegions(pixels, matte.width, matte.height, regions);
+
+      const buffer = browserCanvasFactory.create(matte.width, matte.height);
+      const imageData = buffer.ctx.createImageData(matte.width, matte.height);
+      imageData.data.set(pixels);
+      buffer.ctx.putImageData(imageData, 0, 0);
+
+      const sourceId = `blur_${Math.random().toString(36).slice(2, 10)}`;
+      rasters.set({ id: sourceId, width: matte.width, height: matte.height, image: buffer.canvas });
+
+      dispatch({
+        type: "update-layer",
+        id: matte.layerId,
+        patch: { sourceId } as Partial<Layer>,
+        label: "Obscure regions",
+        mergeKey: "regions",
+      });
+      setRasterVersion((version) => version + 1);
+    }, 120);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regions, workspace.id]);
+
+  const addRegion = useCallback(
+    (rect: { x: number; y: number; width: number; height: number }) => {
+      const matte = matteRef.current;
+      const layer = matte
+        ? editorDocument(state).layers.find((entry) => entry.id === matte.layerId)
+        : null;
+      if (!matte || !layer) return;
+
+      // Translate the drag from document space into the photo's pixel grid.
+      const scaleX = matte.width / Math.max(1, layer.width);
+      const scaleY = matte.height / Math.max(1, layer.height);
+      const inPhoto = {
+        x: (rect.x - layer.x) * scaleX,
+        y: (rect.y - layer.y) * scaleY,
+        width: rect.width * scaleX,
+        height: rect.height * scaleY,
+      };
+
+      const region = regionFromDrag(
+        inPhoto,
+        getPreset(regionPreset),
+        `region_${Math.random().toString(36).slice(2, 10)}`
+      );
+      setRegions((current) => [...current, region]);
+      setSelectedRegion(region.id);
+    },
+    [regionPreset, state]
+  );
+
+  /* ---------------------------------------------------------------------- */
+  /* Workspace: metadata cleaner                                            */
+  /* ---------------------------------------------------------------------- */
+
+  /** Rewrites the current file with the selected metadata removed. */
+  const downloadCleaned = useCallback(() => {
+    const original = originalBytesRef.current;
+    if (!original) {
+      notify("Import a photo first.", "error");
+      return;
+    }
+
+    const result = cleanMetadata(original.bytes, cleanOptions);
+    if (!result.removedBytes) {
+      notify("There was nothing to remove.", "error");
+      return;
+    }
+
+    const format = detectFormat(original.bytes);
+    const extension = format === "jpeg" ? "jpg" : format === "png" ? "png" : "webp";
+    const base = original.name.replace(/\.[^.]+$/, "");
+    const fileName = `${base}-clean.${extension}`;
+    downloadBlob(
+      new Blob([result.bytes as unknown as BlobPart], { type: `image/${format}` }),
+      fileName
+    );
+
+    setMetaReport(inspectMetadata(result.bytes));
+    notify(
+      `Removed ${result.removed.length} ${result.removed.length === 1 ? "entry" : "entries"} (${formatBytes(result.removedBytes)}).`
+    );
+
+    void recordActivity({
+      productId: "imagepilot",
+      toolName: "Metadata Cleaner",
+      fileName,
+      fileSize: result.bytes.length,
+      inputFileSize: original.bytes.length,
+      mimeType: `image/${format}`,
+    });
+  }, [cleanOptions, notify]);
+
+  /** Cleans every queued file. */
+  const runMetadataBatch = useCallback(async () => {
+    if (!batch.length) return;
+    setBusy(`Cleaning ${batch.length} file${batch.length === 1 ? "" : "s"}…`);
+
+    let succeeded = 0;
+    let strippedBytes = 0;
+    try {
+      for (const item of batch) {
+        try {
+          const bytes = new Uint8Array(await item.file.arrayBuffer());
+          const result = cleanMetadata(bytes, cleanOptions);
+          const format = detectFormat(bytes);
+          const extension = format === "jpeg" ? "jpg" : format === "png" ? "png" : "webp";
+          const base = item.entry.name.replace(/\.[^.]+$/, "");
+
+          downloadBlob(
+            new Blob([result.bytes as unknown as BlobPart], { type: `image/${format}` }),
+            `${base}-clean.${extension}`
+          );
+          strippedBytes += result.removedBytes;
+          succeeded++;
+
+          setBatch((current) =>
+            current.map((entry) =>
+              entry.entry.id === item.entry.id
+                ? {
+                    ...entry,
+                    entry: { ...entry.entry, status: "done", resultBytes: result.bytes.length },
+                  }
+                : entry
+            )
+          );
+        } catch {
+          setBatch((current) =>
+            current.map((entry) =>
+              entry.entry.id === item.entry.id
+                ? { ...entry, entry: { ...entry.entry, status: "failed" } }
+                : entry
+            )
+          );
+        }
+      }
+
+      notify(`Cleaned ${succeeded} of ${batch.length} files, removing ${formatBytes(strippedBytes)}.`);
+      void recordActivity({
+        productId: "imagepilot",
+        toolName: "Metadata Cleaner",
+        fileName: `${succeeded} cleaned images`,
+      });
+    } finally {
+      setBusy(null);
+    }
+  }, [batch, cleanOptions, notify]);
+
+  /* ---------------------------------------------------------------------- */
+  /* Workspace: batch converter                                             */
+  /* ---------------------------------------------------------------------- */
+
+  /** Converts everything queued and downloads the result. */
+  const runConversion = useCallback(async () => {
+    if (!batch.length) return;
+    setBusy(`Converting ${batch.length} image${batch.length === 1 ? "" : "s"}…`);
+    setConvertProgress(0);
+
+    const outcomes: Array<Awaited<ReturnType<typeof convertImage>>> = [];
+    let originalTotal = 0;
+
+    try {
+      for (let index = 0; index < batch.length; index++) {
+        const item = batch[index];
+        try {
+          const decoded = await decodeImage(item.file);
+          const outcome = await convertImage(
+            decoded.image,
+            decoded.width,
+            decoded.height,
+            convertSettings,
+            browserCanvasFactory,
+            canvasToBlob,
+            {
+              originalName: item.entry.name,
+              index: convertSettings.startIndex + index,
+              originalBytes: item.file.size,
+            }
+          );
+          outcomes.push(outcome);
+          originalTotal += item.file.size;
+
+          setBatch((current) =>
+            current.map((entry) =>
+              entry.entry.id === item.entry.id
+                ? {
+                    ...entry,
+                    entry: { ...entry.entry, status: "done", resultBytes: outcome.blob.size },
+                  }
+                : entry
+            )
+          );
+        } catch {
+          setBatch((current) =>
+            current.map((entry) =>
+              entry.entry.id === item.entry.id
+                ? { ...entry, entry: { ...entry.entry, status: "failed" } }
+                : entry
+            )
+          );
+        }
+        // Encoding is the bulk of the work; packaging is the remaining tenth.
+        setConvertProgress(((index + 1) / batch.length) * 90);
+      }
+
+      if (!outcomes.length) {
+        notify("Nothing could be converted.", "error");
+        return;
+      }
+
+      if (outcomes.length === 1) {
+        downloadBlob(outcomes[0].blob, outcomes[0].fileName);
+      } else {
+        const zip = await packageZip(outcomes, (percent) => {
+          setConvertProgress(90 + percent * 0.1);
+        });
+        downloadBlob(zip, `imagepilot-converted-${outcomes.length}.zip`);
+      }
+
+      const bytes = totalBytes(outcomes);
+      setLastConvertRun({ count: outcomes.length, bytes, originalBytes: originalTotal });
+      notify(
+        `Converted ${outcomes.length} image${outcomes.length === 1 ? "" : "s"} to ${convertDescriptor(convertSettings.format).label}.`
+      );
+
+      void recordActivity({
+        productId: "imagepilot",
+        toolName: "Batch Converter",
+        fileName:
+          outcomes.length === 1
+            ? outcomes[0].fileName
+            : `imagepilot-converted-${outcomes.length}.zip`,
+        fileSize: bytes,
+        inputFileSize: originalTotal,
+      });
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "The conversion failed.",
+        "error"
+      );
+    } finally {
+      setBusy(null);
+      setConvertProgress(null);
+    }
+  }, [batch, convertSettings, notify]);
+
+  /* ---------------------------------------------------------------------- */
   /* Keyboard                                                               */
   /* ---------------------------------------------------------------------- */
 
@@ -1415,6 +2151,66 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
   }, [importFiles]);
 
   /* ---------------------------------------------------------------------- */
+  /* Canvas overlay wiring                                                  */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Pointer behaviour contributed by the active workspace.
+   *
+   * The background remover paints continuously; the blur studio drags out a
+   * rectangle. Both reuse the one canvas rather than each introducing its own.
+   */
+  const canvasOverlay = useMemo(() => {
+    if (workspace.id === "background" && brushActive) {
+      return {
+        mode: "brush" as const,
+        cursor: "crosshair",
+        brushRadius: brushSize / 2,
+        onMove: (point: { x: number; y: number }) => paintBrush(point.x, point.y),
+      };
+    }
+    if (workspace.id === "blur") {
+      return {
+        mode: "drag" as const,
+        cursor: "crosshair",
+        onEnd: (rect: { x: number; y: number; width: number; height: number }) => {
+          // Ignore an accidental click; a region needs real area.
+          if (rect.width < 6 || rect.height < 6) return;
+          addRegion(rect);
+        },
+      };
+    }
+    return undefined;
+  }, [addRegion, brushActive, brushSize, paintBrush, workspace.id]);
+
+  /**
+   * Region outlines drawn over the canvas.
+   *
+   * Regions live in the photo's pixel grid, so they are converted back into
+   * document space for display.
+   */
+  const overlayRects = useMemo(() => {
+    if (workspace.id !== "blur" || !regions.length || !matteFrame) return undefined;
+    const layer = doc.layers.find((entry) => entry.id === matteFrame.layerId);
+    if (!layer) return undefined;
+
+    const scaleX = layer.width / Math.max(1, matteFrame.width);
+    const scaleY = layer.height / Math.max(1, matteFrame.height);
+
+    return regions.map((region) => ({
+      id: region.id,
+      rect: {
+        x: layer.x + region.x * scaleX,
+        y: layer.y + region.y * scaleY,
+        width: region.width * scaleX,
+        height: region.height * scaleY,
+      },
+      selected: region.id === selectedRegion,
+      ellipse: region.shape === "ellipse",
+    }));
+  }, [doc.layers, matteFrame, regions, selectedRegion, workspace.id]);
+
+  /* ---------------------------------------------------------------------- */
   /* Rendering                                                              */
   /* ---------------------------------------------------------------------- */
 
@@ -1442,7 +2238,7 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
       <input
         ref={fileInputRef}
         type="file"
-        accept={IMPORT_ACCEPT}
+        accept={workspace.id === "convert" ? CONVERT_INPUT_ACCEPT : IMPORT_ACCEPT}
         multiple
         aria-label="Import images"
         className="sr-only"
@@ -1457,6 +2253,10 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
 
           if (mode === "logo") {
             void loadLogo(files[0]);
+            return;
+          }
+          if (mode === "backdrop") {
+            void loadBackdrop(files[0]);
             return;
           }
           if (mode === "batch") {
@@ -1715,6 +2515,8 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
             dispatch={dispatch}
             rasterVersion={rasterVersion}
             cropRatio={cropRatio}
+            overlay={canvasOverlay}
+            overlayRects={overlayRects}
             onRequestTextEdit={(id) => dispatch({ type: "edit-text", id })}
           />
 
@@ -1864,6 +2666,96 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
                 onToggleGuides={setPassportGuides}
                 onRefit={() => refitPassport()}
                 onExportSheet={() => void exportPrintSheet()}
+              />
+            )}
+            {rightTab === "background" && (
+              <BackgroundPanel
+                settings={removal}
+                backdrop={backdrop}
+                backdropColor={backdropColor}
+                hasBackdropImage={Boolean(backdropSourceId)}
+                brushMode={brushMode}
+                brushSize={brushSize}
+                brushActive={brushActive}
+                showMask={showMask}
+                compare={compareBefore}
+                removedPercent={matteInfo?.removed ?? null}
+                working={matteWorking}
+                busy={Boolean(busy)}
+                onChange={(patch) => setRemoval((current) => ({ ...current, ...patch }))}
+                onBackdropChange={setBackdrop}
+                onBackdropColorChange={setBackdropColor}
+                onChooseBackdropImage={() => {
+                  pickerModeRef.current = "backdrop";
+                  fileInputRef.current?.click();
+                }}
+                onBrushModeChange={setBrushMode}
+                onBrushSizeChange={setBrushSize}
+                onToggleBrush={setBrushActive}
+                onToggleMask={setShowMask}
+                onToggleCompare={setCompareBefore}
+                onRecompute={recomputeMatte}
+                onResetBrush={resetBrushStrokes}
+              />
+            )}
+            {rightTab === "blur" && (
+              <BlurPanel
+                presetId={regionPreset}
+                regions={regions}
+                selectedId={selectedRegion}
+                busy={Boolean(busy)}
+                onPresetChange={setRegionPreset}
+                onSelect={setSelectedRegion}
+                onUpdate={(id, patch) =>
+                  setRegions((current) =>
+                    current.map((region) => (region.id === id ? { ...region, ...patch } : region))
+                  )
+                }
+                onRemove={(id) => {
+                  setRegions((current) => current.filter((region) => region.id !== id));
+                  setSelectedRegion((current) => (current === id ? null : current));
+                }}
+                onClear={() => {
+                  setRegions([]);
+                  setSelectedRegion(null);
+                }}
+              />
+            )}
+            {rightTab === "metadata" && (
+              <MetadataPanel
+                report={metaReport}
+                options={cleanOptions}
+                fileName={sourceFile?.name ?? null}
+                batch={batch.map((item) => item.entry)}
+                busy={Boolean(busy)}
+                onChange={(patch) => setCleanOptions((current) => ({ ...current, ...patch }))}
+                onClean={downloadCleaned}
+                onAddBatchImages={() => {
+                  pickerModeRef.current = "batch";
+                  fileInputRef.current?.click();
+                }}
+                onRunBatch={() => void runMetadataBatch()}
+                onClearBatch={() => setBatch([])}
+              />
+            )}
+            {rightTab === "convert" && (
+              <ConvertPanel
+                settings={convertSettings}
+                supported={supportedFormats}
+                batch={batch.map((item) => item.entry)}
+                busy={Boolean(busy)}
+                progress={convertProgress}
+                lastRun={lastConvertRun}
+                onChange={(patch) => setConvertSettings((current) => ({ ...current, ...patch }))}
+                onAddImages={() => {
+                  pickerModeRef.current = "batch";
+                  fileInputRef.current?.click();
+                }}
+                onRun={() => void runConversion()}
+                onClear={() => {
+                  setBatch([]);
+                  setLastConvertRun(null);
+                }}
               />
             )}
             {rightTab === "compress" && (

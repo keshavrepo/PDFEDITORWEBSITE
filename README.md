@@ -9,8 +9,9 @@ tools for securely processing documents without uploading them.
 
 **ImagePilot** is the second: a professional image editor with layers, undo
 history, non-destructive adjustments, text and shapes, exporting to PNG, JPG,
-WEBP and SVG. Four focused studios — Screenshot Editor, Watermark Studio,
-Passport Photo Studio and Image Compressor — are configurations of that same
+WEBP and SVG. Eight focused studios — Screenshot Editor, Watermark Studio,
+Passport Photo Studio, Image Compressor, Background Remover, Object Blur
+Studio, Metadata Cleaner and Batch Converter — are configurations of that same
 editor rather than separate applications.
 
 DevPilot, OfficePilot, WebPilot, FinancePilot and AIPilot are registered on the
@@ -56,6 +57,10 @@ new module inherits them rather than reimplementing them:
 | `/imagepilot/watermark-studio` | Text and logo watermarks, single or batch |
 | `/imagepilot/passport-photo` | Compliant ID photos and print sheets |
 | `/imagepilot/compressor` | Compress JPG, PNG and WEBP |
+| `/imagepilot/background-remover` | Cut out a subject, replace the backdrop |
+| `/imagepilot/object-blur` | Hide faces, plates and private details |
+| `/imagepilot/metadata-cleaner` | Inspect and strip EXIF, GPS and camera data |
+| `/imagepilot/converter` | Batch convert, resize, rename and ZIP |
 | `/files` | Unified file manager, shared by every product |
 | `/dashboard` | Storage, files, activity, favourites and usage |
 | `/docs` | Documentation, with guides authored in the blog CMS |
@@ -116,7 +121,7 @@ mocks:
 ```bash
 npm test                  # both suites
 npm run test:conversions  # 147 document conversion tests
-npm run test:imagepilot   # 141 image editor tests
+npm run test:imagepilot   # 182 image editor tests
 ```
 
 The conversion suite runs the real converters against generated Word,
@@ -160,6 +165,10 @@ without reimplementing any of it.
 | `watermark.ts` | Watermark layer generation, including tiling |
 | `passport.ts` | ID photo specifications, guides and print sheets |
 | `compress.ts` | Quality and target-size compression |
+| `segmentation.ts` | Background matting, brush refinement |
+| `regions.ts` | Region obscuring for redaction |
+| `metadata.ts` | EXIF/XMP/ICC parsing and lossless removal |
+| `convert.ts` | Batch conversion, BMP encoding, ZIP packaging |
 | `raster.ts` | Browser-only: decoding, clipboard, downloads |
 
 Design decisions worth knowing:
@@ -216,6 +225,50 @@ Consequences worth noting:
   a guessed quality value cannot hit a byte budget reliably. Eight encodes
   resolve it to within one quality point, and the result is the *highest*
   quality that fits rather than the first one that happens to.
+
+### Background removal without a model
+
+No ML model is used: none can be fetched at runtime in an offline,
+privacy-first product, and shipping one would dwarf the application. Instead
+`segmentation.ts` implements a classical matting pipeline — border sampling,
+distance scoring, a trimap, an inward flood fill, then fractional alpha across
+the uncertain band. The flood fill is what stops an enclosed region that merely
+*resembles* the backdrop from being punched out, and the fractional band is
+what preserves hair instead of producing a cut-out sticker. A brush is provided
+because automatic detection will always miss something.
+
+The sampler deliberately does more than count border colours. In almost every
+portrait the subject's shoulders run off the bottom edge, so a naive count
+learns the shirt as "background" and deletes the body. Clusters are scored by
+how many edges they touch and whether they reach the corners, and a colour
+confined to one edge with no corner presence is rejected outright.
+
+### Redaction errs outward
+
+`regions.ts` grows every region beyond the box the user dragged, and fits an
+aspect-ratio preset by growing rather than preserving area. People drag
+approximately; stopping a few pixels short of a licence plate leaves the digits
+legible. Over-covering costs a little background, under-covering defeats the
+tool. Pixelation is the default for faces and plates because averaging into
+blocks is irreversible, whereas a light blur can sometimes be partly recovered
+by deconvolution — the UI says so.
+
+### Metadata removal is lossless
+
+`metadata.ts` reads and rewrites the container bytes (JPEG APPn segments, PNG
+chunks, RIFF chunks) rather than going through a canvas. Re-encoding would both
+recompress the image and discard the metadata silently, without ever telling
+the user what was in it. The compressed image data is copied verbatim, so a
+cleaned JPEG is bit-identical in its scan data. The ICC colour profile is
+retained by default because dropping it changes how the image displays.
+
+### Format support is probed, not assumed
+
+`canvas.toBlob` silently falls back to PNG for a type the browser cannot
+encode, so the converter asks the browser what it can actually produce and only
+offers those formats. BMP has no canvas encoder at all and is written directly.
+TIFF is accepted as input but not offered as output: no browser can encode it,
+and a hand-rolled encoder would produce files real TIFF readers reject.
 
 ## Document conversion
 
