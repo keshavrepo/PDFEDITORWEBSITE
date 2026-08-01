@@ -214,18 +214,28 @@ export const products: Product[] = [
     name: "FinancePilot",
     tagline: "Financial calculators in your browser",
     description:
-      "Run the financial calculators you reach for every day — EMI, SIP, compound interest, loans, budgets, expenses, savings goals, net worth, retirement, investment, multi-goal planning and a one-screen financial dashboard — inside the LaunchStack workspace, with autosave, the same shared chrome as OfficePilot, and print-to-PDF export.",
+      "Run the financial calculators you reach for every day — EMI, SIP, compound interest, loans, budgets, expenses, savings goals, net worth, retirement, investment, multi-goal planning, a one-screen financial dashboard and a 0–100 financial health score — inside the LaunchStack workspace, with autosave, the same shared chrome as OfficePilot, and print-to-PDF export.",
     status: "active",
     category: "Finance",
-    version: "0.4.0",
+    version: "0.5.0",
     href: "/financepilot",
     accent: "text-primary",
     highlights: [
-      "12 calculators: EMI, SIP, compound interest, loan, budget, expense, savings, net worth, retirement, investment, goal, dashboard",
+      "13 calculators: EMI, SIP, compound interest, loan, budget, expense, savings, net worth, retirement, investment, goal, dashboard, health score",
       "Autosave and recent mirror",
       "Print-to-PDF export",
     ],
     releaseNotes: [
+      {
+        version: "0.5.0",
+        date: "2026-08-03",
+        changes: [
+          "Financial Health Score: 0–100 weighted score across 6 categories (Emergency Fund, Debt Ratio, Savings Rate, Investment Ratio, Insurance Coverage, Goal Progress) with per-category verdicts and prioritised improvement suggestions",
+          "Net Worth Tracker adds the spec asset categories (Cash, Savings, Investments, Property, Gold, Vehicles) and liability categories (Loans, Credit Cards, Mortgage) without removing the existing granular ones",
+          "Goal Planner keeps the existing multi-goal surface and confirms every spec field (target amount, current savings, monthly contribution, expected return, target date) plus progress, remaining amount, remaining months and projected completion",
+          "Dashboard integration adds the Health Score card, a recent-calculations list and a quick-actions row that links to every other calculator",
+        ],
+      },
       {
         version: "0.4.0",
         date: "2026-08-03",

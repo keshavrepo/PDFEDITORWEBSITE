@@ -189,7 +189,78 @@ export function DashboardSurface({ calculation, onChange }: DashboardSurfaceProp
           value="—"
           hint="Add goals to see the high-priority count here."
         />
+        <KpiCard
+          label="Health score"
+          value={
+            body.healthScore === null
+              ? "—"
+              : `${body.healthScore.toFixed(0)} / 100`
+          }
+          tone={body.healthScore !== null && body.healthScore >= 70 ? "highlight" : "default"}
+          hint={
+            body.healthScore === null
+              ? "Open the Health Score page to compute one."
+              : "Mirrored from the Financial Health Score page."
+          }
+        />
       </div>
+
+      <Card className="p-4">
+        <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Recent calculations
+        </h3>
+        {summary.recentCalculations.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            Open a calculator to see it here.
+          </p>
+        ) : (
+          <ul className="space-y-1.5 text-xs">
+            {summary.recentCalculations.map((entry) => (
+              <li
+                key={entry.id}
+                className="flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{entry.title}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {entry.kind} · {new Date(entry.updatedAt).toLocaleString()}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <Card className="p-4">
+        <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Quick actions
+        </h3>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { label: "EMI", href: "/financepilot/emi" },
+            { label: "SIP", href: "/financepilot/sip" },
+            { label: "Compound", href: "/financepilot/compound-interest" },
+            { label: "Loan", href: "/financepilot/loan" },
+            { label: "Budget", href: "/financepilot/budget" },
+            { label: "Expense", href: "/financepilot/expense" },
+            { label: "Savings", href: "/financepilot/savings" },
+            { label: "Net worth", href: "/financepilot/net-worth" },
+            { label: "Retirement", href: "/financepilot/retirement" },
+            { label: "Investment", href: "/financepilot/investment" },
+            { label: "Goals", href: "/financepilot/goal" },
+            { label: "Health score", href: "/financepilot/health-score" },
+          ].map((entry) => (
+            <a
+              key={entry.href}
+              href={entry.href}
+              className="rounded-lg border border-border bg-background px-3 py-1.5 text-xs hover:bg-accent"
+            >
+              {entry.label}
+            </a>
+          ))}
+        </div>
+      </Card>
 
       <Card className="p-4">
         <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">

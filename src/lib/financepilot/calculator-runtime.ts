@@ -1250,19 +1250,27 @@ export interface NetWorthBody {
 
 export const NET_WORTH_ASSET_CATEGORIES = [
   "Cash",
+  "Savings",
   "Bank account",
   "Fixed deposit",
   "Stocks",
+  "Investments",
   "Mutual funds",
+  "Property",
   "Real estate",
+  "Gold",
+  "Vehicles",
   "Vehicle",
   "Other",
 ] as const;
 
 export const NET_WORTH_LIABILITY_CATEGORIES = [
+  "Loans",
   "Home loan",
+  "Mortgage",
   "Car loan",
   "Personal loan",
+  "Credit Cards",
   "Credit card",
   "Education loan",
   "Other",
@@ -2154,6 +2162,10 @@ export interface DashboardBody {
   savingsHistory: Array<{ id: string; month: string; savings: number }>;
   /** Quick insights: free-text bullets. */
   insights: string[];
+  /** Optional Health Score, 0-100, mirrored from the Health Score page. */
+  healthScore: number | null;
+  /** Recent calculation titles, newest first, shown in the dashboard. */
+  recentCalculations: Array<{ id: string; title: string; kind: string; updatedAt: string }>;
 }
 
 export function defaultDashboardBody(): DashboardBody {
@@ -2185,6 +2197,27 @@ export function defaultDashboardBody(): DashboardBody {
       "Savings rate is 17% of income — aim for 20% to be on a stronger footing.",
       "Three active goals, two are on track for the target date.",
     ],
+    healthScore: 72,
+    recentCalculations: [
+      {
+        id: "rc-emi",
+        title: "Home loan EMI",
+        kind: "emi",
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: "rc-sip",
+        title: "Long-term SIP",
+        kind: "sip",
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: "rc-budget",
+        title: "Monthly household budget",
+        kind: "budget",
+        updatedAt: new Date().toISOString(),
+      },
+    ],
   };
 }
 
@@ -2204,6 +2237,19 @@ export function readDashboardBody(body: unknown): DashboardBody {
   const insights = Array.isArray(raw.insights)
     ? raw.insights.filter((value): value is string => typeof value === "string")
     : defaultDashboardBody().insights;
+  const rawHealthScore = raw.healthScore;
+  const healthScore =
+    rawHealthScore === null || rawHealthScore === undefined
+      ? defaultDashboardBody().healthScore
+      : Number(rawHealthScore);
+  const recentCalculations = Array.isArray(raw.recentCalculations)
+    ? raw.recentCalculations
+        .map((entry, index) => normaliseRecentCalculation(entry, index))
+        .filter(
+          (entry): entry is DashboardBody["recentCalculations"][number] =>
+            entry !== null
+        )
+    : defaultDashboardBody().recentCalculations;
   return {
     totalAssets: readNumber(raw, "totalAssets", 0),
     totalLiabilities: readNumber(raw, "totalLiabilities", 0),
@@ -2215,6 +2261,8 @@ export function readDashboardBody(body: unknown): DashboardBody {
     history,
     savingsHistory,
     insights,
+    healthScore: Number.isFinite(healthScore) ? healthScore : null,
+    recentCalculations,
   };
 }
 
@@ -2250,6 +2298,24 @@ function normaliseSavingsEntry(
   };
 }
 
+function normaliseRecentCalculation(
+  value: unknown,
+  index: number
+): DashboardBody["recentCalculations"][number] | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const title = typeof raw.title === "string" ? raw.title : "";
+  const kind = typeof raw.kind === "string" ? raw.kind : "";
+  const updatedAt = typeof raw.updatedAt === "string" ? raw.updatedAt : "";
+  if (!title || !kind || !updatedAt) return null;
+  return {
+    id: typeof raw.id === "string" ? raw.id : `rc-${index}-${Math.random().toString(36).slice(2, 6)}`,
+    title,
+    kind,
+    updatedAt,
+  };
+}
+
 export interface DashboardSummary {
   netWorth: number;
   savingsRate: number;
@@ -2258,6 +2324,8 @@ export interface DashboardSummary {
   history: DashboardBody["history"];
   savingsHistory: DashboardBody["savingsHistory"];
   insights: string[];
+  healthScore: number | null;
+  recentCalculations: DashboardBody["recentCalculations"];
 }
 
 export function summariseDashboard(body: DashboardBody): DashboardSummary {
@@ -2282,6 +2350,8 @@ export function summariseDashboard(body: DashboardBody): DashboardSummary {
     history: body.history,
     savingsHistory: body.savingsHistory,
     insights: body.insights,
+    healthScore: body.healthScore,
+    recentCalculations: body.recentCalculations,
   };
 }
 
@@ -2323,8 +2393,484 @@ export function evaluateDashboard(
       { label: "Budget status", value: budgetStatusLabel },
       { label: "Active goals", value: String(body.activeGoals) },
       { label: "Total invested", value: formatCurrency(body.totalInvested) },
+      {
+        label: "Health score",
+        value: body.healthScore === null ? "—" : `${body.healthScore.toFixed(0)} / 100`,
+      },
+      { label: "Recent calculations", value: String(body.recentCalculations.length) },
     ],
     series: [netWorthSeries, savingsSeries],
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Financial Health Score                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Inputs the user can supply on the health-score page. Every input is
+ * optional; missing values fall back to safe defaults (a low score)
+ * so the page never crashes on a half-filled form. The summary and
+ * the evaluator read the same shape so the UI and the verification
+ * harness exercise the same code path.
+ */
+export interface HealthScoreBody {
+  /** Monthly take-home income in rupees. */
+  monthlyIncome: number;
+  /** Monthly take-home expenses in rupees. */
+  monthlyExpenses: number;
+  /** Liquid savings available for an emergency. */
+  emergencyFund: number;
+  /** Total outstanding debt in rupees (loans, credit cards, etc.). */
+  totalDebt: number;
+  /** Total monthly debt service (EMI + interest + minimums). */
+  monthlyDebtService: number;
+  /** Amount currently invested in market-linked instruments. */
+  investedAmount: number;
+  /** Number of active insurance policies the user carries. */
+  insurancePolicies: number;
+  /** Number of financial goals the user is tracking. */
+  activeGoals: number;
+  /** Number of goals that are on track for the target date. */
+  goalsOnTrack: number;
+}
+
+export function defaultHealthScoreBody(): HealthScoreBody {
+  return {
+    monthlyIncome: 145_000,
+    monthlyExpenses: 120_000,
+    emergencyFund: 250_000,
+    totalDebt: 4_868_000,
+    monthlyDebtService: 93_412,
+    investedAmount: 1_500_000,
+    insurancePolicies: 2,
+    activeGoals: 3,
+    goalsOnTrack: 2,
+  };
+}
+
+export function readHealthScoreBody(body: unknown): HealthScoreBody {
+  if (!body || typeof body !== "object") return defaultHealthScoreBody();
+  const raw = body as Record<string, unknown>;
+  return {
+    monthlyIncome: readNumber(raw, "monthlyIncome", 0),
+    monthlyExpenses: readNumber(raw, "monthlyExpenses", 0),
+    emergencyFund: readNumber(raw, "emergencyFund", 0),
+    totalDebt: readNumber(raw, "totalDebt", 0),
+    monthlyDebtService: readNumber(raw, "monthlyDebtService", 0),
+    investedAmount: readNumber(raw, "investedAmount", 0),
+    insurancePolicies: readNumber(raw, "insurancePolicies", 0),
+    activeGoals: readNumber(raw, "activeGoals", 0),
+    goalsOnTrack: readNumber(raw, "goalsOnTrack", 0),
+  };
+}
+
+export interface HealthScoreCategory {
+  /** "Emergency Fund" | "Debt Ratio" | ... */
+  name: string;
+  /** 0..100 — the score for this category. */
+  score: number;
+  /** A short verdict shown next to the score. */
+  verdict: "Excellent" | "Good" | "Fair" | "Weak" | "Critical";
+  /** One-sentence explanation of the verdict. */
+  detail: string;
+  /** Optional improvement suggestion. */
+  suggestion?: string;
+}
+
+export interface HealthScoreSummary {
+  /** 0..100 — weighted average of every category score. */
+  overall: number;
+  /** Per-category breakdown. */
+  categories: HealthScoreCategory[];
+  /** Overall verdict for the headline badge. */
+  verdict: "Excellent" | "Good" | "Fair" | "Weak" | "Critical";
+  /** Ordered list of improvement suggestions (deduped across categories). */
+  suggestions: string[];
+}
+
+/**
+ * The category weights. Emergency fund and debt ratio are weighted
+ * highest because a single failure in either can disrupt the rest of
+ * the financial plan; insurance and goal progress tie for the next
+ * most important.
+ */
+const HEALTH_CATEGORY_WEIGHTS = {
+  emergencyFund: 0.25,
+  debtRatio: 0.2,
+  savingsRate: 0.2,
+  investmentRatio: 0.15,
+  insuranceCoverage: 0.1,
+  goalProgress: 0.1,
+} as const;
+
+/** Maps a 0..100 score to a verdict label. */
+function verdictFor(score: number): HealthScoreCategory["verdict"] {
+  if (score >= 85) return "Excellent";
+  if (score >= 70) return "Good";
+  if (score >= 50) return "Fair";
+  if (score >= 30) return "Weak";
+  return "Critical";
+}
+
+/** Clamps a value to the 0..100 range. */
+function clampScore(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, value));
+}
+
+/** Caps a value at 0 from below. */
+function clampNonNegative(value: number): number {
+  if (!Number.isFinite(value) || value < 0) return 0;
+  return value;
+}
+
+/**
+ * Emergency fund score: how many months of expenses the liquid
+ * savings covers. The conventional target is 3–6 months.
+ */
+function scoreEmergencyFund(body: HealthScoreBody): HealthScoreCategory {
+  const months = body.monthlyExpenses > 0 ? body.emergencyFund / body.monthlyExpenses : 0;
+  // 0 months → 0, 6+ months → 100, with 3 months scoring ~50.
+  let score = 0;
+  let verdict: HealthScoreCategory["verdict"] = "Critical";
+  let detail = "";
+  let suggestion: string | undefined;
+  if (months >= 6) {
+    score = 100;
+    verdict = "Excellent";
+    detail = `${months.toFixed(1)} months of expenses in liquid savings.`;
+  } else if (months >= 3) {
+    score = 50 + ((months - 3) / 3) * 50;
+    verdict = months >= 4 ? "Good" : "Fair";
+    detail = `${months.toFixed(1)} months of expenses covered.`;
+    suggestion = "Top up the emergency fund to 6 months of expenses.";
+  } else if (months > 0) {
+    score = (months / 3) * 50;
+    verdict = months >= 1 ? "Weak" : "Critical";
+    detail = `Only ${months.toFixed(1)} month${months < 1.5 ? "" : "s"} of expenses covered.`;
+    suggestion = "Build the emergency fund to 3 months first, then 6.";
+  } else {
+    score = 0;
+    verdict = "Critical";
+    detail = "No liquid savings set aside.";
+    suggestion = "Park at least one month of expenses in a savings account.";
+  }
+  return {
+    name: "Emergency Fund",
+    score: clampScore(score),
+    verdict,
+    detail,
+    suggestion,
+  };
+}
+
+/**
+ * Debt ratio score: total debt as a fraction of annual income.
+ * Conventional threshold: under 30% is healthy.
+ */
+function scoreDebtRatio(body: HealthScoreBody): HealthScoreCategory {
+  const annualIncome = body.monthlyIncome * 12;
+  const ratio = annualIncome > 0 ? body.totalDebt / annualIncome : Number.POSITIVE_INFINITY;
+  let score = 0;
+  let verdict: HealthScoreCategory["verdict"] = "Critical";
+  let detail = "";
+  let suggestion: string | undefined;
+  if (!Number.isFinite(ratio)) {
+    score = 0;
+    verdict = "Critical";
+    detail = "No income recorded; debt ratio cannot be evaluated.";
+    suggestion = "Add the monthly take-home income to unlock the score.";
+  } else if (ratio <= 0.2) {
+    score = 100;
+    verdict = "Excellent";
+    detail = `Debt is ${(ratio * 100).toFixed(0)}% of annual income.`;
+  } else if (ratio <= 0.3) {
+    score = 80 + ((0.3 - ratio) / 0.1) * 20;
+    verdict = ratio <= 0.25 ? "Excellent" : "Good";
+    detail = `Debt is ${(ratio * 100).toFixed(0)}% of annual income.`;
+  } else if (ratio <= 0.5) {
+    score = 50 + ((0.5 - ratio) / 0.2) * 30;
+    verdict = "Fair";
+    detail = `Debt is ${(ratio * 100).toFixed(0)}% of annual income.`;
+    suggestion = "Aim to bring total debt below 30% of annual income.";
+  } else if (ratio <= 1) {
+    score = ((1 - ratio) / 0.5) * 50;
+    verdict = "Weak";
+    detail = `Debt is ${(ratio * 100).toFixed(0)}% of annual income — that's a year of salary or more.`;
+    suggestion = "Prioritise repaying the highest-interest loan first.";
+  } else {
+    score = 0;
+    verdict = "Critical";
+    detail = `Debt is ${(ratio * 100).toFixed(0)}% of annual income.`;
+    suggestion = "Speak to a credit counsellor before taking on more debt.";
+  }
+  // Cross-check with the debt service ratio (EMI / income). A high
+  // service ratio pulls the score down further.
+  if (body.monthlyIncome > 0) {
+    const serviceRatio = body.monthlyDebtService / body.monthlyIncome;
+    if (serviceRatio > 0.5) {
+      score = Math.min(score, 30);
+      verdict = "Weak";
+      detail = `Debt service is ${(serviceRatio * 100).toFixed(0)}% of monthly income.`;
+      suggestion = "Reduce the EMI to below 40% of monthly income.";
+    } else if (serviceRatio > 0.4 && verdict === "Excellent") {
+      verdict = "Good";
+      detail = `Debt service is ${(serviceRatio * 100).toFixed(0)}% of monthly income.`;
+    }
+  }
+  return {
+    name: "Debt Ratio",
+    score: clampScore(score),
+    verdict,
+    detail,
+    suggestion,
+  };
+}
+
+/**
+ * Savings rate score: monthly savings as a percentage of income.
+ * Conventional target: 20% or more.
+ */
+function scoreSavingsRate(body: HealthScoreBody): HealthScoreCategory {
+  const rate = body.monthlyIncome > 0 ? (body.monthlyIncome - body.monthlyExpenses) / body.monthlyIncome : 0;
+  let score = 0;
+  let verdict: HealthScoreCategory["verdict"] = "Critical";
+  let detail = "";
+  let suggestion: string | undefined;
+  if (rate >= 0.3) {
+    score = 100;
+    verdict = "Excellent";
+    detail = `Saving ${(rate * 100).toFixed(0)}% of monthly income.`;
+  } else if (rate >= 0.2) {
+    score = 80 + ((rate - 0.2) / 0.1) * 20;
+    verdict = rate >= 0.25 ? "Excellent" : "Good";
+    detail = `Saving ${(rate * 100).toFixed(0)}% of monthly income.`;
+  } else if (rate >= 0.1) {
+    score = 50 + ((rate - 0.1) / 0.1) * 30;
+    verdict = "Fair";
+    detail = `Saving ${(rate * 100).toFixed(0)}% of monthly income.`;
+    suggestion = "Push the savings rate to 20% of income.";
+  } else if (rate > 0) {
+    score = (rate / 0.1) * 50;
+    verdict = rate >= 0.05 ? "Weak" : "Critical";
+    detail = `Saving only ${(rate * 100).toFixed(0)}% of monthly income.`;
+    suggestion = "Trim discretionary expenses to save at least 10% of income.";
+  } else {
+    score = 0;
+    verdict = "Critical";
+    detail = "Expenses meet or exceed income.";
+    suggestion = "Build a budget before taking on more commitments.";
+  }
+  return {
+    name: "Savings Rate",
+    score: clampScore(score),
+    verdict,
+    detail,
+    suggestion,
+  };
+}
+
+/**
+ * Investment ratio score: invested amount as a multiple of annual
+ * income. The conventional rule of thumb is at least 1× annual income
+ * invested by age 30, scaling up from there.
+ */
+function scoreInvestmentRatio(body: HealthScoreBody): HealthScoreCategory {
+  const annualIncome = body.monthlyIncome * 12;
+  const ratio = annualIncome > 0 ? body.investedAmount / annualIncome : 0;
+  let score = 0;
+  let verdict: HealthScoreCategory["verdict"] = "Critical";
+  let detail = "";
+  let suggestion: string | undefined;
+  if (ratio >= 3) {
+    score = 100;
+    verdict = "Excellent";
+    detail = `Investments are ${ratio.toFixed(1)}× annual income.`;
+  } else if (ratio >= 1) {
+    score = 70 + ((ratio - 1) / 2) * 30;
+    verdict = ratio >= 2 ? "Excellent" : "Good";
+    detail = `Investments are ${ratio.toFixed(1)}× annual income.`;
+  } else if (ratio >= 0.5) {
+    score = 40 + ((ratio - 0.5) / 0.5) * 30;
+    verdict = "Fair";
+    detail = `Investments are ${ratio.toFixed(1)}× annual income.`;
+    suggestion = "Aim to invest at least one full year of income.";
+  } else if (ratio > 0) {
+    score = (ratio / 0.5) * 40;
+    verdict = ratio >= 0.25 ? "Weak" : "Critical";
+    detail = `Investments are ${ratio.toFixed(1)}× annual income.`;
+    suggestion = "Move a slice of every paycheck into a long-term portfolio.";
+  } else {
+    score = 0;
+    verdict = "Critical";
+    detail = "No investments tracked.";
+    suggestion = "Open an index fund or a SIP to start investing this month.";
+  }
+  return {
+    name: "Investment Ratio",
+    score: clampScore(score),
+    verdict,
+    detail,
+    suggestion,
+  };
+}
+
+/**
+ * Insurance coverage score: 1 point per policy, capped at 3 (life,
+ * health, vehicle are the conventional minimums).
+ */
+function scoreInsuranceCoverage(body: HealthScoreBody): HealthScoreCategory {
+  const policies = clampNonNegative(body.insurancePolicies);
+  const score = clampScore((policies / 3) * 100);
+  let verdict: HealthScoreCategory["verdict"];
+  let detail: string;
+  let suggestion: string | undefined;
+  if (policies >= 3) {
+    verdict = "Excellent";
+    detail = `${policies} policies tracked — life, health and asset cover.`;
+  } else if (policies === 2) {
+    verdict = "Good";
+    detail = `${policies} policies tracked.`;
+    suggestion = "Add a third policy (life, health or critical illness) for full cover.";
+  } else if (policies === 1) {
+    verdict = "Fair";
+    detail = "Only one policy tracked.";
+    suggestion = "Add at least a term life and a health insurance policy.";
+  } else {
+    verdict = "Critical";
+    detail = "No insurance policies tracked.";
+    suggestion = "Buy a term life policy and a health cover today.";
+  }
+  return {
+    name: "Insurance Coverage",
+    score,
+    verdict,
+    detail,
+    suggestion,
+  };
+}
+
+/**
+ * Goal progress score: fraction of active goals that are on track.
+ */
+function scoreGoalProgress(body: HealthScoreBody): HealthScoreCategory {
+  const total = clampNonNegative(body.activeGoals);
+  const onTrack = clampNonNegative(body.goalsOnTrack);
+  const ratio = total > 0 ? Math.min(1, onTrack / total) : 0;
+  let score = 0;
+  let verdict: HealthScoreCategory["verdict"] = "Critical";
+  let detail = "";
+  let suggestion: string | undefined;
+  if (total === 0) {
+    verdict = "Critical";
+    detail = "No active financial goals.";
+    suggestion = "Add at least one goal in the Goal Planner.";
+    return { name: "Goal Progress", score: 0, verdict, detail, suggestion };
+  }
+  if (ratio >= 1) {
+    score = 100;
+    verdict = "Excellent";
+    detail = `All ${total} active goals are on track.`;
+  } else if (ratio >= 0.66) {
+    score = 70 + ((ratio - 0.66) / 0.34) * 30;
+    verdict = ratio >= 0.85 ? "Excellent" : "Good";
+    detail = `${onTrack} of ${total} active goals are on track.`;
+  } else if (ratio >= 0.33) {
+    score = 40 + ((ratio - 0.33) / 0.33) * 30;
+    verdict = "Fair";
+    detail = `${onTrack} of ${total} active goals are on track.`;
+    suggestion = "Increase the monthly contribution to off-track goals.";
+  } else {
+    score = ratio * 40;
+    verdict = ratio > 0 ? "Weak" : "Critical";
+    detail = ratio > 0
+      ? `Only ${onTrack} of ${total} active goals are on track.`
+      : `None of the ${total} active goals are on track.`;
+    suggestion = "Re-balance the monthly contribution across goals.";
+  }
+  return {
+    name: "Goal Progress",
+    score: clampScore(score),
+    verdict,
+    detail,
+    suggestion,
+  };
+}
+
+/**
+ * Builds the health score summary.
+ *
+ * The category scores are computed independently and combined with the
+ * weights above. Suggestions are de-duplicated and ordered by the
+ * weakest category first, so the user sees the most impactful
+ * improvement first.
+ */
+export function summariseHealthScore(body: HealthScoreBody): HealthScoreSummary {
+  const emergency = scoreEmergencyFund(body);
+  const debt = scoreDebtRatio(body);
+  const savings = scoreSavingsRate(body);
+  const investment = scoreInvestmentRatio(body);
+  const insurance = scoreInsuranceCoverage(body);
+  const goals = scoreGoalProgress(body);
+  const categories: HealthScoreCategory[] = [
+    emergency,
+    debt,
+    savings,
+    investment,
+    insurance,
+    goals,
+  ];
+  const overall = clampScore(
+    emergency.score * HEALTH_CATEGORY_WEIGHTS.emergencyFund +
+      debt.score * HEALTH_CATEGORY_WEIGHTS.debtRatio +
+      savings.score * HEALTH_CATEGORY_WEIGHTS.savingsRate +
+      investment.score * HEALTH_CATEGORY_WEIGHTS.investmentRatio +
+      insurance.score * HEALTH_CATEGORY_WEIGHTS.insuranceCoverage +
+      goals.score * HEALTH_CATEGORY_WEIGHTS.goalProgress
+  );
+  const verdict = verdictFor(overall);
+  const suggestions: string[] = [];
+  // Order suggestions by the score of the category they came from so
+  // the user sees the weakest one first.
+  const ordered = [...categories].sort((a, b) => a.score - b.score);
+  for (const category of ordered) {
+    if (category.suggestion && !suggestions.includes(category.suggestion)) {
+      suggestions.push(category.suggestion);
+    }
+  }
+  return { overall, categories, verdict, suggestions };
+}
+
+export function evaluateHealthScore(
+  calculation: FinanceCalculation
+): FinanceEvaluation {
+  const body = readHealthScoreBody(calculation.body);
+  const summary = summariseHealthScore(body);
+  const scoreSeries: FinanceChartSeries = {
+    name: "Score",
+    points: summary.categories.map((entry) => ({
+      label: entry.name,
+      value: entry.score,
+    })),
+  };
+  const lines: Array<{ label: string; value: string }> = [
+    { label: "Overall score", value: `${summary.overall.toFixed(0)} / 100` },
+    { label: "Verdict", value: summary.verdict },
+  ];
+  for (const entry of summary.categories) {
+    lines.push({
+      label: entry.name,
+      value: `${entry.score.toFixed(0)} · ${entry.verdict}`,
+    });
+  }
+  if (summary.suggestions.length > 0) {
+    lines.push({ label: "Top suggestion", value: summary.suggestions[0]! });
+  }
+  return {
+    ok: true,
+    lines,
+    series: [scoreSeries],
   };
 }
 
@@ -2344,7 +2890,8 @@ export type CalculatorKind =
   | "retirement"
   | "investment"
   | "goal"
-  | "dashboard";
+  | "dashboard"
+  | "health-score";
 
 /**
  * Resolves a calculation to its runtime evaluator.
@@ -2418,6 +2965,12 @@ export function dispatch(calculation: FinanceCalculation): {
         kind: "dashboard",
         body: calculation.body,
         evaluate: evaluateDashboard,
+      };
+    case "health-score":
+      return {
+        kind: "health-score",
+        body: calculation.body,
+        evaluate: evaluateHealthScore,
       };
     default:
       return { kind: "emi", body: calculation.body, evaluate: evaluateEmi };

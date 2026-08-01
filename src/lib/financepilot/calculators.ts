@@ -356,6 +356,32 @@ export const calculators: FinanceCalculatorDefinition[] = [
     highlights: ["Net worth", "Budget status", "Charts", "Quick insights"],
     toolCount: 1,
   },
+  {
+    id: "finance-health-score",
+    kind: "health-score",
+    slug: "health-score",
+    name: "Financial Health Score",
+    tagline: "0–100 score across emergency fund, debt, savings, insurance and goals",
+    description:
+      "Get a 0–100 financial health score with category breakdowns (emergency fund, debt ratio, savings rate, investment ratio, insurance coverage, goal progress) and prioritised improvement suggestions.",
+    intro:
+      "Type the monthly income, monthly expenses, emergency fund, total debt, monthly debt service, invested amount, insurance policies, active goals and goals on track. The workspace computes the overall score, the per-category score and the most impactful improvement suggestion, then lets you save the plan or export it as a PDF.",
+    defaultCategory: "savings",
+    keywords: [
+      "health score",
+      "financial health",
+      "score",
+      "improvement",
+      "FinancePilot",
+    ],
+    highlights: [
+      "0–100 overall score",
+      "6 category scores",
+      "Improvement suggestions",
+      "Export PDF",
+    ],
+    toolCount: 1,
+  },
 ];
 
 export function getCalculator(

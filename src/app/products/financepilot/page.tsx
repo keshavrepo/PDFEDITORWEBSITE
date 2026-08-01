@@ -67,10 +67,11 @@ const structuredData = {
 
 /** The features the product page advertises. */
 const FEATURE_HIGHLIGHTS = [
-  "12 calculators: formula, personal-finance and investment & retirement",
+  "13 calculators: formula, personal-finance, investment & retirement, plus a 0–100 financial health score",
   "Amortisation and growth schedules with a virtualised scroll for long tenures",
   "Pure-SVG pie, line and bar charts that match the LaunchStack visual language",
   "Reusable line-item list editor shared by every personal-finance module",
+  "Health score with 6 categories and prioritised improvement suggestions",
   "Autosave to IndexedDB with a server-side recent mirror and full rename / duplicate / delete",
   "Print-to-PDF export for every calculation, using the same browser pipeline as OfficePilot",
 ];
@@ -83,6 +84,7 @@ const LAUNCHED_CHECKLIST = [
   "Four formula calculators: EMI, SIP, compound interest, loan",
   "Four personal-finance modules: budget planner, expense tracker, savings planner, net worth tracker",
   "Four investment & retirement modules: retirement, investment, goal, financial dashboard",
+  "Financial Health Score with 6 categories and improvement suggestions",
 ];
 
 export default async function FinancePilotProductPage() {
@@ -165,7 +167,7 @@ export default async function FinancePilotProductPage() {
                 <p className="mt-2 text-sm text-muted-foreground">
                   {calculators.length === 0
                     ? "The reusable FinancePilot workspace is live. The first calculator lands in the next batch and will plug straight into the same shell, sidebar, autosave loop and export pipeline."
-                    : "The reusable FinancePilot workspace is live with four formula calculators (EMI, SIP, compound interest, loan), four personal-finance modules (budget, expense, savings, net worth) and four investment & retirement modules (retirement, investment, goal, financial dashboard). Every module uses the same shell, sidebar, autosave loop and print-to-PDF export pipeline."}
+                    : "The reusable FinancePilot workspace is live with four formula calculators (EMI, SIP, compound interest, loan), four personal-finance modules (budget, expense, savings, net worth), four investment & retirement modules (retirement, investment, goal, financial dashboard) and a 0–100 financial health score. Every module uses the same shell, sidebar, autosave loop and print-to-PDF export pipeline."}
                 </p>
               </Card>
             </div>
@@ -192,7 +194,7 @@ export default async function FinancePilotProductPage() {
           <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
             <div className="mb-6 flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <h2 className="text-lg font-semibold">What ships in batches 1, 2 and 3</h2>
+              <h2 className="text-lg font-semibold">What ships in batches 1, 2, 3 and 4</h2>
             </div>
             <Card className="p-6">
               <ul className="space-y-3 text-sm">
@@ -242,7 +244,7 @@ export default async function FinancePilotProductPage() {
                 <h2 className="text-lg font-semibold">Open the FinancePilot workspace</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Pick a calculator from the workspace rail or jump straight to
-                  one of the twelve live calculators below. Calculations save
+                  one of the thirteen live calculators below. Calculations save
                   themselves and export as a PDF in one click.
                 </p>
               </div>

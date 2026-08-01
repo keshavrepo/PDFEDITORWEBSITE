@@ -17,6 +17,7 @@ import { RetirementSurface } from "@/components/financepilot/surfaces/retirement
 import { InvestmentSurface } from "@/components/financepilot/surfaces/investment";
 import { GoalSurface } from "@/components/financepilot/surfaces/goal";
 import { DashboardSurface } from "@/components/financepilot/surfaces/dashboard";
+import { HealthScoreSurface } from "@/components/financepilot/surfaces/health-score";
 import { EmiProperties } from "@/components/financepilot/properties/emi";
 import { SipProperties } from "@/components/financepilot/properties/sip";
 import { CompoundInterestProperties } from "@/components/financepilot/properties/compound-interest";
@@ -29,6 +30,7 @@ import { RetirementProperties } from "@/components/financepilot/properties/retir
 import { InvestmentProperties } from "@/components/financepilot/properties/investment";
 import { GoalProperties } from "@/components/financepilot/properties/goal";
 import { DashboardProperties } from "@/components/financepilot/properties/dashboard";
+import { HealthScoreProperties } from "@/components/financepilot/properties/health-score";
 import {
   getCalculatorBySlug,
   focusedCalculators,
@@ -105,6 +107,8 @@ function pickCalculatorComponents(kind: FinanceCalculatorKind): {
       return { Surface: GoalSurface, Properties: GoalProperties };
     case "dashboard":
       return { Surface: DashboardSurface, Properties: DashboardProperties };
+    case "health-score":
+      return { Surface: HealthScoreSurface, Properties: HealthScoreProperties };
     default:
       return null;
   }

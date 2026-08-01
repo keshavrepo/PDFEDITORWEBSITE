@@ -27,6 +27,8 @@ export function DashboardProperties({ calculation }: { calculation: FinanceCalcu
       : summary.budgetStatus === "deficit"
         ? "Deficit"
         : "Balanced";
+  const healthLabel =
+    body.healthScore === null ? "—" : `${body.healthScore.toFixed(0)} / 100`;
 
   return (
     <div className="flex flex-col gap-4 p-4 text-xs">
@@ -62,7 +64,9 @@ export function DashboardProperties({ calculation }: { calculation: FinanceCalcu
             label="Investment coverage"
             value={formatPercent(Math.max(0, Math.min(1, summary.investmentCoverage) * 100))}
           />
+          <Row label="Health score" value={healthLabel} />
           <Row label="Insights" value={String(body.insights.length)} />
+          <Row label="Recent calculations" value={String(summary.recentCalculations.length)} />
         </dl>
       </section>
       <section>

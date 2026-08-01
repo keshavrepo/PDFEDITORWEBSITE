@@ -24,6 +24,7 @@ import {
   defaultEmiBody,
   defaultExpenseBody,
   defaultGoalBody,
+  defaultHealthScoreBody,
   defaultInvestmentBody,
   defaultLoanBody,
   defaultNetWorthBody,
@@ -155,6 +156,15 @@ export const templates: FinanceTemplate[] = [
     hasStarter: true,
     highlights: ["Net worth + savings", "12-month history", "Quick insights"],
   },
+  {
+    id: "finance-health-score",
+    kind: "health-score",
+    category: "savings",
+    name: "Health score check",
+    description: "A baseline health score built from the canonical household inputs.",
+    hasStarter: true,
+    highlights: ["6 categories", "Improvement list", "PDF export"],
+  },
 ];
 
 /** Templates for one calculator kind, in the canonical category order. */
@@ -214,6 +224,8 @@ export function loadTemplateBody(template: FinanceTemplate): unknown {
         return defaultGoalBody();
       case "finance-dashboard":
         return defaultDashboardBody();
+      case "finance-health-score":
+        return defaultHealthScoreBody();
       default:
         if (template.kind === "blank") return {};
         return {};
@@ -249,6 +261,8 @@ export function createBlankBody(kind: string): unknown {
       return defaultGoalBody();
     case "dashboard":
       return defaultDashboardBody();
+    case "health-score":
+      return defaultHealthScoreBody();
     default:
       return {};
   }
