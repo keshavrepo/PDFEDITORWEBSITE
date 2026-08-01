@@ -214,18 +214,29 @@ export const products: Product[] = [
     name: "FinancePilot",
     tagline: "Financial calculators in your browser",
     description:
-      "Run the financial calculators you reach for every day — EMI, SIP, compound interest, loans and more — inside the LaunchStack workspace, with autosave, the same shared chrome as OfficePilot, and print-to-PDF export.",
+      "Run the financial calculators you reach for every day — EMI, SIP, compound interest, loans, budgets, expenses, savings goals and net worth — inside the LaunchStack workspace, with autosave, the same shared chrome as OfficePilot, and print-to-PDF export.",
     status: "active",
     category: "Finance",
-    version: "0.2.0",
+    version: "0.3.0",
     href: "/financepilot",
     accent: "text-primary",
     highlights: [
-      "EMI, SIP, compound interest and loan calculators",
+      "8 calculators: EMI, SIP, compound interest, loan, budget, expense, savings, net worth",
       "Autosave and recent mirror",
       "Print-to-PDF export",
     ],
     releaseNotes: [
+      {
+        version: "0.3.0",
+        date: "2026-08-02",
+        changes: [
+          "Four personal-finance modules: Budget Planner, Expense Tracker, Savings Planner, Net Worth Tracker",
+          "Reusable line-item list editor and list workspace shared by every personal-finance module",
+          "Expense tracker adds search, filter, sort, by-method breakdown and a daily spend chart",
+          "Savings planner projects when the goal is met and reports progress, on-track flag and yearly chart",
+          "Net worth tracker ships a 6-month historical timeline plus asset and liability category breakdowns",
+        ],
+      },
       {
         version: "0.2.0",
         date: "2026-08-02",

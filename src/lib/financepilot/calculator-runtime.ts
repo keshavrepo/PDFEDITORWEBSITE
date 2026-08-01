@@ -612,6 +612,858 @@ export function evaluateLoan(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Budget Planner                                                             */
+/* -------------------------------------------------------------------------- */
+
+/** A line item in the budget planner. */
+export interface BudgetLine {
+  id: string;
+  /** "income", "fixed" or "variable". */
+  kind: "income" | "fixed" | "variable";
+  /** Optional category like "Salary", "Rent", "Groceries". */
+  category: string;
+  /** Free-text label shown to the user. */
+  label: string;
+  /** Monthly amount in rupees. Negative amounts are accepted as deductions. */
+  amount: number;
+}
+
+export interface BudgetBody {
+  /** YYYY-MM month for which the budget is being planned. */
+  month: string;
+  /** Plan lines (income, fixed expenses, variable expenses). */
+  lines: BudgetLine[];
+  /** Optional rollover cap for the remaining budget. */
+  rollover: number;
+}
+
+const BUDGET_KINDS: ReadonlyArray<BudgetLine["kind"]> = [
+  "income",
+  "fixed",
+  "variable",
+];
+
+const BUDGET_CATEGORIES: Record<BudgetLine["kind"], string[]> = {
+  income: ["Salary", "Freelance", "Investment", "Side income", "Other"],
+  fixed: ["Rent", "EMI", "Utilities", "Insurance", "Subscription", "Other"],
+  variable: ["Groceries", "Dining", "Transport", "Entertainment", "Shopping", "Health", "Other"],
+};
+
+export function budgetCategories(kind: BudgetLine["kind"]): string[] {
+  return BUDGET_CATEGORIES[kind] ?? [];
+}
+
+export function defaultBudgetBody(): BudgetBody {
+  const now = new Date();
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return {
+    month,
+    rollover: 0,
+    lines: [
+      { id: "i-1", kind: "income", category: "Salary", label: "Take-home salary", amount: 120_000 },
+      { id: "i-2", kind: "income", category: "Freelance", label: "Freelance project", amount: 25_000 },
+      { id: "f-1", kind: "fixed", category: "Rent", label: "Rent", amount: 35_000 },
+      { id: "f-2", kind: "fixed", category: "EMI", label: "Home loan EMI", amount: 21_695 },
+      { id: "f-3", kind: "fixed", category: "Utilities", label: "Electricity + water", amount: 3_500 },
+      { id: "f-4", kind: "fixed", category: "Subscription", label: "Streaming bundle", amount: 1_000 },
+      { id: "v-1", kind: "variable", category: "Groceries", label: "Groceries", amount: 12_000 },
+      { id: "v-2", kind: "variable", category: "Transport", label: "Fuel + cabs", amount: 6_000 },
+      { id: "v-3", kind: "variable", category: "Dining", label: "Dining out", amount: 5_000 },
+      { id: "v-4", kind: "variable", category: "Entertainment", label: "Movies + events", amount: 3_000 },
+    ],
+  };
+}
+
+export function readBudgetBody(body: unknown): BudgetBody {
+  if (!body || typeof body !== "object") return defaultBudgetBody();
+  const raw = body as Record<string, unknown>;
+  const lines = Array.isArray(raw.lines)
+    ? raw.lines
+        .map((entry, index) => normaliseBudgetLine(entry, index))
+        .filter((entry): entry is BudgetLine => entry !== null)
+    : [];
+  const month = typeof raw.month === "string" ? raw.month : "";
+  const rollover = readNumber(raw, "rollover", 0);
+  return { month, lines, rollover };
+}
+
+function normaliseBudgetLine(value: unknown, index: number): BudgetLine | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const kindValue = raw.kind;
+  const kind: BudgetLine["kind"] = BUDGET_KINDS.includes(kindValue as BudgetLine["kind"])
+    ? (kindValue as BudgetLine["kind"])
+    : "variable";
+  const label = typeof raw.label === "string" ? raw.label : "";
+  const category = typeof raw.category === "string" ? raw.category : "Other";
+  const amount = readNumber(raw, "amount", 0);
+  if (!label) return null;
+  return {
+    id: typeof raw.id === "string" ? raw.id : `${kind}-${index}-${Math.random().toString(36).slice(2, 6)}`,
+    kind,
+    category,
+    label,
+    amount,
+  };
+}
+
+export interface BudgetSummary {
+  totalIncome: number;
+  totalFixed: number;
+  totalVariable: number;
+  totalExpenses: number;
+  remaining: number;
+  /** Per-category totals for the variable bucket (used by the chart). */
+  variableByCategory: Array<{ category: string; amount: number }>;
+}
+
+export function summariseBudget(body: BudgetBody): BudgetSummary {
+  let totalIncome = 0;
+  let totalFixed = 0;
+  let totalVariable = 0;
+  const variableMap = new Map<string, number>();
+  for (const line of body.lines) {
+    if (line.amount <= 0) continue;
+    if (line.kind === "income") totalIncome += line.amount;
+    else if (line.kind === "fixed") totalFixed += line.amount;
+    else if (line.kind === "variable") {
+      totalVariable += line.amount;
+      variableMap.set(line.category, (variableMap.get(line.category) ?? 0) + line.amount);
+    }
+  }
+  const totalExpenses = totalFixed + totalVariable;
+  const remaining = totalIncome - totalExpenses + (body.rollover ?? 0);
+  return {
+    totalIncome,
+    totalFixed,
+    totalVariable,
+    totalExpenses,
+    remaining,
+    variableByCategory: Array.from(variableMap.entries())
+      .map(([category, amount]) => ({ category, amount }))
+      .sort((a, b) => b.amount - a.amount),
+  };
+}
+
+export function evaluateBudget(
+  calculation: FinanceCalculation
+): FinanceEvaluation {
+  const body = readBudgetBody(calculation.body);
+  const summary = summariseBudget(body);
+  const variablePie: FinanceChartSeries = {
+    name: "Variable spending",
+    points: summary.variableByCategory.map((entry) => ({
+      label: entry.category,
+      value: Math.round(entry.amount),
+    })),
+  };
+  const fixedSeries: FinanceChartSeries = {
+    name: "Fixed",
+    points: [{ label: "Fixed", value: Math.round(summary.totalFixed) }],
+  };
+  const variableSeries: FinanceChartSeries = {
+    name: "Variable",
+    points: [{ label: "Variable", value: Math.round(summary.totalVariable) }],
+  };
+  const incomeSeries: FinanceChartSeries = {
+    name: "Income",
+    points: [{ label: "Income", value: Math.round(summary.totalIncome) }],
+  };
+  const remainingLabel = summary.remaining < 0 ? "Overspend" : "Remaining";
+  return {
+    ok: true,
+    lines: [
+      { label: "Month", value: body.month || "—" },
+      { label: "Income", value: formatCurrency(summary.totalIncome) },
+      { label: "Fixed expenses", value: formatCurrency(summary.totalFixed) },
+      { label: "Variable expenses", value: formatCurrency(summary.totalVariable) },
+      { label: "Total expenses", value: formatCurrency(summary.totalExpenses) },
+      { label: remainingLabel, value: formatCurrency(summary.remaining) },
+    ],
+    series: [incomeSeries, fixedSeries, variableSeries, variablePie],
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Expense Tracker                                                            */
+/* -------------------------------------------------------------------------- */
+
+export interface ExpenseBody {
+  /** YYYY-MM month the expense list belongs to. */
+  month: string;
+  expenses: Array<{
+    id: string;
+    /** ISO date (YYYY-MM-DD). */
+    date: string;
+    /** Category like "Groceries", "Transport". */
+    category: string;
+    /** Free-text label. */
+    label: string;
+    amount: number;
+    paymentMethod: "cash" | "card" | "upi" | "netbanking" | "wallet";
+    notes?: string;
+  }>;
+}
+
+export const EXPENSE_CATEGORIES = [
+  "Groceries",
+  "Rent",
+  "Utilities",
+  "Transport",
+  "Dining",
+  "Entertainment",
+  "Shopping",
+  "Health",
+  "Travel",
+  "Education",
+  "Other",
+] as const;
+
+export const EXPENSE_PAYMENT_METHODS = [
+  "cash",
+  "card",
+  "upi",
+  "netbanking",
+  "wallet",
+] as const;
+
+export function defaultExpenseBody(): ExpenseBody {
+  const now = new Date();
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return {
+    month,
+    expenses: [
+      { id: "e-1", date: `${month}-03`, category: "Groceries", label: "Weekly grocery run", amount: 2_400, paymentMethod: "upi" },
+      { id: "e-2", date: `${month}-05`, category: "Transport", label: "Fuel refill", amount: 3_000, paymentMethod: "card" },
+      { id: "e-3", date: `${month}-07`, category: "Dining", label: "Team lunch", amount: 1_850, paymentMethod: "upi" },
+      { id: "e-4", date: `${month}-12`, category: "Utilities", label: "Electricity bill", amount: 2_300, paymentMethod: "netbanking" },
+      { id: "e-5", date: `${month}-15`, category: "Entertainment", label: "Concert tickets", amount: 4_500, paymentMethod: "card" },
+      { id: "e-6", date: `${month}-18`, category: "Shopping", label: "Winter jacket", amount: 6_200, paymentMethod: "card" },
+      { id: "e-7", date: `${month}-22`, category: "Health", label: "Pharmacy", amount: 950, paymentMethod: "cash" },
+      { id: "e-8", date: `${month}-27`, category: "Groceries", label: "Stock-up grocery run", amount: 3_100, paymentMethod: "upi" },
+    ],
+  };
+}
+
+export function readExpenseBody(body: unknown): ExpenseBody {
+  if (!body || typeof body !== "object") return defaultExpenseBody();
+  const raw = body as Record<string, unknown>;
+  const month = typeof raw.month === "string" ? raw.month : "";
+  const expenses = Array.isArray(raw.expenses)
+    ? raw.expenses
+        .map((entry, index) => normaliseExpense(entry, index))
+        .filter((entry): entry is ExpenseBody["expenses"][number] => entry !== null)
+    : [];
+  return { month, expenses };
+}
+
+function normaliseExpense(
+  value: unknown,
+  index: number
+): ExpenseBody["expenses"][number] | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const label = typeof raw.label === "string" ? raw.label : "";
+  if (!label) return null;
+  const category = typeof raw.category === "string" ? raw.category : "Other";
+  const date = typeof raw.date === "string" ? raw.date : "";
+  const amount = readNumber(raw, "amount", 0);
+  const paymentMethod = (
+    EXPENSE_PAYMENT_METHODS as ReadonlyArray<string>
+  ).includes(raw.paymentMethod as string)
+    ? (raw.paymentMethod as ExpenseBody["expenses"][number]["paymentMethod"])
+    : "upi";
+  const notes = typeof raw.notes === "string" ? raw.notes : undefined;
+  return {
+    id: typeof raw.id === "string" ? raw.id : `e-${index}-${Math.random().toString(36).slice(2, 6)}`,
+    date,
+    category,
+    label,
+    amount,
+    paymentMethod,
+    notes,
+  };
+}
+
+export interface ExpenseFilters {
+  query: string;
+  category: string;
+  paymentMethod: string;
+  sort: "date-desc" | "date-asc" | "amount-desc" | "amount-asc";
+}
+
+export const DEFAULT_EXPENSE_FILTERS: ExpenseFilters = {
+  query: "",
+  category: "all",
+  paymentMethod: "all",
+  sort: "date-desc",
+};
+
+/** Applies search / filter / sort to a list of expenses. */
+export function applyExpenseFilters(
+  expenses: ExpenseBody["expenses"],
+  filters: ExpenseFilters
+): ExpenseBody["expenses"] {
+  const q = filters.query.trim().toLowerCase();
+  let filtered = expenses;
+  if (q) {
+    filtered = filtered.filter(
+      (entry) =>
+        entry.label.toLowerCase().includes(q) ||
+        entry.category.toLowerCase().includes(q) ||
+        (entry.notes ?? "").toLowerCase().includes(q)
+    );
+  }
+  if (filters.category !== "all") {
+    filtered = filtered.filter((entry) => entry.category === filters.category);
+  }
+  if (filters.paymentMethod !== "all") {
+    filtered = filtered.filter((entry) => entry.paymentMethod === filters.paymentMethod);
+  }
+  const sorted = [...filtered];
+  switch (filters.sort) {
+    case "date-asc":
+      sorted.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      break;
+    case "amount-desc":
+      sorted.sort((a, b) => b.amount - a.amount);
+      break;
+    case "amount-asc":
+      sorted.sort((a, b) => a.amount - b.amount);
+      break;
+    case "date-desc":
+    default:
+      sorted.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+      break;
+  }
+  return sorted;
+}
+
+export interface ExpenseSummary {
+  total: number;
+  count: number;
+  average: number;
+  byCategory: Array<{ category: string; amount: number }>;
+  byMethod: Array<{ method: string; amount: number }>;
+  byDay: Array<{ day: string; amount: number }>;
+}
+
+export function summariseExpenses(
+  expenses: ExpenseBody["expenses"]
+): ExpenseSummary {
+  let total = 0;
+  const byCategory = new Map<string, number>();
+  const byMethod = new Map<string, number>();
+  const byDay = new Map<string, number>();
+  for (const entry of expenses) {
+    total += entry.amount;
+    byCategory.set(entry.category, (byCategory.get(entry.category) ?? 0) + entry.amount);
+    byMethod.set(entry.paymentMethod, (byMethod.get(entry.paymentMethod) ?? 0) + entry.amount);
+    if (entry.date) {
+      byDay.set(entry.date, (byDay.get(entry.date) ?? 0) + entry.amount);
+    }
+  }
+  return {
+    total,
+    count: expenses.length,
+    average: expenses.length === 0 ? 0 : total / expenses.length,
+    byCategory: Array.from(byCategory.entries())
+      .map(([category, amount]) => ({ category, amount }))
+      .sort((a, b) => b.amount - a.amount),
+    byMethod: Array.from(byMethod.entries())
+      .map(([method, amount]) => ({ method, amount }))
+      .sort((a, b) => b.amount - a.amount),
+    byDay: Array.from(byDay.entries())
+      .map(([day, amount]) => ({ day, amount }))
+      .sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0)),
+  };
+}
+
+export function evaluateExpense(
+  calculation: FinanceCalculation
+): FinanceEvaluation {
+  const body = readExpenseBody(calculation.body);
+  const summary = summariseExpenses(body.expenses);
+  const byDay: FinanceChartSeries = {
+    name: "Daily spend",
+    points: summary.byDay.map((entry) => ({
+      label: entry.day.slice(8),
+      value: Math.round(entry.amount),
+    })),
+  };
+  const byCategory: FinanceChartSeries = {
+    name: "By category",
+    points: summary.byCategory.map((entry) => ({
+      label: entry.category,
+      value: Math.round(entry.amount),
+    })),
+  };
+  return {
+    ok: true,
+    lines: [
+      { label: "Month", value: body.month || "—" },
+      { label: "Entries", value: String(summary.count) },
+      { label: "Total spend", value: formatCurrency(summary.total) },
+      { label: "Average", value: formatCurrencyPrecise(summary.average) },
+    ],
+    series: [byDay, byCategory],
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Savings Planner                                                            */
+/* -------------------------------------------------------------------------- */
+
+export interface SavingsBody {
+  goalName: string;
+  targetAmount: number;
+  currentSavings: number;
+  monthlyContribution: number;
+  /** YYYY-MM-DD target date. */
+  targetDate: string;
+  /** Optional annual return on the savings (%). 0 by default. */
+  annualReturn: number;
+}
+
+export function defaultSavingsBody(): SavingsBody {
+  const now = new Date();
+  const target = new Date(now.getFullYear() + 2, now.getMonth(), now.getDate());
+  return {
+    goalName: "Emergency fund",
+    targetAmount: 600_000,
+    currentSavings: 150_000,
+    monthlyContribution: 15_000,
+    targetDate: target.toISOString().slice(0, 10),
+    annualReturn: 6,
+  };
+}
+
+export function readSavingsBody(body: unknown): SavingsBody {
+  if (!body || typeof body !== "object") return defaultSavingsBody();
+  const raw = body as Record<string, unknown>;
+  return {
+    goalName: typeof raw.goalName === "string" ? raw.goalName : "Savings goal",
+    targetAmount: readNumber(raw, "targetAmount", 0),
+    currentSavings: readNumber(raw, "currentSavings", 0),
+    monthlyContribution: readNumber(raw, "monthlyContribution", 0),
+    targetDate: typeof raw.targetDate === "string" ? raw.targetDate : "",
+    annualReturn: readNumber(raw, "annualReturn", 0),
+  };
+}
+
+export interface SavingsSummary {
+  monthsRemaining: number;
+  yearsRemaining: number;
+  /** Months required at the chosen contribution to hit the goal. */
+  monthsToGoal: number;
+  /** Progress towards the goal (0..1+). */
+  progressFraction: number;
+  /** Yearly projection of the balance. */
+  yearly: Array<{ year: number; balance: number; contributed: number; interest: number }>;
+  /** Estimated date the goal will be met. May be past the target date. */
+  estimatedCompletion: string;
+  onTrack: boolean;
+}
+
+export function summariseSavings(body: SavingsBody): SavingsSummary {
+  const targetAmount = Math.max(0, body.targetAmount);
+  const current = Math.max(0, body.currentSavings);
+  const monthly = Math.max(0, body.monthlyContribution);
+  const annualRate = Math.max(0, body.annualReturn) / 100;
+  const monthlyRate = annualRate / 12;
+  const monthsToGoal = monthsToReach(
+    current,
+    targetAmount,
+    monthly,
+    monthlyRate
+  );
+  const today = new Date();
+  const completion = addMonths(today, monthsToGoal);
+  const target = body.targetDate ? new Date(body.targetDate) : null;
+  const monthsRemaining = target
+    ? monthsBetween(today, target)
+    : Math.max(0, Math.round(monthsToGoal));
+  const yearly = projectSavings(current, monthly, monthlyRate, monthlyRate === 0 ? monthsToGoal : Math.max(monthsRemaining, monthsToGoal));
+  const progress = targetAmount > 0 ? Math.min(1.5, current / targetAmount) : 0;
+  return {
+    monthsRemaining,
+    yearsRemaining: monthsRemaining / 12,
+    monthsToGoal,
+    progressFraction: progress,
+    yearly,
+    estimatedCompletion: completion.toISOString().slice(0, 10),
+    onTrack: monthsToGoal <= monthsRemaining,
+  };
+}
+
+/**
+ * Number of months to grow `principal` to `target` by contributing
+ * `monthly` per month, with monthly compounding at `monthlyRate`.
+ *
+ * Uses the standard closed-form solution of the future-value of an
+ * ordinary annuity. Returns 0 if the principal already meets the
+ * target, and `Infinity` if the monthly contribution cannot reach the
+ * target at the given rate.
+ */
+function monthsToReach(
+  principal: number,
+  target: number,
+  monthly: number,
+  monthlyRate: number
+): number {
+  if (target <= principal) return 0;
+  if (monthly <= 0) return Number.POSITIVE_INFINITY;
+  if (monthlyRate === 0) {
+    return Math.ceil((target - principal) / monthly);
+  }
+  // FV = P*(1+r)^n + PMT * ((1+r)^n - 1) / r = target
+  // Solve for n by iteration (closed form is awkward; a few hundred
+  // iterations converge in microseconds for any practical horizon).
+  let n = 0;
+  let balance = principal;
+  while (balance < target && n < 12 * 100) {
+    balance = balance * (1 + monthlyRate) + monthly;
+    n += 1;
+  }
+  return n === 12 * 100 ? Number.POSITIVE_INFINITY : n;
+}
+
+function addMonths(start: Date, months: number): Date {
+  if (!Number.isFinite(months)) return new Date(start.getTime());
+  const result = new Date(start);
+  const wholeMonths = Math.floor(months);
+  const frac = months - wholeMonths;
+  result.setMonth(result.getMonth() + wholeMonths);
+  const daysInMonth = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate();
+  result.setDate(Math.min(result.getDate(), daysInMonth));
+  result.setDate(result.getDate() + Math.round(frac * daysInMonth));
+  return result;
+}
+
+function monthsBetween(a: Date, b: Date): number {
+  const years = b.getFullYear() - a.getFullYear();
+  const months = b.getMonth() - a.getMonth();
+  const days = b.getDate() - a.getDate();
+  return years * 12 + months + days / 30;
+}
+
+function projectSavings(
+  principal: number,
+  monthly: number,
+  monthlyRate: number,
+  totalMonths: number
+): Array<{ year: number; balance: number; contributed: number; interest: number }> {
+  const result: Array<{ year: number; balance: number; contributed: number; interest: number }> = [];
+  let balance = principal;
+  let contributed = 0;
+  let totalInterest = 0;
+  const months = Math.max(0, Math.min(Math.round(totalMonths), 12 * 60));
+  for (let m = 1; m <= months; m++) {
+    const interest = balance * monthlyRate;
+    balance = balance + interest + monthly;
+    totalInterest += interest;
+    contributed += monthly;
+    if (m % 12 === 0) {
+      result.push({
+        year: m / 12,
+        balance: Math.round(balance),
+        contributed: Math.round(contributed),
+        interest: Math.round(totalInterest),
+      });
+    }
+  }
+  return result;
+}
+
+export function evaluateSavings(
+  calculation: FinanceCalculation
+): FinanceEvaluation {
+  const body = readSavingsBody(calculation.body);
+  if (body.targetAmount <= 0) {
+    return {
+      ok: false,
+      error: "Set a target amount above zero.",
+      lines: [],
+    };
+  }
+  const summary = summariseSavings(body);
+  const balanceSeries: FinanceChartSeries = {
+    name: "Projected balance",
+    points: summary.yearly.map((entry) => ({
+      label: `Year ${entry.year}`,
+      value: entry.balance,
+    })),
+  };
+  const contributedSeries: FinanceChartSeries = {
+    name: "Cumulative contribution",
+    points: summary.yearly.map((entry) => ({
+      label: `Year ${entry.year}`,
+      value: entry.contributed,
+    })),
+  };
+  const remaining = body.targetAmount - body.currentSavings;
+  return {
+    ok: true,
+    lines: [
+      { label: "Goal", value: body.goalName || "Savings goal" },
+      { label: "Target", value: formatCurrency(body.targetAmount) },
+      { label: "Current", value: formatCurrency(body.currentSavings) },
+      { label: "Remaining", value: formatCurrency(remaining) },
+      { label: "Progress", value: formatPercent(summary.progressFraction * 100) },
+      { label: "Months to goal", value: Number.isFinite(summary.monthsToGoal) ? String(summary.monthsToGoal) : "—" },
+      { label: "Estimated completion", value: summary.estimatedCompletion },
+      {
+        label: "On track",
+        value: summary.onTrack ? "Yes" : "No",
+      },
+    ],
+    series: [contributedSeries, balanceSeries],
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Net Worth Tracker                                                          */
+/* -------------------------------------------------------------------------- */
+
+export interface NetWorthBody {
+  /** YYYY-MM snapshot month. */
+  month: string;
+  assets: Array<{
+    id: string;
+    category: string;
+    label: string;
+    amount: number;
+  }>;
+  liabilities: Array<{
+    id: string;
+    category: string;
+    label: string;
+    amount: number;
+  }>;
+  /** Historical monthly snapshots for the trend line. */
+  history: Array<{
+    id: string;
+    month: string;
+    netWorth: number;
+  }>;
+}
+
+export const NET_WORTH_ASSET_CATEGORIES = [
+  "Cash",
+  "Bank account",
+  "Fixed deposit",
+  "Stocks",
+  "Mutual funds",
+  "Real estate",
+  "Vehicle",
+  "Other",
+] as const;
+
+export const NET_WORTH_LIABILITY_CATEGORIES = [
+  "Home loan",
+  "Car loan",
+  "Personal loan",
+  "Credit card",
+  "Education loan",
+  "Other",
+] as const;
+
+export function defaultNetWorthBody(): NetWorthBody {
+  const now = new Date();
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return {
+    month,
+    assets: [
+      { id: "a-1", category: "Bank account", label: "Savings account", amount: 250_000 },
+      { id: "a-2", category: "Fixed deposit", label: "FD ladder", amount: 500_000 },
+      { id: "a-3", category: "Mutual funds", label: "Equity portfolio", amount: 850_000 },
+      { id: "a-4", category: "Stocks", label: "Long-term holdings", amount: 320_000 },
+      { id: "a-5", category: "Real estate", label: "Apartment (self-valuation)", amount: 7_500_000 },
+      { id: "a-6", category: "Vehicle", label: "Car", amount: 650_000 },
+    ],
+    liabilities: [
+      { id: "l-1", category: "Home loan", label: "Home loan principal outstanding", amount: 4_500_000 },
+      { id: "l-2", category: "Car loan", label: "Car loan outstanding", amount: 350_000 },
+      { id: "l-3", category: "Credit card", label: "Credit card balance", amount: 18_000 },
+    ],
+    history: buildSeedHistory(month, 1_900_000),
+  };
+}
+
+/**
+ * Builds a six-month history that trends up so the chart has a
+ * recognisable shape on the first open. The current month is the
+ * latest entry; the rest walk back from the actual computed net
+ * worth with a small monthly drift.
+ */
+function buildSeedHistory(currentMonth: string, currentNetWorth: number): NetWorthBody["history"] {
+  const result: NetWorthBody["history"] = [];
+  const [yearStr, monthStr] = currentMonth.split("-");
+  let year = Number(yearStr);
+  let month = Number(monthStr);
+  for (let i = 5; i >= 0; i--) {
+    const drift = 1 - i * 0.015;
+    const value = Math.max(0, Math.round(currentNetWorth * drift));
+    const padded = String(month).padStart(2, "0");
+    result.push({
+      id: `h-${year}-${padded}`,
+      month: `${year}-${padded}`,
+      netWorth: value,
+    });
+    month -= 1;
+    if (month === 0) {
+      month = 12;
+      year -= 1;
+    }
+  }
+  return result.reverse();
+}
+
+export function readNetWorthBody(body: unknown): NetWorthBody {
+  if (!body || typeof body !== "object") return defaultNetWorthBody();
+  const raw = body as Record<string, unknown>;
+  const month = typeof raw.month === "string" ? raw.month : "";
+  const assets = Array.isArray(raw.assets)
+    ? raw.assets
+        .map((entry, index) => normaliseNetWorthEntry(entry, index, "asset"))
+        .filter((entry): entry is NetWorthBody["assets"][number] => entry !== null)
+    : [];
+  const liabilities = Array.isArray(raw.liabilities)
+    ? raw.liabilities
+        .map((entry, index) => normaliseNetWorthEntry(entry, index, "liability"))
+        .filter((entry): entry is NetWorthBody["liabilities"][number] => entry !== null)
+    : [];
+  const history = Array.isArray(raw.history)
+    ? raw.history
+        .map((entry, index) => normaliseHistoryEntry(entry, index))
+        .filter((entry): entry is NetWorthBody["history"][number] => entry !== null)
+    : [];
+  return { month, assets, liabilities, history };
+}
+
+function normaliseNetWorthEntry(
+  value: unknown,
+  index: number,
+  kind: "asset" | "liability"
+): { id: string; category: string; label: string; amount: number } | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const label = typeof raw.label === "string" ? raw.label : "";
+  if (!label) return null;
+  const category = typeof raw.category === "string" ? raw.category : "Other";
+  const amount = readNumber(raw, "amount", 0);
+  return {
+    id: typeof raw.id === "string" ? raw.id : `${kind[0]}-${index}-${Math.random().toString(36).slice(2, 6)}`,
+    category,
+    label,
+    amount,
+  };
+}
+
+function normaliseHistoryEntry(
+  value: unknown,
+  index: number
+): { id: string; month: string; netWorth: number } | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const month = typeof raw.month === "string" ? raw.month : "";
+  if (!month) return null;
+  const netWorth = readNumber(raw, "netWorth", 0);
+  return {
+    id: typeof raw.id === "string" ? raw.id : `h-${index}`,
+    month,
+    netWorth,
+  };
+}
+
+export interface NetWorthSummary {
+  totalAssets: number;
+  totalLiabilities: number;
+  netWorth: number;
+  byAssetCategory: Array<{ category: string; amount: number }>;
+  byLiabilityCategory: Array<{ category: string; amount: number }>;
+  history: Array<{ month: string; netWorth: number }>;
+}
+
+export function summariseNetWorth(body: NetWorthBody): NetWorthSummary {
+  const totalAssets = body.assets.reduce((acc, entry) => acc + Math.max(0, entry.amount), 0);
+  const totalLiabilities = body.liabilities.reduce(
+    (acc, entry) => acc + Math.max(0, entry.amount),
+    0
+  );
+  const netWorth = totalAssets - totalLiabilities;
+  const byAssetCategory = aggregate(body.assets);
+  const byLiabilityCategory = aggregate(body.liabilities);
+  let history = body.history
+    .map((entry) => ({ month: entry.month, netWorth: entry.netWorth }))
+    .sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0));
+  if (body.month && !history.some((entry) => entry.month === body.month)) {
+    history = [...history, { month: body.month, netWorth }];
+  }
+  return {
+    totalAssets,
+    totalLiabilities,
+    netWorth,
+    byAssetCategory,
+    byLiabilityCategory,
+    history,
+  };
+}
+
+function aggregate(
+  entries: Array<{ category: string; amount: number }>
+): Array<{ category: string; amount: number }> {
+  const map = new Map<string, number>();
+  for (const entry of entries) {
+    map.set(entry.category, (map.get(entry.category) ?? 0) + Math.max(0, entry.amount));
+  }
+  return Array.from(map.entries())
+    .map(([category, amount]) => ({ category, amount }))
+    .sort((a, b) => b.amount - a.amount);
+}
+
+export function evaluateNetWorth(
+  calculation: FinanceCalculation
+): FinanceEvaluation {
+  const body = readNetWorthBody(calculation.body);
+  const summary = summariseNetWorth(body);
+  const trend: FinanceChartSeries = {
+    name: "Net worth",
+    points: summary.history.map((entry) => ({
+      label: entry.month,
+      value: Math.round(entry.netWorth),
+    })),
+  };
+  const assetsPie: FinanceChartSeries = {
+    name: "Assets",
+    points: summary.byAssetCategory.map((entry) => ({
+      label: entry.category,
+      value: Math.round(entry.amount),
+    })),
+  };
+  const liabilitiesPie: FinanceChartSeries = {
+    name: "Liabilities",
+    points: summary.byLiabilityCategory.map((entry) => ({
+      label: entry.category,
+      value: Math.round(entry.amount),
+    })),
+  };
+  return {
+    ok: true,
+    lines: [
+      { label: "Month", value: body.month || "—" },
+      { label: "Total assets", value: formatCurrency(summary.totalAssets) },
+      { label: "Total liabilities", value: formatCurrency(summary.totalLiabilities) },
+      {
+        label: "Net worth",
+        value: formatCurrency(summary.netWorth),
+      },
+    ],
+    series: [trend, assetsPie, liabilitiesPie],
+  };
+}
+
+/* -------------------------------------------------------------------------- */
 /* Dispatcher                                                                 */
 /* -------------------------------------------------------------------------- */
 
@@ -619,7 +1471,11 @@ export type CalculatorKind =
   | "emi"
   | "sip"
   | "compound-interest"
-  | "loan";
+  | "loan"
+  | "budget"
+  | "expense"
+  | "savings"
+  | "net-worth";
 
 /**
  * Resolves a calculation to its runtime evaluator.
@@ -646,6 +1502,30 @@ export function dispatch(calculation: FinanceCalculation): {
       };
     case "loan":
       return { kind: "loan", body: calculation.body, evaluate: evaluateLoan };
+    case "budget":
+      return {
+        kind: "budget",
+        body: calculation.body,
+        evaluate: evaluateBudget,
+      };
+    case "expense":
+      return {
+        kind: "expense",
+        body: calculation.body,
+        evaluate: evaluateExpense,
+      };
+    case "savings":
+      return {
+        kind: "savings",
+        body: calculation.body,
+        evaluate: evaluateSavings,
+      };
+    case "net-worth":
+      return {
+        kind: "net-worth",
+        body: calculation.body,
+        evaluate: evaluateNetWorth,
+      };
     default:
       return { kind: "emi", body: calculation.body, evaluate: evaluateEmi };
   }

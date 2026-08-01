@@ -176,6 +176,92 @@ export const calculators: FinanceCalculatorDefinition[] = [
     highlights: ["Monthly payment", "Total cost", "Amortisation table", "Export PDF"],
     toolCount: 1,
   },
+  {
+    id: "finance-budget",
+    kind: "budget",
+    slug: "budget",
+    name: "Budget Planner",
+    tagline: "Plan a month of income and expenses with a remaining-budget readout",
+    description:
+      "Set a monthly budget with income, fixed expenses and variable expenses. The workspace shows the remaining budget, a category breakdown of variable spending and a monthly summary that exports to PDF.",
+    intro:
+      "Add income, fixed expenses and variable expenses for a month. The workspace computes the remaining budget, a category breakdown of variable spending and a monthly summary, then lets you save the budget or export it as a PDF.",
+    defaultCategory: "budget",
+    keywords: [
+      "budget",
+      "monthly budget",
+      "income",
+      "expenses",
+      "category",
+      "FinancePilot",
+    ],
+    highlights: ["Income", "Fixed and variable expenses", "Remaining budget", "Export PDF"],
+    toolCount: 1,
+  },
+  {
+    id: "finance-expense",
+    kind: "expense",
+    slug: "expense",
+    name: "Expense Tracker",
+    tagline: "Track every expense with category, payment method and notes",
+    description:
+      "Capture every expense with a date, category, payment method and notes. The workspace supports search, filter and sort, shows a daily and category breakdown and exports the list as a PDF.",
+    intro:
+      "Add expenses with a date, category, payment method and notes. The workspace supports search, filter and sort, shows a daily and category breakdown, a monthly summary and exports the list as a PDF.",
+    defaultCategory: "budget",
+    keywords: [
+      "expense",
+      "expense tracker",
+      "spend",
+      "category",
+      "payment method",
+      "FinancePilot",
+    ],
+    highlights: ["Search & filter", "Daily breakdown", "Monthly summary", "Export PDF"],
+    toolCount: 1,
+  },
+  {
+    id: "finance-savings",
+    kind: "savings",
+    slug: "savings",
+    name: "Savings Planner",
+    tagline: "Project when a savings goal is met and how contributions compound",
+    description:
+      "Set a savings goal, current savings and a monthly contribution. The workspace shows the progress percentage, the months remaining, the estimated completion date and a yearly projection of the balance.",
+    intro:
+      "Type the goal name, target amount, current savings, monthly contribution and a target date. The workspace computes the progress percentage, the months remaining, the estimated completion date and a yearly projection, then lets you save the plan or export it as a PDF.",
+    defaultCategory: "savings",
+    keywords: [
+      "savings",
+      "savings goal",
+      "monthly contribution",
+      "target",
+      "FinancePilot",
+    ],
+    highlights: ["Progress tracking", "Estimated completion", "Yearly chart", "Export PDF"],
+    toolCount: 1,
+  },
+  {
+    id: "finance-net-worth",
+    kind: "net-worth",
+    slug: "net-worth",
+    name: "Net Worth Tracker",
+    tagline: "Assets minus liabilities, with a historical timeline",
+    description:
+      "Track assets and liabilities by category. The workspace shows the total assets, total liabilities, net worth, a category breakdown of assets and liabilities, and a historical monthly timeline.",
+    intro:
+      "Add assets and liabilities by category. The workspace computes the total assets, total liabilities, net worth, a category breakdown and a historical monthly timeline, then lets you save the snapshot or export it as a PDF.",
+    defaultCategory: "savings",
+    keywords: [
+      "net worth",
+      "assets",
+      "liabilities",
+      "balance sheet",
+      "FinancePilot",
+    ],
+    highlights: ["Assets & liabilities", "Net worth", "Historical timeline", "Export PDF"],
+    toolCount: 1,
+  },
 ];
 
 export function getCalculator(

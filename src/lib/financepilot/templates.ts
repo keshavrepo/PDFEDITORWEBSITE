@@ -18,9 +18,13 @@ import type {
 } from "./types";
 import { calculatorCategoryOrder } from "./calculators";
 import {
+  defaultBudgetBody,
   defaultCompoundInterestBody,
   defaultEmiBody,
+  defaultExpenseBody,
   defaultLoanBody,
+  defaultNetWorthBody,
+  defaultSavingsBody,
   defaultSipBody,
 } from "./calculator-runtime";
 
@@ -75,6 +79,42 @@ export const templates: FinanceTemplate[] = [
     hasStarter: true,
     highlights: ["₹50 lakh", "5 years", "₹5 lakh down, 1% fee"],
   },
+  {
+    id: "finance-budget",
+    kind: "budget",
+    category: "budget",
+    name: "Monthly household budget",
+    description: "A typical month of income, fixed and variable expenses with a remaining-budget readout.",
+    hasStarter: true,
+    highlights: ["Income + fixed + variable", "Category breakdown", "Remaining budget"],
+  },
+  {
+    id: "finance-expense",
+    kind: "expense",
+    category: "budget",
+    name: "Sample expenses",
+    description: "Eight sample expenses for the current month, ready to search, filter and export.",
+    hasStarter: true,
+    highlights: ["8 entries", "Search & filter", "Daily + category charts"],
+  },
+  {
+    id: "finance-savings",
+    kind: "savings",
+    category: "savings",
+    name: "Two-year emergency fund",
+    description: "A ₹6L emergency fund with ₹15,000 / month contributions and a 6% return assumption.",
+    hasStarter: true,
+    highlights: ["₹6L goal", "₹15K / month", "2-year horizon"],
+  },
+  {
+    id: "finance-net-worth",
+    kind: "net-worth",
+    category: "savings",
+    name: "Family balance sheet",
+    description: "A household balance sheet with assets, liabilities and a 6-month historical trend.",
+    hasStarter: true,
+    highlights: ["6 assets", "3 liabilities", "6-month trend"],
+  },
 ];
 
 /** Templates for one calculator kind, in the canonical category order. */
@@ -118,6 +158,14 @@ export function loadTemplateBody(template: FinanceTemplate): unknown {
         return defaultCompoundInterestBody();
       case "finance-loan":
         return defaultLoanBody();
+      case "finance-budget":
+        return defaultBudgetBody();
+      case "finance-expense":
+        return defaultExpenseBody();
+      case "finance-savings":
+        return defaultSavingsBody();
+      case "finance-net-worth":
+        return defaultNetWorthBody();
       default:
         if (template.kind === "blank") return {};
         return {};
@@ -137,6 +185,14 @@ export function createBlankBody(kind: string): unknown {
       return defaultCompoundInterestBody();
     case "loan":
       return defaultLoanBody();
+    case "budget":
+      return defaultBudgetBody();
+    case "expense":
+      return defaultExpenseBody();
+    case "savings":
+      return defaultSavingsBody();
+    case "net-worth":
+      return defaultNetWorthBody();
     default:
       return {};
   }

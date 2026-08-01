@@ -9,10 +9,18 @@ import { EmiSurface } from "@/components/financepilot/surfaces/emi";
 import { SipSurface } from "@/components/financepilot/surfaces/sip";
 import { CompoundInterestSurface } from "@/components/financepilot/surfaces/compound-interest";
 import { LoanSurface } from "@/components/financepilot/surfaces/loan";
+import { BudgetSurface } from "@/components/financepilot/surfaces/budget";
+import { ExpenseSurface } from "@/components/financepilot/surfaces/expense";
+import { SavingsSurface } from "@/components/financepilot/surfaces/savings";
+import { NetWorthSurface } from "@/components/financepilot/surfaces/net-worth";
 import { EmiProperties } from "@/components/financepilot/properties/emi";
 import { SipProperties } from "@/components/financepilot/properties/sip";
 import { CompoundInterestProperties } from "@/components/financepilot/properties/compound-interest";
 import { LoanProperties } from "@/components/financepilot/properties/loan";
+import { BudgetProperties } from "@/components/financepilot/properties/budget";
+import { ExpenseProperties } from "@/components/financepilot/properties/expense";
+import { SavingsProperties } from "@/components/financepilot/properties/savings";
+import { NetWorthProperties } from "@/components/financepilot/properties/net-worth";
 import {
   getCalculatorBySlug,
   focusedCalculators,
@@ -73,6 +81,14 @@ function pickCalculatorComponents(kind: FinanceCalculatorKind): {
       };
     case "loan":
       return { Surface: LoanSurface, Properties: LoanProperties };
+    case "budget":
+      return { Surface: BudgetSurface, Properties: BudgetProperties };
+    case "expense":
+      return { Surface: ExpenseSurface, Properties: ExpenseProperties };
+    case "savings":
+      return { Surface: SavingsSurface, Properties: SavingsProperties };
+    case "net-worth":
+      return { Surface: NetWorthSurface, Properties: NetWorthProperties };
     default:
       return null;
   }
