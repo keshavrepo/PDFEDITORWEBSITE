@@ -1,32 +1,28 @@
 "use client";
 
 import { ChangeEvent, useRef, useState } from "react";
-import JSZip from "jszip";
 import { AlertCircle, Check, Download, FileText, Loader2, Upload, X } from "lucide-react";
-import { PdfUploadZone } from "@/components/pdf-upload-zone";
+import { PdfUploadZone } from "@/components/pdfpilot/pdf-upload-zone";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { ToolDefinition } from "@/lib/tools";
+/*
+ * Only the dependency-free validation helpers are imported statically. The
+ * processing module pulls in `pdf-lib` (~430 kB), which is not needed until
+ * the user actually picks a file, so it is loaded on demand by `pdfEngine()`
+ * below. That keeps first paint on all twenty-seven tool pages cheap.
+ */
 import {
-  addTextToPDF,
-  addWatermark,
-  deletePages,
-  downloadBlob,
-  getPDFMetadata,
-  imagesToPDF,
   parsePageSelection,
-  protectPDF,
-  renderPDFToImages,
-  repairPDF,
-  rotatePages,
-  splitPDF,
-  unlockPDF,
-  validatePDF,
   validatePDFSelection,
   type ProcessingProgress,
-  type TextPosition,
-} from "@/lib/pdf-utils";
+} from "@/lib/pdf-types";
+import type { TextPosition } from "@/lib/pdf-utils";
+import { downloadBlob } from "@/lib/download";
+
+/** Loads the PDF processing engine on first use. */
+const pdfEngine = () => import("@/lib/pdf-utils");
 
 interface GenericPdfToolProps { tool: ToolDefinition }
 const fieldClass = "flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm";
@@ -36,7 +32,14 @@ function outputName(input: string, suffix: string, extension = "pdf") {
   return `${base}-${suffix}.${extension}`;
 }
 
+/**
+ * Packages split pages into an archive.
+ *
+ * JSZip is imported on demand: only the split tools ever build an archive, so
+ * a static import would add ~100 kB to every PDF tool page.
+ */
 async function zipBlobs(blobs: Blob[], baseName: string, extension: string) {
+  const { default: JSZip } = await import("jszip");
   const zip = new JSZip();
   blobs.forEach((blob, index) => zip.file(`${baseName}-page-${index + 1}.${extension}`, blob));
   return zip.generateAsync({ type: "blob", compression: "DEFLATE" });
@@ -84,7 +87,10 @@ export function GenericPdfTool({ tool }: GenericPdfToolProps) {
     }
 
     const allowEncrypted = tool.id === "unlock-pdf" || tool.id === "repair-pdf";
-    const validation = await validatePDF(selected, { allowEncrypted });
+    // The parser is fetched here, at the moment a file is chosen, rather than
+    // when the page loads.
+    const pdf = await pdfEngine();
+    const validation = await pdf.validatePDF(selected, { allowEncrypted });
     if (sequence !== validationSequence.current) return;
     if (!validation.valid) {
       setError(validation.error || "Choose a valid PDF");
@@ -95,7 +101,7 @@ export function GenericPdfTool({ tool }: GenericPdfToolProps) {
     setFileReady(true);
     setValidating(false);
     try {
-      const metadata = await getPDFMetadata(selected);
+      const metadata = await pdf.getPDFMetadata(selected);
       if (sequence === validationSequence.current) {
         setPageCount(metadata.pageCount);
       }
@@ -130,20 +136,22 @@ export function GenericPdfTool({ tool }: GenericPdfToolProps) {
       let blob: Blob;
       let name: string;
       const progressCallback = (value: ProcessingProgress) => setProgress(value);
+      // Already resolved from the validation step, so this is a cache hit.
+      const pdf = await pdfEngine();
 
       switch (tool.id) {
         case "image-to-pdf":
-          blob = await imagesToPDF(images, progressCallback);
+          blob = await pdf.imagesToPDF(images, progressCallback);
           name = "images-combined.pdf";
           break;
         case "pdf-to-image": {
-          const rendered = await renderPDFToImages(file!, imageFormat, progressCallback);
+          const rendered = await pdf.renderPDFToImages(file!, imageFormat, progressCallback);
           blob = await zipBlobs(rendered, file!.name.replace(/\.pdf$/i, ""), imageFormat === "jpeg" ? "jpg" : "png");
           name = outputName(file!.name, "images", "zip");
           break;
         }
         case "split-pdf": {
-          const split = await splitPDF(file!, progressCallback);
+          const split = await pdf.splitPDF(file!, progressCallback);
           blob = await zipBlobs(split, file!.name.replace(/\.pdf$/i, ""), "pdf");
           name = outputName(file!.name, "pages", "zip");
           break;
@@ -152,45 +160,45 @@ export function GenericPdfTool({ tool }: GenericPdfToolProps) {
           const selectedPages = pages.trim()
             ? parsePageSelection(pages, pageCount)
             : Array.from({ length: pageCount }, (_, index) => index + 1);
-          blob = await rotatePages(file!, selectedPages, rotation, progressCallback);
+          blob = await pdf.rotatePages(file!, selectedPages, rotation, progressCallback);
           name = outputName(file!.name, "rotated");
           break;
         }
         case "delete-pages": {
           const selectedPages = parsePageSelection(pages, pageCount);
           if (selectedPages.length >= pageCount) throw new Error("At least one page must remain");
-          blob = await deletePages(file!, selectedPages, progressCallback);
+          blob = await pdf.deletePages(file!, selectedPages, progressCallback);
           name = outputName(file!.name, "pages-removed");
           break;
         }
         case "repair-pdf":
-          blob = await repairPDF(file!, progressCallback);
+          blob = await pdf.repairPDF(file!, progressCallback);
           name = outputName(file!.name, "repaired");
           break;
         case "watermark-pdf":
           if (!text.trim()) throw new Error("Enter watermark text");
-          blob = await addWatermark(file!, text.trim(), progressCallback);
+          blob = await pdf.addWatermark(file!, text.trim(), progressCallback);
           name = outputName(file!.name, "watermarked");
           break;
         case "edit-pdf":
           if (!text.trim()) throw new Error("Enter text to add");
-          blob = await addTextToPDF(file!, text.trim(), pageNumber, position, 18, false, progressCallback);
+          blob = await pdf.addTextToPDF(file!, text.trim(), pageNumber, position, 18, false, progressCallback);
           name = outputName(file!.name, "edited");
           break;
         case "sign-pdf":
           if (!text.trim()) throw new Error("Enter the signer name");
-          blob = await addTextToPDF(file!, text.trim(), pageNumber, position, 28, true, progressCallback);
+          blob = await pdf.addTextToPDF(file!, text.trim(), pageNumber, position, 28, true, progressCallback);
           name = outputName(file!.name, "signed");
           break;
         case "protect-pdf":
           if (password.length < 8) throw new Error("Use a password with at least 8 characters");
           if (password !== confirmPassword) throw new Error("Passwords do not match");
-          blob = await protectPDF(file!, password, progressCallback);
+          blob = await pdf.protectPDF(file!, password, progressCallback);
           name = outputName(file!.name, "protected");
           break;
         case "unlock-pdf":
           if (!password) throw new Error("Enter the PDF password");
-          blob = await unlockPDF(file!, password, progressCallback);
+          blob = await pdf.unlockPDF(file!, password, progressCallback);
           name = outputName(file!.name, "unlocked");
           break;
         default:

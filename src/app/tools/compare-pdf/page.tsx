@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { ComparePdfTool } from "@/components/compare-pdf-tool";
+import { ComparePdfTool } from "@/components/pdfpilot/compare-pdf-tool";
 import { getAppUrl } from "@/lib/env";
 
 const description =

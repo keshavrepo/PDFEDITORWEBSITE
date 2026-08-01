@@ -6,7 +6,7 @@ import { users } from "@/db/schema";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { SettingsForms } from "@/components/settings-forms";
-import { PreferencesForm } from "@/components/preferences-form";
+import { PreferencesForm } from "@/components/platform/preferences-form";
 import { parsePreferences } from "@/lib/platform/preferences";
 
 export const dynamic = "force-dynamic";

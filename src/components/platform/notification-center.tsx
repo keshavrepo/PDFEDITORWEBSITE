@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  AlertCircle,
   Bell,
   Check,
   CreditCard,
@@ -235,6 +234,3 @@ export function NotificationCenter() {
     </div>
   );
 }
-
-/** Icon used when a notification has no matching category. */
-export const fallbackNotificationIcon = AlertCircle;

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { CropPdfTool } from "@/components/crop-pdf-tool";
+import { CropPdfTool } from "@/components/pdfpilot/crop-pdf-tool";
 import { getAppUrl } from "@/lib/env";
 
 const description =

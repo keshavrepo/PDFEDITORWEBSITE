@@ -16,20 +16,23 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { PdfUploadZone } from "@/components/pdf-upload-zone";
+import { PdfUploadZone } from "@/components/pdfpilot/pdf-upload-zone";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { downloadBlob } from "@/lib/pdf-utils";
+import { downloadBlob } from "@/lib/download";
 import {
   IMAGE_ACCEPT,
   MAX_CONVERSION_SIZE,
   toConversionMessage,
   type ConversionProgress,
+} from "@/lib/conversion/client";
+import {
   type ImageFitMode,
   type MarginSize,
   type PageOrientation,
   type PageSizeId,
 } from "@/lib/conversion";
+import { formatBytes as formatFileSize } from "@/lib/format";
 
 interface SelectedImage {
   id: string;
@@ -40,12 +43,6 @@ interface SelectedImage {
 const ACCEPTED_TYPES = ["image/jpeg", "image/png"];
 const MAX_IMAGE_SIZE = 30 * 1024 * 1024;
 
-function formatFileSize(bytes: number): string {
-  if (!bytes) return "0 KB";
-  const units = ["Bytes", "KB", "MB", "GB"];
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  return `${Math.round((bytes / 1024 ** index) * 10) / 10} ${units[index]}`;
-}
 
 export function ImageToPdfTool() {
   const abortRef = useRef<AbortController | null>(null);

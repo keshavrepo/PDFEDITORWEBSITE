@@ -37,13 +37,3 @@ export function Logo({ className = "w-8 h-8" }: { className?: string }) {
   );
 }
 
-export function LogoMark({ className = "w-6 h-6" }: { className?: string }) {
-  return (
-    <div className="relative inline-flex">
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5 rounded-xl blur-sm" />
-      <div className="relative bg-gradient-to-br from-primary to-primary/90 rounded-xl p-1.5 shadow-lg shadow-primary/25">
-        <Logo className={className} />
-      </div>
-    </div>
-  );
-}

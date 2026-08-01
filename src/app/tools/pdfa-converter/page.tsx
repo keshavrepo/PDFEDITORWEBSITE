@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { PdfATool } from "@/components/pdfa-tool";
+import { PdfATool } from "@/components/pdfpilot/pdfa-tool";
 import { getAppUrl } from "@/lib/env";
 
 const description =

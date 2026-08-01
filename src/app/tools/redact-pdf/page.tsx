@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { RedactPdfTool } from "@/components/redact-pdf-tool";
+import { RedactPdfTool } from "@/components/pdfpilot/redact-pdf-tool";
 import { getAppUrl } from "@/lib/env";
 
 const description =

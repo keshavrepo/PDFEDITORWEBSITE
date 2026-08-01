@@ -23,6 +23,7 @@ import { getStorageSummary, listFiles } from "@/lib/platform/files";
 import { getFavorites, getUsageStatistics } from "@/lib/platform/usage";
 import { platform } from "@/lib/products";
 import { tools } from "@/lib/tools";
+import { formatBytes } from "@/lib/format";
 
 export const metadata: Metadata = {
   title: `Dashboard | ${platform.name}`,
@@ -46,12 +47,6 @@ const ACTIVITY_ICON: Record<ActivityKind, typeof FileText> = {
   account: UserCog,
 };
 
-function formatBytes(bytes: number): string {
-  if (!bytes) return "0 MB";
-  const units = ["B", "KB", "MB", "GB"];
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  return `${Math.round((bytes / 1024 ** index) * 10) / 10} ${units[index]}`;
-}
 
 function formatWhen(value: Date): string {
   return value.toLocaleDateString(undefined, {

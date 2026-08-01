@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { GenericPdfTool } from "@/components/generic-pdf-tool";
+import { GenericPdfTool } from "@/components/pdfpilot/generic-pdf-tool";
 import { tools } from "@/lib/tools";
 import { conversionToolMap } from "@/lib/conversion/tool-config";
 

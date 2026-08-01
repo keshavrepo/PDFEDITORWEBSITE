@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { PageNumbersTool } from "@/components/page-numbers-tool";
+import { PageNumbersTool } from "@/components/pdfpilot/page-numbers-tool";
 import { getAppUrl } from "@/lib/env";
 
 const description =

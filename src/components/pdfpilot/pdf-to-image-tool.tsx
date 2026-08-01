@@ -14,19 +14,22 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { PdfUploadZone } from "@/components/pdf-upload-zone";
+import { PdfUploadZone } from "@/components/pdfpilot/pdf-upload-zone";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { downloadBlob } from "@/lib/pdf-utils";
+import { downloadBlob } from "@/lib/download";
 import {
   MAX_CONVERSION_SIZE,
   toConversionMessage,
   validateConversionInput,
   validateSelection,
   type ConversionProgress,
+} from "@/lib/conversion/client";
+import {
   type PageImageFormat,
   type RenderedPage,
 } from "@/lib/conversion";
+import { formatBytes as formatFileSize } from "@/lib/format";
 
 type Phase = "idle" | "validating" | "ready" | "converting" | "done";
 
@@ -36,12 +39,6 @@ const DPI_CHOICES = [
   { value: 300, label: "Print", detail: "300 DPI" },
 ] as const;
 
-function formatFileSize(bytes: number): string {
-  if (!bytes) return "0 KB";
-  const units = ["Bytes", "KB", "MB", "GB"];
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  return `${Math.round((bytes / 1024 ** index) * 10) / 10} ${units[index]}`;
-}
 
 function baseName(fileName: string): string {
   return fileName.replace(/\.[^.]+$/, "").replace(/[^\w\-. ]+/g, "-").trim() || "document";

@@ -144,6 +144,37 @@ export function EditorCanvas({
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [cursor, setCursor] = useState("default");
   const [pointerDoc, setPointerDoc] = useState<{ x: number; y: number } | null>(null);
+  /** Pending pointer position, flushed once per animation frame. */
+  const pointerFrameRef = useRef<number | null>(null);
+  const pendingPointerRef = useRef<{ x: number; y: number } | null>(null);
+
+  /**
+   * Publishes the pointer position at most once per frame.
+   *
+   * `pointerDoc` only feeds the ruler crosshairs and the coordinate readout,
+   * but it is React state on the component that owns the whole workspace, so
+   * setting it on every `pointermove` re-rendered the canvas subtree far more
+   * often than the display could show. A pointer can fire well above 120 Hz on
+   * a high-polling mouse; coalescing to the frame rate removes that work
+   * without any visible change.
+   */
+  const publishPointer = useCallback((point: { x: number; y: number } | null) => {
+    pendingPointerRef.current = point;
+    if (pointerFrameRef.current !== null) return;
+    pointerFrameRef.current = requestAnimationFrame(() => {
+      pointerFrameRef.current = null;
+      setPointerDoc(pendingPointerRef.current);
+    });
+  }, []);
+
+  // Cancel any queued frame on unmount so the callback cannot fire against a
+  // torn-down component.
+  useEffect(
+    () => () => {
+      if (pointerFrameRef.current !== null) cancelAnimationFrame(pointerFrameRef.current);
+    },
+    []
+  );
 
   const { viewport, settings, selection, tool, crop, marquee } = state;
   const showRulers = settings.showRulers;
@@ -779,7 +810,7 @@ export function EditorCanvas({
     (event: ReactPointerEvent<HTMLDivElement>) => {
       const workspace = toWorkspace(event);
       const point = screenToDocument(viewport, workspace.x, workspace.y);
-      setPointerDoc(point);
+      publishPointer(point);
 
       const drag = dragRef.current;
 
@@ -1017,6 +1048,7 @@ export function EditorCanvas({
       overlay,
       paintOverlay,
       paintScene,
+      publishPointer,
       selection,
       settings,
       tool,
@@ -1322,7 +1354,7 @@ export function EditorCanvas({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        onPointerLeave={() => setPointerDoc(null)}
+        onPointerLeave={() => publishPointer(null)}
         onDoubleClick={onDoubleClick}
         onContextMenu={(event) => event.preventDefault()}
       >

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { getSession } from "@/lib/auth";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { ToolsDirectory } from "@/components/tools-directory";
+import { ToolsDirectory } from "@/components/pdfpilot/tools-directory";
 
 export const metadata: Metadata = {
   title: "PDF Tools | PDFPilot by LaunchStack",

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { ProductCard } from "@/components/product-card";
+import { ProductCard } from "@/components/platform/product-card";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ArrowRight, Check, Layers, Lock, Shield, Users, Zap } from "lucide-react";

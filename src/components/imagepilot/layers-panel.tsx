@@ -8,7 +8,7 @@
  * only here so the rest of the system keeps one unambiguous convention.
  */
 
-import { useCallback, useRef, useState } from "react";
+import { memo, useCallback, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -36,7 +36,7 @@ function LayerIcon({ layer }: { layer: Layer }) {
   return <Shapes className={className} aria-hidden="true" />;
 }
 
-export function LayersPanel({
+function LayersPanelImpl({
   document: doc,
   selection,
   dispatch,
@@ -328,7 +328,7 @@ export function LayersPanel({
 }
 
 /** History list, shown beneath the layers panel. */
-export function HistoryPanel({
+function HistoryPanelImpl({
   entries,
   index,
   dispatch,
@@ -362,3 +362,10 @@ export function HistoryPanel({
     </PanelSection>
   );
 }
+
+/*
+ * Memoised: the editor re-renders on every pointer move, and these panels
+ * depend only on the document, the selection and stable callbacks.
+ */
+export const LayersPanel = memo(LayersPanelImpl);
+export const HistoryPanel = memo(HistoryPanelImpl);

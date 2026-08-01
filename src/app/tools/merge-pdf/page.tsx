@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Navbar } from "@/components/navbar";
-import { PdfUploadZone } from "@/components/pdf-upload-zone";
+import { PdfUploadZone } from "@/components/pdfpilot/pdf-upload-zone";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -18,13 +18,18 @@ import {
   Zap,
   AlertCircle,
 } from "lucide-react";
+/*
+ * Only the dependency-free helpers are static. The processing module pulls in
+ * `pdf-lib` (~430 kB) and is fetched when a file is chosen, not at page load.
+ */
 import {
-  mergePDFs,
-  downloadBlob,
-  validatePDF,
   validatePDFSelection,
   type ProcessingProgress,
-} from "@/lib/pdf-utils";
+} from "@/lib/pdf-types";
+import { downloadBlob } from "@/lib/download";
+
+/** Loads the PDF engine on first use. */
+const pdfEngine = () => import("@/lib/pdf-utils");
 
 export default function MergePDFPage() {
   const [files, setFiles] = useState<File[]>([]);
@@ -64,7 +69,7 @@ export default function MergePDFPage() {
     setValidationsInFlight((count) => count + accepted.length);
 
     for (const file of accepted) {
-      void validatePDF(file).then((validation) => {
+      void pdfEngine().then((pdf) => pdf.validatePDF(file)).then((validation) => {
         const key = fileKey(file);
         setInvalidFileKeys((previous) => {
           const next = new Set(previous);
@@ -114,14 +119,14 @@ export default function MergePDFPage() {
     try {
       // Validate all files first
       for (const file of files) {
-        const validation = await validatePDF(file);
+        const validation = await (await pdfEngine()).validatePDF(file);
         if (!validation.valid) {
           throw new Error(`${file.name}: ${validation.error}`);
         }
       }
       
       // Merge PDFs
-      const merged = await mergePDFs(files, (p) => setProgress(p));
+      const merged = await (await pdfEngine()).mergePDFs(files, (p) => setProgress(p));
       setMergedPDF(merged);
       setCompleted(true);
     } catch (err) {

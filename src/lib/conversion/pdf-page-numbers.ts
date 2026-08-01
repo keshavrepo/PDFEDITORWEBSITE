@@ -55,13 +55,10 @@ function hexToRgb(hex: string | undefined): RGB {
   );
 }
 
-/** Renders the label for one page. */
-export function formatPageLabel(template: string, current: number, total: number): string {
-  return (template || "{n}")
-    .replace(/\{n\}/g, String(current))
-    .replace(/\{total\}/g, String(total))
-    .replace(/\{page\}/g, String(current));
-}
+// Defined in `./client` so the tool UI can render a live label preview
+// without loading `pdf-lib`. Re-exported here for the converters.
+export { formatPageLabel } from "./client";
+import { formatPageLabel } from "./client";
 
 function measure(font: PDFFont, text: string, size: number): number {
   try {

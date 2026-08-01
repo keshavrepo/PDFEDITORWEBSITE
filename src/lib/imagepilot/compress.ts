@@ -13,6 +13,9 @@
  */
 
 import type { CanvasFactory } from "./renderer";
+// Byte and percentage formatting is shared platform-wide so every product
+// renders the same number identically.
+export { formatBytes, savingsPercent } from "@/lib/format";
 
 export type CompressFormat = "jpeg" | "png" | "webp";
 
@@ -78,13 +81,6 @@ export function isLossless(format: CompressFormat): boolean {
   return format === "png";
 }
 
-export function formatBytes(bytes: number): string {
-  if (!bytes) return "0 KB";
-  const units = ["B", "KB", "MB", "GB"];
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  const value = bytes / 1024 ** index;
-  return `${value >= 100 || index === 0 ? Math.round(value) : Math.round(value * 10) / 10} ${units[index]}`;
-}
 
 /** Dimensions after applying a longest-edge cap. */
 export function scaledSize(
@@ -197,11 +193,6 @@ export async function compressImage(
   };
 }
 
-/** Percentage saved, clamped so a larger output reads as 0% rather than negative. */
-export function savingsPercent(originalBytes: number, compressedBytes: number): number {
-  if (originalBytes <= 0) return 0;
-  return Math.max(0, Math.round((1 - compressedBytes / originalBytes) * 100));
-}
 
 /** Target-size presets offered in the UI, in bytes. */
 export const TARGET_SIZE_PRESETS = [

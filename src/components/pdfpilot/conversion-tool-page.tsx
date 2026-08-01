@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { DocumentConverter } from "@/components/document-converter";
+import { DocumentConverter } from "@/components/pdfpilot/document-converter";
 import { getAppUrl } from "@/lib/env";
 import type { ConversionToolConfig } from "@/lib/conversion/tool-config";
 

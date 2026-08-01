@@ -16,10 +16,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Menu, X, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
+import { getInitials } from "@/lib/format";
 import { Logo } from "@/components/logo";
 import { platform } from "@/lib/products";
-import { GlobalSearch } from "@/components/global-search";
-import { NotificationCenter } from "@/components/notification-center";
+import { GlobalSearch } from "@/components/platform/global-search";
+import { NotificationCenter } from "@/components/platform/notification-center";
 import { signOut, useSession } from "next-auth/react";
 
 interface NavbarProps {
@@ -63,17 +64,6 @@ export function Navbar({ user: serverUser }: NavbarProps) {
   // which module they are in while the platform name stays one click away.
   const inPdfPilot = pathname?.startsWith("/tools") ?? false;
 
-  const getInitials = (name?: string | null, email?: string) => {
-    if (name) {
-      return name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2);
-    }
-    return email?.slice(0, 2).toUpperCase() || "U";
-  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">

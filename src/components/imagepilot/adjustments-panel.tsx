@@ -1,5 +1,7 @@
 "use client";
 
+import { memo } from "react";
+
 /**
  * Image operations panel.
  *
@@ -41,7 +43,7 @@ const PRESETS: Array<{ name: string; values: Partial<Adjustments> }> = [
   { name: "Line art", values: { grayscale: 100, thresholdEnabled: true, threshold: 150 } },
 ];
 
-export function AdjustmentsPanel({
+function AdjustmentsPanelImpl({
   layer,
   dispatch,
 }: {
@@ -207,3 +209,9 @@ export function AdjustmentsPanel({
     </>
   );
 }
+
+/*
+ * Memoised: the editor re-renders on every pointer move, and these panels
+ * depend only on the document, the selection and stable callbacks.
+ */
+export const AdjustmentsPanel = memo(AdjustmentsPanelImpl);

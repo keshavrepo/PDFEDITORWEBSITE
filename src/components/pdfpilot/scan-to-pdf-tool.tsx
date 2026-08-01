@@ -16,16 +16,19 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { PdfUploadZone } from "@/components/pdf-upload-zone";
+import { PdfUploadZone } from "@/components/pdfpilot/pdf-upload-zone";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { downloadBlob } from "@/lib/pdf-utils";
+import { downloadBlob } from "@/lib/download";
 import {
   IMAGE_ACCEPT,
   toConversionMessage,
   type ConversionProgress,
+} from "@/lib/conversion/client";
+import {
   type ScanPageSize,
 } from "@/lib/conversion";
+import { formatBytes as formatFileSize } from "@/lib/format";
 
 interface Capture {
   id: string;
@@ -35,12 +38,6 @@ interface Capture {
 
 const MAX_CAPTURE_SIZE = 30 * 1024 * 1024;
 
-function formatFileSize(bytes: number): string {
-  if (!bytes) return "0 KB";
-  const units = ["Bytes", "KB", "MB", "GB"];
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  return `${Math.round((bytes / 1024 ** index) * 10) / 10} ${units[index]}`;
-}
 
 /** Decodes an image file into raw pixels for the scan pipeline. */
 async function readPixels(

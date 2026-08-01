@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { BillingButton } from "@/components/billing-button";
+import { getInitials } from "@/lib/format";
 
 interface SettingsFormsProps {
   user: {
@@ -22,17 +23,6 @@ interface SettingsFormsProps {
   billingStatus?: string;
 }
 
-function getInitials(name?: string | null, email?: string) {
-  if (name) {
-    return name
-      .split(" ")
-      .map((part) => part[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  }
-  return email?.slice(0, 2).toUpperCase() || "U";
-}
 
 export function SettingsForms({
   user,

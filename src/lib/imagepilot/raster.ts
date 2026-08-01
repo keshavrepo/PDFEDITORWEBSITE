@@ -77,10 +77,46 @@ export class RasterStore implements RasterLookup {
   prune(activeIds: Set<string>): void {
     for (const [id, source] of this.sources) {
       if (activeIds.has(id)) continue;
-      if (typeof ImageBitmap !== "undefined" && source.image instanceof ImageBitmap) {
-        source.image.close();
-      }
+      this.release(source);
       this.sources.delete(id);
+    }
+  }
+
+  /**
+   * Drops a single entry immediately.
+   *
+   * Used by the tools that regenerate a full-resolution raster on every
+   * interaction — the background remover recomputes its matte on each brush
+   * dab, and the blur studio on each region change. Each pass allocates a new
+   * bitmap, so without releasing the one it replaces the store would grow by
+   * a full frame per stroke: on a 12-megapixel photo that is roughly 48 MB
+   * every time the pointer moves.
+   *
+   * The id is compared against the layers still using it by the caller; this
+   * method only frees what it is given.
+   */
+  delete(id: string): void {
+    const source = this.sources.get(id);
+    if (!source) return;
+    this.release(source);
+    this.sources.delete(id);
+  }
+
+  /** Releases the underlying bitmap's memory where the platform allows it. */
+  private release(source: RasterSource): void {
+    // `ImageBitmap` holds memory outside the JS heap, so garbage collection
+    // alone will not reclaim it promptly.
+    if (typeof ImageBitmap !== "undefined" && source.image instanceof ImageBitmap) {
+      source.image.close();
+      return;
+    }
+    // A detached canvas is reclaimed by the GC, but shrinking it to zero
+    // releases the backing store straight away rather than at the next
+    // collection, which matters during a long editing session.
+    const canvas = source.image as { width?: number; height?: number };
+    if (typeof canvas?.width === "number" && typeof canvas?.height === "number") {
+      canvas.width = 0;
+      canvas.height = 0;
     }
   }
 
@@ -229,18 +265,8 @@ export function blobToDataUrl(blob: Blob): Promise<string> {
 /* Downloads                                                                  */
 /* -------------------------------------------------------------------------- */
 
-/** Triggers a browser download without leaking the object URL. */
-export function downloadBlob(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  // Revoking synchronously can cancel the download in some browsers.
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
-}
+// Shared with every other product rather than reimplemented here.
+export { downloadBlob } from "@/lib/download";
 
 /* -------------------------------------------------------------------------- */
 /* Clipboard                                                                  */

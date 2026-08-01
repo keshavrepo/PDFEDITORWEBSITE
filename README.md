@@ -79,7 +79,53 @@ are added as convenience aliases that redirect into the platform routes.
 - **Billing:** Stripe Checkout, Customer Portal, and signed webhooks
 - **Email:** Resend's HTTPS API (optional, for support and password reset)
 
-Source is organized by App Router route under `src/app`, shared UI under `src/components`, server integrations under `src/lib`, and the data model under `src/db`.
+Source is organized by App Router route under `src/app`, shared UI under
+`src/components`, server integrations under `src/lib`, and the data model under
+`src/db`.
+
+### Product isolation
+
+Components and libraries are grouped by owner so a product can be worked on —
+or removed — without touching the others:
+
+```
+src/components/
+  ui/          design-system primitives, owned by no product
+  platform/    search, files, notifications, product cards
+  pdfpilot/    every PDF tool component
+  imagepilot/  the image editor and its workspace panels
+  <root>       platform chrome: navbar, footer, auth, blog, admin
+src/lib/
+  platform/    services every product shares
+  conversion/  PDFPilot's engine
+  imagepilot/  ImagePilot's engine
+  format.ts    byte/percentage/initials formatting, shared
+  download.ts  browser download, shared
+  pdf-types.ts PDF types and validation, free of `pdf-lib`
+```
+
+A new product adds `src/components/<product>/`, `src/lib/<product>/` and an
+entry in `src/lib/products.ts`. Nothing else needs to change: the homepage,
+products page, footer, global search, file manager and activity feed all read
+from that registry.
+
+### Keeping the bundle small
+
+Two rules keep page weight flat as products are added:
+
+1. **Heavy engines are imported at the call site, never at module scope.**
+   `pdf-lib` (~430 kB), JSZip (~96 kB) and the conversion core (~1.8 MB) are
+   all reached through `await import(...)` inside the handler that needs them.
+   A tool page therefore renders its interface immediately and fetches its
+   engine when the user picks a file.
+2. **Types and validation live apart from implementations.** `pdf-types.ts`
+   carries the interfaces and the cheap `File` checks with no dependency on
+   `pdf-lib`, so a component can validate a selection without pulling in a
+   parser.
+
+`optimizePackageImports` in `next.config.ts` rewrites barrel imports for
+`lucide-react` and the Radix primitives at build time, so the readable named
+imports in source do not cost a barrel walk per component.
 
 ## Local development
 

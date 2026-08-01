@@ -16,7 +16,6 @@
  * readers reject.
  */
 
-import JSZip from "jszip";
 import type { CanvasFactory } from "./renderer";
 
 export type ConvertFormat = "jpeg" | "png" | "webp" | "avif" | "bmp";
@@ -402,6 +401,10 @@ export async function packageZip(
   outcomes: ConversionOutcome[],
   onProgress?: (percent: number) => void
 ): Promise<Blob> {
+  // Imported on demand. JSZip is ~100 kB and only the Batch Converter ever
+  // packages an archive, so a static import would put it in the bundle of
+  // every page that touches the editor core.
+  const { default: JSZip } = await import("jszip");
   const zip = new JSZip();
   const used = new Map<string, number>();
 

@@ -13,6 +13,7 @@
  */
 
 import {
+  memo,
   useCallback,
   useEffect,
   useId,
@@ -121,7 +122,7 @@ interface SliderFieldProps {
  * adjustments where "-12" is a real answer and hunting for it with a mouse is
  * not. Both inputs write through the same handler so they cannot disagree.
  */
-export function SliderField({
+function SliderFieldImpl({
   label,
   value,
   min,
@@ -220,7 +221,7 @@ export function SliderField({
  * A local draft is kept while typing so clearing the box does not immediately
  * push `0` into the document — the value commits on blur or Enter.
  */
-export function NumberField({
+function NumberFieldImpl({
   label,
   value,
   min,
@@ -384,7 +385,7 @@ export function SegmentedControl<T extends string>({
 /* Toggle                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export function ToggleField({
+function ToggleFieldImpl({
   label,
   checked,
   disabled,
@@ -565,7 +566,7 @@ export function ColorField({
 /* Toolbar button                                                             */
 /* -------------------------------------------------------------------------- */
 
-export function ToolbarButton({
+function ToolbarButtonImpl({
   icon,
   label,
   shortcut,
@@ -604,3 +605,20 @@ export function ToolbarButton({
     </button>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/* Memoised exports                                                           */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * The leaf controls are pure functions of their props and appear dozens of
+ * times across the inspector. The editor re-renders on every pointer move
+ * (the canvas tracks the cursor position), so without memoisation a mouse
+ * drag re-rendered every slider, field and button in the panel on each frame.
+ *
+ * Callers keep the original names; only the identity check is added.
+ */
+export const SliderField = memo(SliderFieldImpl);
+export const NumberField = memo(NumberFieldImpl);
+export const ToggleField = memo(ToggleFieldImpl);
+export const ToolbarButton = memo(ToolbarButtonImpl);

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { ScanToPdfTool } from "@/components/scan-to-pdf-tool";
+import { ScanToPdfTool } from "@/components/pdfpilot/scan-to-pdf-tool";
 import { getAppUrl } from "@/lib/env";
 
 const description =

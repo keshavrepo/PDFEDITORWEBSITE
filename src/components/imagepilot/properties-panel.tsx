@@ -1,5 +1,7 @@
 "use client";
 
+import { memo } from "react";
+
 /**
  * Right-hand inspector.
  *
@@ -53,7 +55,7 @@ interface PropertiesPanelProps {
   onResizeCanvas: () => void;
 }
 
-export function PropertiesPanel({
+function PropertiesPanelImpl({
   document: doc,
   selection,
   dispatch,
@@ -615,3 +617,9 @@ function DocumentProperties({
     </PanelSection>
   );
 }
+
+/*
+ * Memoised: the editor re-renders on every pointer move, and these panels
+ * depend only on the document, the selection and stable callbacks.
+ */
+export const PropertiesPanel = memo(PropertiesPanelImpl);

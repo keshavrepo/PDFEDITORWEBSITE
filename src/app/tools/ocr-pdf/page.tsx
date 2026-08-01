@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { OcrPdfTool } from "@/components/ocr-pdf-tool";
+import { OcrPdfTool } from "@/components/pdfpilot/ocr-pdf-tool";
 import { getAppUrl } from "@/lib/env";
 
 const description =

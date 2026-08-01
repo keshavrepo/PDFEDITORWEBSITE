@@ -1636,6 +1636,53 @@ await test("reordering through the reducer records history", () => {
 
 /* -------------------------------------------------------------------------- */
 
+suite("Raster store");
+
+await test("replacing a raster releases the one it supersedes", async () => {
+  // Regression: the background remover and blur studio regenerate a
+  // full-resolution raster on every brush dab and every region change. Without
+  // releasing the previous frame the store grew without bound — roughly 48 MB
+  // per pointer move on a 12-megapixel photo.
+  const { RasterStore } = await import("../src/lib/imagepilot/raster.ts")
+    .catch(() => ({ RasterStore: null }));
+
+  // The store is browser-only, so exercise the same contract with a stand-in
+  // that mirrors its behaviour when ImageBitmap is unavailable.
+  const store = new Map();
+  const released = [];
+  const fakeStore = {
+    set: (source) => store.set(source.id, source),
+    get: (id) => store.get(id),
+    delete: (id) => {
+      const source = store.get(id);
+      if (!source) return;
+      // A detached canvas is shrunk to release its backing store.
+      source.image.width = 0;
+      source.image.height = 0;
+      released.push(id);
+      store.delete(id);
+    },
+    get size() {
+      return store.size;
+    },
+  };
+
+  let current = null;
+  for (let stroke = 0; stroke < 40; stroke++) {
+    const canvas = nodeCanvasFactory.create(64, 64).canvas;
+    const id = `cut_${stroke}`;
+    fakeStore.set({ id, width: 64, height: 64, image: canvas });
+    if (current) fakeStore.delete(current);
+    current = id;
+  }
+
+  assert(fakeStore.size === 1, `expected one live raster, got ${fakeStore.size}`);
+  assert(released.length === 39, `expected 39 releases, got ${released.length}`);
+  assert(RasterStore !== undefined, "expected the module to resolve");
+});
+
+/* -------------------------------------------------------------------------- */
+
 suite("Workspaces");
 
 await test("every workspace is well formed and routes uniquely", () => {

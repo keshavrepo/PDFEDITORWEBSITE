@@ -1,39 +1,25 @@
 import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
-import { saveAs } from 'file-saver';
 
-export interface ProcessingProgress {
-  stage: string;
-  progress: number;
-  total: number;
-}
+/*
+ * Types and lightweight validation live in `./pdf-types`, which is free of
+ * `pdf-lib`. They are re-exported here so existing import sites are unchanged;
+ * a caller that only needs validation should import from `./pdf-types`
+ * directly and avoid loading the parser.
+ */
+export {
+  MAX_PDF_SIZE,
+  parsePageSelection,
+  validatePDFSelection,
+  type CompressionLevel,
+  type ProcessingProgress,
+  type ProgressCallback,
+} from './pdf-types';
+import type { CompressionLevel, ProgressCallback } from './pdf-types';
+import { MAX_PDF_SIZE, validatePDFSelection } from './pdf-types';
 
-export type ProgressCallback = (progress: ProcessingProgress) => void;
-export type CompressionLevel = 'low' | 'medium' | 'high';
 
-export const MAX_PDF_SIZE = 100 * 1024 * 1024;
 
-export function validatePDFSelection(
-  file: File,
-  maxSize = MAX_PDF_SIZE
-): { valid: boolean; error?: string } {
-  const hasPdfExtension = file.name.toLowerCase().endsWith('.pdf');
-  const hasPdfMime =
-    !file.type ||
-    file.type === 'application/pdf' ||
-    file.type === 'application/x-pdf';
 
-  if (!hasPdfExtension && !hasPdfMime) {
-    return { valid: false, error: `${file.name} is not a PDF file` };
-  }
-  if (!file.size) return { valid: false, error: `${file.name} is empty` };
-  if (file.size > maxSize) {
-    return {
-      valid: false,
-      error: `${file.name} exceeds the ${Math.round(maxSize / 1024 / 1024)}MB file limit`,
-    };
-  }
-  return { valid: true };
-}
 
 // Helper to convert Uint8Array to Blob properly
 function createPDFBlob(pdfBytes: Uint8Array): Blob {
@@ -340,32 +326,10 @@ export async function addPageNumbers(
   return createPDFBlob(pdfBytes);
 }
 
-// Reorder pages
-export async function reorderPages(
-  file: File,
-  newOrder: number[],
-  onProgress?: ProgressCallback
-): Promise<Blob> {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await PDFDocument.load(arrayBuffer);
-  const newPdf = await PDFDocument.create();
-  
-  for (let i = 0; i < newOrder.length; i++) {
-    onProgress?.({ stage: 'Reordering', progress: i + 1, total: newOrder.length });
-    
-    const pageIndex = newOrder[i] - 1;
-    const [copiedPage] = await newPdf.copyPages(pdf, [pageIndex]);
-    newPdf.addPage(copiedPage);
-  }
-  
-  const pdfBytes = await newPdf.save();
-  return createPDFBlob(pdfBytes);
-}
 
-// Download helper
-export function downloadBlob(blob: Blob, filename: string) {
-  saveAs(blob, filename);
-}
+// The download helper is shared platform-wide; re-exported so existing import
+// sites keep working without pulling this module in just to save a file.
+export { downloadBlob } from './download';
 
 // Get PDF metadata
 export async function getPDFMetadata(file: File) {
@@ -384,27 +348,6 @@ export async function getPDFMetadata(file: File) {
   };
 }
 
-// Update PDF metadata
-export async function updatePDFMetadata(
-  file: File,
-  metadata: {
-    title?: string;
-    author?: string;
-    subject?: string;
-    keywords?: string[];
-  }
-): Promise<Blob> {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await PDFDocument.load(arrayBuffer);
-  
-  if (metadata.title) pdf.setTitle(metadata.title);
-  if (metadata.author) pdf.setAuthor(metadata.author);
-  if (metadata.subject) pdf.setSubject(metadata.subject);
-  if (metadata.keywords) pdf.setKeywords(metadata.keywords);
-  
-  const pdfBytes = await pdf.save();
-  return createPDFBlob(pdfBytes);
-}
 
 export type TextPosition =
   | 'top-left'
@@ -531,24 +474,6 @@ export async function renderPDFToImages(
   return images;
 }
 
-export function parsePageSelection(selection: string, pageCount: number): number[] {
-  const pages = new Set<number>();
-  const normalized = selection.trim();
-  if (!normalized) throw new Error('Enter at least one page');
-
-  for (const part of normalized.split(',')) {
-    const range = part.trim().match(/^(\d+)(?:\s*-\s*(\d+))?$/);
-    if (!range) throw new Error(`Invalid page range: ${part.trim()}`);
-    const start = Number(range[1]);
-    const end = Number(range[2] || range[1]);
-    if (start < 1 || end < start || end > pageCount) {
-      throw new Error(`Pages must be between 1 and ${pageCount}`);
-    }
-    for (let page = start; page <= end; page++) pages.add(page);
-  }
-
-  return [...pages].sort((a, b) => a - b);
-}
 
 // Validate PDF file contents, not only the browser-provided MIME type.
 export async function validatePDF(
@@ -582,14 +507,3 @@ export async function validatePDF(
   }
 }
 
-// Get page dimensions
-export async function getPageDimensions(file: File): Promise<Array<{ width: number; height: number }>> {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await PDFDocument.load(arrayBuffer);
-  const pages = pdf.getPages();
-  
-  return pages.map(page => {
-    const { width, height } = page.getSize();
-    return { width, height };
-  });
-}

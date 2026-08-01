@@ -15,10 +15,10 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { PdfUploadZone } from "@/components/pdf-upload-zone";
+import { PdfUploadZone } from "@/components/pdfpilot/pdf-upload-zone";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { downloadBlob } from "@/lib/pdf-utils";
+import { downloadBlob } from "@/lib/download";
 import {
   MAX_CONVERSION_SIZE,
   toConversionMessage,
@@ -26,12 +26,13 @@ import {
   validateSelection,
   type ConversionProgress,
   type PdfAnalysis,
-} from "@/lib/conversion";
+} from "@/lib/conversion/client";
 import {
   buildOutputName,
   type ConversionToolConfig,
 } from "@/lib/conversion/tool-config";
 import { recordActivity } from "@/lib/platform/record-activity";
+import { formatBytes as formatFileSize } from "@/lib/format";
 
 interface DocumentConverterProps {
   tool: ConversionToolConfig;
@@ -47,12 +48,6 @@ const INPUT_LABELS: Record<ConversionToolConfig["input"], string> = {
 
 type Phase = "idle" | "validating" | "ready" | "converting" | "done";
 
-function formatFileSize(bytes: number): string {
-  if (!bytes) return "0 KB";
-  const units = ["Bytes", "KB", "MB", "GB"];
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  return `${Math.round((bytes / 1024 ** index) * 10) / 10} ${units[index]}`;
-}
 
 export function DocumentConverter({ tool }: DocumentConverterProps) {
   const validationSequence = useRef(0);

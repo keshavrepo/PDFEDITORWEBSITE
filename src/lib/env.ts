@@ -21,13 +21,6 @@ export function isEmailConfigured(): boolean {
   );
 }
 
-export function isStripeConfigured(): boolean {
-  return Boolean(
-    process.env.STRIPE_SECRET_KEY &&
-      process.env.STRIPE_WEBHOOK_SECRET &&
-      process.env.STRIPE_PRO_PRICE_ID
-  );
-}
 
 export function getAppUrl(): string {
   return (process.env.NEXTAUTH_URL || "http://localhost:3000").replace(/\/$/, "");

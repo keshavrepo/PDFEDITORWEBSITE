@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
-import { FileManager } from "@/components/file-manager";
+import { FileManager } from "@/components/platform/file-manager";
 import { getStorageSummary, listFiles } from "@/lib/platform/files";
 import { platform } from "@/lib/products";
 

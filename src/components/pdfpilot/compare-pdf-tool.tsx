@@ -13,17 +13,20 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { PdfUploadZone } from "@/components/pdf-upload-zone";
+import { PdfUploadZone } from "@/components/pdfpilot/pdf-upload-zone";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
   toConversionMessage,
   validateConversionInput,
   validateSelection,
-  type ComparisonSummary,
   type ConversionProgress,
+} from "@/lib/conversion/client";
+import {
+  type ComparisonSummary,
   type PageStatus,
 } from "@/lib/conversion";
+import { formatBytes as formatFileSize } from "@/lib/format";
 
 type Phase = "idle" | "comparing" | "done";
 type Slot = "original" | "revised";
@@ -35,12 +38,6 @@ const STATUS_STYLES: Record<PageStatus, { label: string; className: string }> = 
   removed: { label: "Removed", className: "bg-destructive/15 text-destructive" },
 };
 
-function formatFileSize(bytes: number): string {
-  if (!bytes) return "0 KB";
-  const units = ["Bytes", "KB", "MB", "GB"];
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  return `${Math.round((bytes / 1024 ** index) * 10) / 10} ${units[index]}`;
-}
 
 export function ComparePdfTool() {
   const abortRef = useRef<AbortController | null>(null);

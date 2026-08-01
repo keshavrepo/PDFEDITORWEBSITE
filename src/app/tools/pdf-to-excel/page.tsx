@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import {
   ConversionToolPage,
   buildConversionMetadata,
-} from "@/components/conversion-tool-page";
+} from "@/components/pdfpilot/conversion-tool-page";
 import { getConversionTool } from "@/lib/conversion/tool-config";
 
 const tool = getConversionTool("pdf-to-excel");

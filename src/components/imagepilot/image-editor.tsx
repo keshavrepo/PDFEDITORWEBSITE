@@ -60,6 +60,7 @@ import {
   ZoomIn,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatBytes } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import {
   CROP_RATIOS,
@@ -167,13 +168,19 @@ import { EditorCanvas } from "./editor-canvas";
 import { HistoryPanel, LayersPanel } from "./layers-panel";
 import { PropertiesPanel } from "./properties-panel";
 import { AdjustmentsPanel } from "./adjustments-panel";
-import { WatermarkPanel } from "./watermark-panel";
-import { PassportPanel } from "./passport-panel";
-import { CompressPanel, type BatchEntry } from "./compress-panel";
-import { BackgroundPanel, type BackdropMode } from "./background-panel";
-import { BlurPanel } from "./blur-panel";
-import { MetadataPanel } from "./metadata-panel";
-import { ConvertPanel } from "./convert-panel";
+// Specialist inspectors are code-split: a workspace only downloads its own.
+// Properties, Adjust and Layers stay static because every workspace uses them.
+import {
+  BackgroundPanel,
+  BlurPanel,
+  CompressPanel,
+  ConvertPanel,
+  MetadataPanel,
+  PassportPanel,
+  WatermarkPanel,
+} from "./lazy-panels";
+import type { BatchEntry } from "./compress-panel";
+import type { BackdropMode } from "./background-panel";
 import { NumberField, SegmentedControl, SliderField, ToggleField, ToolbarButton } from "./editor-controls";
 
 /** Icons for the tool rail, keyed by tool id. */
@@ -207,12 +214,6 @@ const PANEL_TABS: Record<PanelId, { label: string; icon: React.ReactNode }> = {
   convert: { label: "Convert", icon: <Repeat className="h-3.5 w-3.5" /> },
 };
 
-function formatBytes(bytes: number): string {
-  if (!bytes) return "0 KB";
-  const units = ["Bytes", "KB", "MB", "GB"];
-  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  return `${Math.round((bytes / 1024 ** index) * 10) / 10} ${units[index]}`;
-}
 
 export interface ImageEditorProps {
   /**
@@ -1516,7 +1517,14 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
         height: matte.height,
         image: buffer.canvas,
       });
+
+      // Free the raster this one replaces. Each pass allocates a full-frame
+      // bitmap, so without this a brush stroke would leak a whole frame per
+      // pointer move. The original photo is held separately in `matte.base`
+      // and is never the id being replaced.
+      const superseded = matte.sourceId;
       matte.sourceId = sourceId;
+      if (superseded && superseded !== sourceId) rasters.delete(superseded);
 
       dispatch({
         type: "update-layer",
@@ -1597,6 +1605,10 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
         buffer.ctx.putImageData(imageData, 0, 0);
         const beforeId = `before_${Math.random().toString(36).slice(2, 10)}`;
         rasters.set({ id: beforeId, width: matte.width, height: matte.height, image: buffer.canvas });
+        // Toggling compare repeatedly must not accumulate frames.
+        const superseded = matte.sourceId;
+        matte.sourceId = beforeId;
+        if (superseded && superseded !== beforeId) rasters.delete(superseded);
         dispatch({
           type: "update-layer",
           id: matte.layerId,
@@ -1718,6 +1730,11 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
 
       const sourceId = `blur_${Math.random().toString(36).slice(2, 10)}`;
       rasters.set({ id: sourceId, width: matte.width, height: matte.height, image: buffer.canvas });
+
+      // Same reasoning as the matte: release the frame this replaces.
+      const superseded = matte.sourceId;
+      matte.sourceId = sourceId;
+      if (superseded && superseded !== sourceId) rasters.delete(superseded);
 
       dispatch({
         type: "update-layer",

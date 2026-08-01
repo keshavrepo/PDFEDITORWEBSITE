@@ -3,18 +3,22 @@
 import { useRef, useState } from "react";
 import { AlertCircle, Download, Loader2, Upload } from "lucide-react";
 import { Navbar } from "@/components/navbar";
-import { PdfUploadZone } from "@/components/pdf-upload-zone";
+import { PdfUploadZone } from "@/components/pdfpilot/pdf-upload-zone";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+/*
+ * Only the dependency-free helpers are static; `pdf-lib` arrives on demand.
+ */
 import {
-  compressPDF,
-  downloadBlob,
-  validatePDF,
   validatePDFSelection,
   type CompressionLevel,
   type ProcessingProgress,
-} from "@/lib/pdf-utils";
+} from "@/lib/pdf-types";
+import { downloadBlob } from "@/lib/download";
+
+/** Loads the PDF engine on first use. */
+const pdfEngine = () => import("@/lib/pdf-utils");
 
 export default function CompressPDFPage() {
   const validationSequence = useRef(0);
@@ -42,7 +46,7 @@ export default function CompressPDFPage() {
       setValidating(false);
       return;
     }
-    const validation = await validatePDF(selected);
+    const validation = await (await pdfEngine()).validatePDF(selected);
     if (sequence !== validationSequence.current) return;
     if (!validation.valid) {
       setError(validation.error || "Choose a valid PDF");
@@ -58,7 +62,7 @@ export default function CompressPDFPage() {
     setProcessing(true);
     setError(null);
     try {
-      setCompressed(await compressPDF(file, compressionLevel, setProgress));
+      setCompressed(await (await pdfEngine()).compressPDF(file, compressionLevel, setProgress));
     } catch (processError) {
       setError(processError instanceof Error ? processError.message : "Unable to compress PDF");
     } finally {
