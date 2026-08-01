@@ -16,38 +16,54 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Menu, X, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
+import { getInitials } from "@/lib/format";
 import { Logo } from "@/components/logo";
+import { platform } from "@/lib/products";
+import { GlobalSearch } from "@/components/platform/global-search";
+import { NotificationCenter } from "@/components/platform/notification-center";
+import { signOut, useSession } from "next-auth/react";
 
 interface NavbarProps {
   user?: {
     name?: string | null;
     email: string;
     avatar?: string | null;
+    role?: string;
   } | null;
 }
 
-export function Navbar({ user }: NavbarProps) {
+export function Navbar({ user: serverUser }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { theme, setTheme } = useTheme();
+  const { data: clientSession } = useSession();
   const pathname = usePathname();
+  const user =
+    serverUser === undefined
+      ? clientSession?.user
+        ? {
+            name: clientSession.user.name,
+            email: clientSession.user.email || "",
+            avatar: clientSession.user.image,
+            role: clientSession.user.role,
+          }
+        : null
+      : serverUser;
 
+  // Platform-level navigation. Dashboard only appears once signed in, so the
+  // bar never offers a link that immediately bounces to the login page.
   const navLinks = [
-    { href: "/tools", label: "Tools" },
+    { href: "/", label: "Home" },
+    { href: "/products", label: "Products" },
     { href: "/pricing", label: "Pricing" },
     { href: "/blog", label: "Blog" },
+    { href: "/contact", label: "Contact" },
+    ...(user ? [{ href: "/dashboard", label: "Dashboard" }] : []),
   ];
 
-  const getInitials = (name?: string | null, email?: string) => {
-    if (name) {
-      return name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2);
-    }
-    return email?.slice(0, 2).toUpperCase() || "U";
-  };
+  // Inside PDFPilot the wordmark reads as the product, so users always know
+  // which module they are in while the platform name stays one click away.
+  const inPdfPilot = pathname?.startsWith("/tools") ?? false;
+
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
@@ -61,7 +77,12 @@ export function Navbar({ user }: NavbarProps) {
                 <Logo className="w-5 h-5 text-primary-foreground" />
               </div>
             </div>
-            <span className="text-[15px] font-semibold tracking-tight">PDFPilot</span>
+            <span className="text-[15px] font-semibold tracking-tight">
+              {platform.name}
+              {inPdfPilot && (
+                <span className="text-muted-foreground font-normal"> / PDFPilot</span>
+              )}
+            </span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -84,6 +105,10 @@ export function Navbar({ user }: NavbarProps) {
 
           {/* Right Side Actions */}
           <div className="hidden md:flex items-center space-x-3">
+            <GlobalSearch />
+
+            {user && <NotificationCenter />}
+
             <Button
               variant="ghost"
               size="icon"
@@ -124,15 +149,21 @@ export function Navbar({ user }: NavbarProps) {
                     <Link href="/dashboard">Dashboard</Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
+                    <Link href="/files">Files</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
                     <Link href="/settings">Settings</Link>
                   </DropdownMenuItem>
+                  {user.role === "admin" && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin/posts">Blog admin</Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <form action="/api/auth/logout" method="POST">
-                      <button type="submit" className="w-full text-left">
-                        Log out
-                      </button>
-                    </form>
+                  <DropdownMenuItem
+                    onSelect={() => void signOut({ callbackUrl: "/" })}
+                  >
+                    Log out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -148,17 +179,22 @@ export function Navbar({ user }: NavbarProps) {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden p-2 rounded-xl hover:bg-accent transition-colors"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            {mobileMenuOpen ? (
-              <X className="w-5 h-5" />
-            ) : (
-              <Menu className="w-5 h-5" />
-            )}
-          </button>
+          {/* Mobile actions */}
+          <div className="flex items-center gap-1 md:hidden">
+            <GlobalSearch />
+            {user && <NotificationCenter />}
+            <button
+              className="p-2 rounded-xl hover:bg-accent transition-colors"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            >
+              {mobileMenuOpen ? (
+                <X className="w-5 h-5" />
+              ) : (
+                <Menu className="w-5 h-5" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -204,20 +240,35 @@ export function Navbar({ user }: NavbarProps) {
                     Dashboard
                   </Link>
                   <Link
+                    href="/files"
+                    className="block px-4 py-3 text-sm rounded-2xl hover:bg-accent"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Files
+                  </Link>
+                  <Link
                     href="/settings"
                     className="block px-4 py-3 text-sm rounded-2xl hover:bg-accent"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Settings
                   </Link>
-                  <form action="/api/auth/logout" method="POST">
-                    <button
-                      type="submit"
-                      className="w-full text-left px-4 py-3 text-sm text-destructive rounded-2xl hover:bg-accent"
+                  {user.role === "admin" && (
+                    <Link
+                      href="/admin/posts"
+                      className="block px-4 py-3 text-sm rounded-2xl hover:bg-accent"
+                      onClick={() => setMobileMenuOpen(false)}
                     >
-                      Log out
-                    </button>
-                  </form>
+                      Blog admin
+                    </Link>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void signOut({ callbackUrl: "/" })}
+                    className="w-full text-left px-4 py-3 text-sm text-destructive rounded-2xl hover:bg-accent"
+                  >
+                    Log out
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-2">

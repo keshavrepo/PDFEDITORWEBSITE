@@ -1,0 +1,46 @@
+export type ToolCategory =
+  | "Convert"
+  | "Organize"
+  | "Optimize"
+  | "Edit"
+  | "Security";
+
+export interface ToolDefinition {
+  id: string;
+  name: string;
+  description: string;
+  href: string;
+  category: ToolCategory;
+}
+
+export const tools: ToolDefinition[] = [
+  { id: "pdf-to-word", name: "PDF to Word", description: "Convert PDF to editable DOCX", href: "/tools/pdf-to-word", category: "Convert" },
+  { id: "word-to-pdf", name: "Word to PDF", description: "Convert DOCX to a shareable PDF", href: "/tools/word-to-pdf", category: "Convert" },
+  { id: "pdf-to-powerpoint", name: "PDF to PowerPoint", description: "Convert PDF pages to editable slides", href: "/tools/pdf-to-powerpoint", category: "Convert" },
+  { id: "powerpoint-to-pdf", name: "PowerPoint to PDF", description: "Convert PPTX slides to PDF", href: "/tools/powerpoint-to-pdf", category: "Convert" },
+  { id: "pdf-to-excel", name: "PDF to Excel", description: "Extract PDF tables into a spreadsheet", href: "/tools/pdf-to-excel", category: "Convert" },
+  { id: "excel-to-pdf", name: "Excel to PDF", description: "Convert spreadsheets to printable PDF", href: "/tools/excel-to-pdf", category: "Convert" },
+  { id: "pdf-to-image", name: "PDF to JPG or PNG", description: "Export pages as high-quality images", href: "/tools/pdf-to-image", category: "Convert" },
+  { id: "image-to-pdf", name: "JPG or PNG to PDF", description: "Combine images into one PDF", href: "/tools/image-to-pdf", category: "Convert" },
+  { id: "ocr-pdf", name: "OCR PDF", description: "Make scanned pages searchable", href: "/tools/ocr-pdf", category: "Convert" },
+  { id: "scan-to-pdf", name: "Scan to PDF", description: "Turn camera photos into a document", href: "/tools/scan-to-pdf", category: "Convert" },
+  { id: "pdfa-converter", name: "PDF/A Converter", description: "Convert to the archival format", href: "/tools/pdfa-converter", category: "Convert" },
+  { id: "merge-pdf", name: "Merge PDF", description: "Combine multiple PDFs", href: "/tools/merge-pdf", category: "Organize" },
+  { id: "split-pdf", name: "Split PDF", description: "Extract pages", href: "/tools/split-pdf", category: "Organize" },
+  { id: "rotate-pdf", name: "Rotate PDF", description: "Rotate selected pages", href: "/tools/rotate-pdf", category: "Organize" },
+  { id: "delete-pages", name: "Delete Pages", description: "Remove selected pages", href: "/tools/delete-pages", category: "Organize" },
+  { id: "compare-pdf", name: "Compare PDF", description: "Highlight differences between versions", href: "/tools/compare-pdf", category: "Organize" },
+  { id: "compress-pdf", name: "Compress PDF", description: "Reduce file size losslessly", href: "/tools/compress-pdf", category: "Optimize" },
+  { id: "repair-pdf", name: "Repair PDF", description: "Recover and rebuild PDF structure", href: "/tools/repair-pdf", category: "Optimize" },
+  { id: "pdf-forms", name: "Fill PDF Forms", description: "Detect and complete fillable fields", href: "/tools/pdf-forms", category: "Edit" },
+  { id: "page-numbers", name: "Page Numbers", description: "Add headers or footers with numbering", href: "/tools/page-numbers", category: "Edit" },
+  { id: "crop-pdf", name: "Crop PDF", description: "Trim margins with a live preview", href: "/tools/crop-pdf", category: "Edit" },
+  { id: "edit-pdf", name: "Edit PDF", description: "Add text to a page", href: "/tools/edit-pdf", category: "Edit" },
+  { id: "sign-pdf", name: "Sign PDF", description: "Add a visual signature", href: "/tools/sign-pdf", category: "Edit" },
+  { id: "watermark-pdf", name: "Watermark", description: "Add a text watermark", href: "/tools/watermark-pdf", category: "Edit" },
+  { id: "redact-pdf", name: "Redact PDF", description: "Permanently remove sensitive text", href: "/tools/redact-pdf", category: "Security" },
+  { id: "protect-pdf", name: "Protect PDF", description: "Encrypt with a password", href: "/tools/protect-pdf", category: "Security" },
+  { id: "unlock-pdf", name: "Unlock PDF", description: "Remove password encryption", href: "/tools/unlock-pdf", category: "Security" },
+];
+
+export const toolIds = new Set(tools.map((tool) => tool.id));

@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { AuthForm } from "@/components/auth-form";
+import { isGoogleAuthConfigured } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -52,53 +52,10 @@ export default async function RegisterPage() {
             </p>
           </div>
 
-          <form action="/api/auth/register" method="POST" className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="name" className="text-sm font-medium">
-                Name
-              </label>
-              <Input
-                id="name"
-                name="name"
-                type="text"
-                placeholder="John Doe"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
-                Email
-              </label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="name@example.com"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
-                Password
-              </label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                required
-                minLength={8}
-              />
-              <p className="text-xs text-muted-foreground">
-                At least 8 characters
-              </p>
-            </div>
-
-            <Button type="submit" className="w-full" size="lg">
-              Continue
-            </Button>
-          </form>
+          <AuthForm
+            mode="register"
+            googleEnabled={isGoogleAuthConfigured()}
+          />
 
           <p className="mt-6 text-center text-sm text-muted-foreground">
             Already have an account?{" "}

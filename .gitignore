@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Local environment files (commit .env.example instead)
+.env
+.env.local
+.env.*.local
+
+# Tooling caches and generated metadata
+*.tsbuildinfo
+coverage/
+
+# Conversion test artifacts (fixtures are generated on demand)
+.conversion-test-build/
+scripts/fixtures/generated/
+# ImagePilot editor test build output
+.imagepilot-test-build/
+# Tesseract unpacks language data beside the working directory when a model is
+# fetched at runtime; the vendored copies under public/tesseract are the ones
+# that ship.
+/*.traineddata
+
+# Runtime-generated local blog uploads
+public/uploads/blog/*
+!public/uploads/blog/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS/editor files
+.DS_Store
+.vscode/
+.idea/
