@@ -42,7 +42,10 @@ export async function GET(
     title: row.title,
     category: row.category as OfficeDocumentSummary["category"],
     updatedAt: row.updatedAt.toISOString(),
-    autosavedAt: row.updatedAt.toISOString(),
+    // The dedicated `autosavedAt` column does not exist on the recent
+    // mirror; return null so consumers know the field is unavailable
+    // rather than treating `updatedAt` as both.
+    autosavedAt: null,
     version: row.version,
     size: row.size,
   };

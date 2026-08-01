@@ -10,7 +10,7 @@
  * serve a small recent list without pagination.
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { officeDocuments } from "@/db/schema";
 import type {
@@ -37,7 +37,11 @@ function toSummary(row: {
     title: row.title,
     category: row.category as OfficeDocumentSummary["category"],
     updatedAt: row.updatedAt.toISOString(),
-    autosavedAt: row.updatedAt.toISOString(),
+    // The server mirror only tracks `updatedAt`; the dedicated
+    // `autosavedAt` column does not exist on this table, so we report
+    // `null` here instead of pretending the modified-time is also an
+    // autosave timestamp.
+    autosavedAt: null,
     version: row.version,
     size: row.size,
   };
@@ -133,13 +137,23 @@ async function pruneRecentDocuments(userId: string): Promise<void> {
 
     if (rows.length <= RECENT_LIMIT_PER_USER) return;
     const overflow = rows.slice(RECENT_LIMIT_PER_USER);
-    for (const row of overflow) {
-      await db
-        .delete(officeDocuments)
-        .where(
-          and(eq(officeDocuments.id, row.id), eq(officeDocuments.userId, userId))
-        );
-    }
+    if (overflow.length === 0) return;
+    // Single round-trip bulk delete avoids the N+1 query pattern; the
+    // per-row delete in the previous implementation could noticeably
+    // slow down the autosave path on a large recent mirror.
+    await db
+      .delete(officeDocuments)
+      .where(
+        and(
+          eq(officeDocuments.userId, userId),
+          // `inArray` is the cleanest "where id in (...)" — drizzle
+          // expands it to a parameterised IN list.
+          inArray(
+            officeDocuments.id,
+            overflow.map((row) => row.id)
+          )
+        )
+      );
   } catch {
     // Pruning is best-effort.
   }

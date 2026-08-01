@@ -368,15 +368,16 @@ async function evictIfNeeded(): Promise<void> {
 
     const toEvict: string[] = stale.map((document) => document.meta.id);
 
-    if (rows.length - toEvict.length > MAX_LOCAL_DOCUMENTS) {
-      const overflow = rows.length - MAX_LOCAL_DOCUMENTS - toEvict.length;
-      const sorted = rows
-        .map((row) => row.document)
-        .sort((a, b) => (a.meta.updatedAt < b.meta.updatedAt ? -1 : 1));
-      for (let i = 0; i < overflow && i < sorted.length; i++) {
-        const id = sorted[i].meta.id;
-        if (!toEvict.includes(id)) toEvict.push(id);
-      }
+    // Add the oldest non-stale documents until the store is at or below
+    // `MAX_LOCAL_DOCUMENTS`. The previous implementation undercounted the
+    // additional rows to remove when many stale rows were present, so the
+    // store could stay over the cap after eviction.
+    const sorted = rows
+      .map((row) => row.document)
+      .sort((a, b) => (a.meta.updatedAt < b.meta.updatedAt ? -1 : 1));
+    for (const doc of sorted) {
+      if (toEvict.length >= rows.length - MAX_LOCAL_DOCUMENTS) break;
+      if (!toEvict.includes(doc.meta.id)) toEvict.push(doc.meta.id);
     }
 
     if (toEvict.length === 0) return;

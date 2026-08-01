@@ -191,9 +191,34 @@ export function OfficeWorkspace({ kind, Surface, Properties }: OfficeWorkspacePr
     await refreshRecent();
   }, [activeDocument, refreshRecent]);
 
-  /** Closes a tab. The browser copy is left intact for later reopening. */
+  /**
+   * Closes a tab. The browser copy is left intact for later reopening.
+   * If the tab is dirty, it is flushed to storage first so the user
+   * never loses unsaved work to an accidental close.
+   */
   const closeTab = useCallback(
-    (id: string) => {
+    async (id: string) => {
+      const state = saveStates[id];
+      const doc = openTabsRef.current.find((d) => d.meta.id === id);
+      if (doc && state === "dirty") {
+        const saved = await saveOfficeDocument(doc);
+        // `saveOfficeDocument` returns the input document unchanged on a
+        // storage failure; only mark the tab as saved when the persisted
+        // version actually advanced.
+        const persisted =
+          saved.meta.autosavedAt && saved.meta.version > doc.meta.version;
+        setOpenTabs((current) =>
+          current.map((d) => (d.meta.id === saved.meta.id ? saved : d))
+        );
+        if (persisted) {
+          setSaveStates((current) => ({ ...current, [saved.meta.id]: "saved" }));
+          await refreshRecent();
+        } else {
+          // Save failed: surface the error, keep the tab dirty, do not close.
+          toast({ message: "Could not save before closing.", tone: "error" });
+          return;
+        }
+      }
       let nextActive: string | null = activeId;
       setOpenTabs((current) => {
         const next = current.filter((doc) => doc.meta.id !== id);
@@ -210,7 +235,7 @@ export function OfficeWorkspace({ kind, Surface, Properties }: OfficeWorkspacePr
         return rest;
       });
     },
-    [activeId]
+    [activeId, refreshRecent, saveStates, toast]
   );
 
   /** Renames a document. */
@@ -358,20 +383,47 @@ export function OfficeWorkspace({ kind, Surface, Properties }: OfficeWorkspacePr
     };
   }, [activeDocument, activeSaveState]);
 
+  /**
+   * Browser-level guard: if the user closes the tab while a document is
+   * dirty, the browser asks for confirmation. The autosave loop keeps
+   * running so the local IndexedDB copy is up to date, but a hard close
+   * before the timer fires would otherwise lose work.
+   */
+  useEffect(() => {
+    const hasDirty = Object.values(saveStates).some((state) => state === "dirty");
+    if (!hasDirty) return;
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      // Modern browsers ignore the custom string but still show the dialog.
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [saveStates]);
+
   /** Keyboard shortcuts: Ctrl/Cmd+S to save, Ctrl/Cmd+W to close tab, ? for help. */
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
-      if (target?.matches("input, textarea, select, [contenteditable='true'], [role='textbox']")) {
-        if (event.key === "Escape") target.blur();
-        return;
-      }
       const mod = event.metaKey || event.ctrlKey;
+
+      // Save works from any focused context, including text inputs — the
+      // browser default for Cmd/Ctrl+S would otherwise pop the "save page"
+      // dialog and the user would lose their work.
       if (mod && event.key.toLowerCase() === "s") {
         event.preventDefault();
         void saveActive();
         return;
       }
+
+      if (target?.matches("input, textarea, select, [contenteditable='true'], [role='textbox']")) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          target.blur();
+        }
+        return;
+      }
+
       if (mod && event.key.toLowerCase() === "w" && activeId) {
         event.preventDefault();
         closeTab(activeId);
@@ -893,6 +945,17 @@ function EmptyState({
 /* -------------------------------------------------------------------------- */
 
 function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
   if (!open) return null;
   const shortcuts: Array<[string, string]> = [
     ["Ctrl/Cmd + S", "Save the active document"],
