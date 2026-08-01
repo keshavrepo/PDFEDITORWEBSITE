@@ -12,6 +12,7 @@ import { products } from "@/lib/products";
 import { tools } from "@/lib/tools";
 import { imageTools } from "@/lib/imagepilot/tools";
 import { editors, templates } from "@/lib/officepilot";
+import { calculators as financeCalculators, templates as financeTemplates } from "@/lib/financepilot";
 import { documentationSections } from "@/lib/platform/documentation";
 
 export type SearchResultType =
@@ -126,6 +127,32 @@ function buildStaticIndex(): IndexEntry[] {
             ? "/officepilot/spreadsheet"
             : "/officepilot/presentation",
       context: `${kindLabel} template`,
+      haystack: `${template.name} ${template.description} ${template.category} ${template.highlights.join(" ")}`.toLowerCase(),
+      weight: 2,
+    });
+  }
+
+  for (const calculator of financeCalculators) {
+    entries.push({
+      id: `tool-financepilot-${calculator.kind}`,
+      type: "tool",
+      title: calculator.name,
+      description: calculator.description,
+      href: calculator.slug ? `/financepilot/${calculator.slug}` : "/financepilot",
+      context: "FinancePilot",
+      haystack: `${calculator.name} ${calculator.description} ${calculator.keywords.join(" ")}`.toLowerCase(),
+      weight: 2,
+    });
+  }
+
+  for (const template of financeTemplates) {
+    entries.push({
+      id: `template-finance-${template.id}`,
+      type: "template",
+      title: template.name,
+      description: template.description,
+      href: "/financepilot",
+      context: "FinancePilot template",
       haystack: `${template.name} ${template.description} ${template.category} ${template.highlights.join(" ")}`.toLowerCase(),
       weight: 2,
     });

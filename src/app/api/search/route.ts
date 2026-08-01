@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { db } from "@/db";
-import { blogPosts, officeDocuments } from "@/db/schema";
+import { blogPosts, officeDocuments, financeCalculations } from "@/db/schema";
 import { searchStatic, type SearchResult } from "@/lib/platform/search";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/request";
 import { getSession } from "@/lib/auth";
@@ -96,6 +96,35 @@ export async function GET(request: NextRequest) {
           description: `${entry.kind} · ${entry.category.replace(/-/g, " ")}`,
           href,
           context: "Your recent documents",
+          score: 4,
+        });
+      }
+
+      const recentFinance = await db
+        .select({
+          id: financeCalculations.id,
+          title: financeCalculations.title,
+          kind: financeCalculations.kind,
+          category: financeCalculations.category,
+          updatedAt: financeCalculations.updatedAt,
+        })
+        .from(financeCalculations)
+        .where(
+          and(
+            eq(financeCalculations.userId, user.id),
+            ilike(financeCalculations.title, term)
+          )
+        )
+        .orderBy(desc(financeCalculations.updatedAt))
+        .limit(8);
+      for (const entry of recentFinance) {
+        results.push({
+          id: `recent-finance-${entry.id}`,
+          type: "recent",
+          title: entry.title,
+          description: `${entry.kind} · ${entry.category.replace(/-/g, " ")}`,
+          href: entry.kind === "blank" ? "/financepilot" : `/financepilot/${entry.kind}`,
+          context: "Your recent calculations",
           score: 4,
         });
       }

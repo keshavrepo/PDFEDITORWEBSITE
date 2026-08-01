@@ -212,15 +212,30 @@ export const products: Product[] = [
   {
     id: "financepilot",
     name: "FinancePilot",
-    tagline: "Invoices and financial documents",
+    tagline: "Financial calculators in your browser",
     description:
-      "Generate invoices, reconcile statements and extract structured data from financial paperwork.",
-    status: "coming-soon",
+      "Run the financial calculators you reach for every day — loans, mortgages, savings, compound interest, ROI and more — inside the LaunchStack workspace, with autosave and the same shared chrome as OfficePilot.",
+    status: "active",
     category: "Finance",
-    version: "0.0.0",
-    accent: "text-muted-foreground",
-    highlights: ["Invoice builder", "Statement parsing", "Exports"],
-    releaseNotes: [],
+    version: "0.1.0",
+    href: "/financepilot",
+    accent: "text-primary",
+    highlights: [
+      "Calculator workspace",
+      "Autosave and recent mirror",
+      "Export to JSON",
+    ],
+    releaseNotes: [
+      {
+        version: "0.1.0",
+        date: "2026-08-01",
+        changes: [
+          "Reusable FinancePilot workspace shell with sidebar, recent calculations, autosave and search integration",
+          "Shared calculation engine and per-calculator registry",
+          "IndexedDB-backed storage and a server-side recent-calculations mirror",
+        ],
+      },
+    ],
   },
   {
     id: "aipilot",

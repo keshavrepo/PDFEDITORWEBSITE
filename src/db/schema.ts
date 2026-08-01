@@ -313,3 +313,30 @@ export const officeDocuments = pgTable(
     index("office_documents_user_kind_idx").on(table.userId, table.kind),
   ]
 );
+
+/**
+ * FinancePilot recent-calculations mirror.
+ *
+ * The full calculation body lives in the browser (IndexedDB) so it is
+ * always available offline. This row is a small index the server uses to
+ * list the user's recent calculations on the dashboard, the file manager
+ * and the search results without round-tripping the local store.
+ */
+export const financeCalculations = pgTable(
+  "finance_calculations",
+  {
+    id: varchar("id", { length: 80 }).primaryKey(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    kind: varchar("kind", { length: 30 }).notNull(),
+    title: varchar("title", { length: 200 }).notNull(),
+    category: varchar("category", { length: 30 }).default("blank").notNull(),
+    version: integer("version").default(1).notNull(),
+    size: integer("size").default(0).notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("finance_calculations_user_updated_idx").on(table.userId, table.updatedAt),
+    index("finance_calculations_user_kind_idx").on(table.userId, table.kind),
+  ]
+);
