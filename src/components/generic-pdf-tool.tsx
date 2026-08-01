@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, useRef, useState } from "react";
-import JSZip from "jszip";
+
 import { AlertCircle, Check, Download, FileText, Loader2, Upload, X } from "lucide-react";
 import { PdfUploadZone } from "@/components/pdf-upload-zone";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,7 @@ function outputName(input: string, suffix: string, extension = "pdf") {
 }
 
 async function zipBlobs(blobs: Blob[], baseName: string, extension: string) {
+  const JSZip = (await import('jszip')).default;
   const zip = new JSZip();
   blobs.forEach((blob, index) => zip.file(`${baseName}-page-${index + 1}.${extension}`, blob));
   return zip.generateAsync({ type: "blob", compression: "DEFLATE" });

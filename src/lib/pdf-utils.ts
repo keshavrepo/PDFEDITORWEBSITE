@@ -1,39 +1,11 @@
+
+import type { ProcessingProgress, ProgressCallback, CompressionLevel } from './pdf-types';
+export type { ProcessingProgress, ProgressCallback, CompressionLevel } from './pdf-types';
 import { PDFDocument, rgb, StandardFonts, degrees } from 'pdf-lib';
-import { saveAs } from 'file-saver';
+import { downloadBlob } from './download';
 
-export interface ProcessingProgress {
-  stage: string;
-  progress: number;
-  total: number;
-}
-
-export type ProgressCallback = (progress: ProcessingProgress) => void;
-export type CompressionLevel = 'low' | 'medium' | 'high';
-
-export const MAX_PDF_SIZE = 100 * 1024 * 1024;
-
-export function validatePDFSelection(
-  file: File,
-  maxSize = MAX_PDF_SIZE
-): { valid: boolean; error?: string } {
-  const hasPdfExtension = file.name.toLowerCase().endsWith('.pdf');
-  const hasPdfMime =
-    !file.type ||
-    file.type === 'application/pdf' ||
-    file.type === 'application/x-pdf';
-
-  if (!hasPdfExtension && !hasPdfMime) {
-    return { valid: false, error: `${file.name} is not a PDF file` };
-  }
-  if (!file.size) return { valid: false, error: `${file.name} is empty` };
-  if (file.size > maxSize) {
-    return {
-      valid: false,
-      error: `${file.name} exceeds the ${Math.round(maxSize / 1024 / 1024)}MB file limit`,
-    };
-  }
-  return { valid: true };
-}
+import { validatePDFSelection, MAX_PDF_SIZE } from './pdf-types';
+export { validatePDFSelection, MAX_PDF_SIZE } from './pdf-types';
 
 // Helper to convert Uint8Array to Blob properly
 function createPDFBlob(pdfBytes: Uint8Array): Blob {
@@ -340,31 +312,16 @@ export async function addPageNumbers(
   return createPDFBlob(pdfBytes);
 }
 
-// Reorder pages
-export async function reorderPages(
-  file: File,
-  newOrder: number[],
-  onProgress?: ProgressCallback
-): Promise<Blob> {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await PDFDocument.load(arrayBuffer);
-  const newPdf = await PDFDocument.create();
-  
-  for (let i = 0; i < newOrder.length; i++) {
-    onProgress?.({ stage: 'Reordering', progress: i + 1, total: newOrder.length });
-    
-    const pageIndex = newOrder[i] - 1;
-    const [copiedPage] = await newPdf.copyPages(pdf, [pageIndex]);
-    newPdf.addPage(copiedPage);
-  }
-  
-  const pdfBytes = await newPdf.save();
-  return createPDFBlob(pdfBytes);
-}
-
 // Download helper
 export function downloadBlob(blob: Blob, filename: string) {
-  saveAs(blob, filename);
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
 }
 
 // Get PDF metadata
@@ -382,28 +339,6 @@ export async function getPDFMetadata(file: File) {
     creationDate: pdf.getCreationDate(),
     modificationDate: pdf.getModificationDate(),
   };
-}
-
-// Update PDF metadata
-export async function updatePDFMetadata(
-  file: File,
-  metadata: {
-    title?: string;
-    author?: string;
-    subject?: string;
-    keywords?: string[];
-  }
-): Promise<Blob> {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await PDFDocument.load(arrayBuffer);
-  
-  if (metadata.title) pdf.setTitle(metadata.title);
-  if (metadata.author) pdf.setAuthor(metadata.author);
-  if (metadata.subject) pdf.setSubject(metadata.subject);
-  if (metadata.keywords) pdf.setKeywords(metadata.keywords);
-  
-  const pdfBytes = await pdf.save();
-  return createPDFBlob(pdfBytes);
 }
 
 export type TextPosition =
@@ -582,14 +517,4 @@ export async function validatePDF(
   }
 }
 
-// Get page dimensions
-export async function getPageDimensions(file: File): Promise<Array<{ width: number; height: number }>> {
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await PDFDocument.load(arrayBuffer);
-  const pages = pdf.getPages();
-  
-  return pages.map(page => {
-    const { width, height } = page.getSize();
-    return { width, height };
-  });
-}
+
