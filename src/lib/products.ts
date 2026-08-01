@@ -210,6 +210,36 @@ export const products: Product[] = [
     releaseNotes: [],
   },
   {
+    id: "socialpilot",
+    name: "SocialPilot",
+    tagline: "A professional creator workspace in your browser",
+    description:
+      "A creator workspace for every future SocialPilot tool. Batch 1 ships the foundation: a Social workspace shell, a project system, a media library and a reusable brand kit. The next batches add the creator tools (post designer, scheduler, AI assistant) on top of the same shell.",
+    status: "active",
+    category: "Media",
+    version: "0.1.0",
+    href: "/socialpilot",
+    accent: "text-primary",
+    highlights: [
+      "Creator workspace shell",
+      "Project system with autosave",
+      "Media library for images, video and audio",
+      "Reusable brand kit",
+    ],
+    releaseNotes: [
+      {
+        version: "0.1.0",
+        date: "2026-08-02",
+        changes: [
+          "Added the SocialPilot workspace shell: left navigation, tool switcher, workspace header, activity panel, properties panel, search, recent projects, favourites, autosave and keyboard shortcuts",
+          "Added the project system with create, rename, duplicate, delete, favourite, recent mirror and dashboard integration",
+          "Added the media library for images, videos and audio with upload, organize, search, filter, preview and delete (reuses the existing upload infrastructure)",
+          "Added the brand kit with logos, brand colours, fonts and default social profiles (reusable across every future tool)",
+        ],
+      },
+    ],
+  },
+  {
     id: "financepilot",
     name: "FinancePilot",
     tagline: "Financial calculators in your browser",

@@ -24,6 +24,8 @@ import { getActivityTimeline, type ActivityKind } from "@/lib/platform/activity"
 import { getStorageSummary, listFiles } from "@/lib/platform/files";
 import { getFavorites, getUsageStatistics } from "@/lib/platform/usage";
 import { listRecentDocuments } from "@/lib/officepilot/recent";
+import { listRecentProjects } from "@/lib/socialpilot/recent";
+import { FileText as GenericFileText } from "lucide-react";
 import { platform } from "@/lib/products";
 import { tools } from "@/lib/tools";
 import { formatBytes } from "@/lib/format";
@@ -71,13 +73,14 @@ export default async function DashboardPage() {
   if (!user) redirect("/login");
 
   // Everything below is derived from this user's own rows; nothing is sampled.
-  const [storage, recentFiles, activity, usage, favorites, recentOffice] = await Promise.all([
+  const [storage, recentFiles, activity, usage, favorites, recentOffice, recentSocial] = await Promise.all([
     getStorageSummary(user.id),
     listFiles(user.id, { limit: 5 }),
     getActivityTimeline(user.id, 8),
     getUsageStatistics(user.id),
     getFavorites(user.id),
     listRecentDocuments(user.id, { limit: 5 }),
+    listRecentProjects(user.id, { limit: 5 }),
   ]);
 
   const allowance = PLAN_STORAGE[user.plan] ?? PLAN_STORAGE.free;
@@ -280,6 +283,34 @@ export default async function DashboardPage() {
                             <p className="text-sm font-medium truncate">{doc.title}</p>
                             <p className="text-[11px] text-muted-foreground">
                               {new Date(doc.updatedAt).toLocaleDateString()} · v{doc.version}
+                            </p>
+                          </div>
+                        </Card>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {/* Recent SocialPilot projects */}
+            {recentSocial.length > 0 && (
+              <section>
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+                  Recent SocialPilot projects
+                </h2>
+                <div className="space-y-2">
+                  {recentSocial.map((entry) => {
+                    const href =
+                      entry.kind === "blank" ? "/socialpilot" : `/socialpilot/${entry.kind}`;
+                    return (
+                      <Link key={entry.id} href={href}>
+                        <Card className="p-4 hover:bg-accent transition-colors cursor-pointer group flex items-center gap-2">
+                          <GenericFileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">{entry.title}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {new Date(entry.updatedAt).toLocaleDateString()} · v{entry.version}
                             </p>
                           </div>
                         </Card>

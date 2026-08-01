@@ -340,3 +340,84 @@ export const financeCalculations = pgTable(
     index("finance_calculations_user_kind_idx").on(table.userId, table.kind),
   ]
 );
+
+/**
+ * SocialPilot recent-projects mirror.
+ *
+ * The full project body lives in the browser (IndexedDB) so it is always
+ * available offline. This row is a small index the server uses to list
+ * the user's recent projects on the dashboard, the file manager and the
+ * search results without round-tripping the local store.
+ */
+export const socialProjects = pgTable(
+  "social_projects",
+  {
+    id: varchar("id", { length: 80 }).primaryKey(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    kind: varchar("kind", { length: 30 }).notNull(),
+    title: varchar("title", { length: 200 }).notNull(),
+    category: varchar("category", { length: 30 }).default("blank").notNull(),
+    version: integer("version").default(1).notNull(),
+    size: integer("size").default(0).notNull(),
+    isFavorite: boolean("is_favorite").default(false).notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("social_projects_user_updated_idx").on(table.userId, table.updatedAt),
+    index("social_projects_user_kind_idx").on(table.userId, table.kind),
+  ]
+);
+
+/**
+ * SocialPilot media-library mirror.
+ *
+ * The media asset binary lives in the browser (IndexedDB) so it is
+ * available offline and the server never has to stream it. This row is
+ * a small index the server uses to list the user's media assets on the
+ * dashboard and the file manager without round-tripping the local
+ * store.
+ */
+export const socialMediaAssets = pgTable(
+  "social_media_assets",
+  {
+    id: varchar("id", { length: 80 }).primaryKey(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    projectId: varchar("project_id", { length: 80 }),
+    /** "image" | "video" | "audio" */
+    kind: varchar("kind", { length: 20 }).notNull(),
+    title: varchar("title", { length: 200 }).notNull(),
+    filename: text("filename").notNull(),
+    mimeType: varchar("mime_type", { length: 100 }),
+    size: integer("size").default(0).notNull(),
+    tags: jsonb("tags"),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("social_media_assets_user_updated_idx").on(table.userId, table.updatedAt),
+    index("social_media_assets_user_project_idx").on(table.userId, table.projectId),
+  ]
+);
+
+/**
+ * SocialPilot brand-kit row.
+ *
+ * One brand kit per user, stored entirely in the database because the
+ * data is small (logos, colours, fonts, default social profiles). The
+ * browser keeps an in-memory copy and mirrors changes back to the
+ * server through the brand-kit endpoint.
+ */
+export const socialBrandKits = pgTable(
+  "social_brand_kits",
+  {
+    userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 100 }).default("Default brand kit").notNull(),
+    logos: jsonb("logos").default([]).notNull(),
+    colors: jsonb("colors").default([]).notNull(),
+    fonts: jsonb("fonts").default([]).notNull(),
+    profiles: jsonb("profiles").default([]).notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  }
+);

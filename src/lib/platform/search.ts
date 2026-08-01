@@ -13,6 +13,7 @@ import { tools } from "@/lib/tools";
 import { imageTools } from "@/lib/imagepilot/tools";
 import { editors, templates } from "@/lib/officepilot";
 import { calculators as financeCalculators, templates as financeTemplates } from "@/lib/financepilot";
+import { projects as socialProjects, templates as socialTemplates } from "@/lib/socialpilot";
 import { documentationSections } from "@/lib/platform/documentation";
 
 export type SearchResultType =
@@ -153,6 +154,32 @@ function buildStaticIndex(): IndexEntry[] {
       description: template.description,
       href: "/financepilot",
       context: "FinancePilot template",
+      haystack: `${template.name} ${template.description} ${template.category} ${template.highlights.join(" ")}`.toLowerCase(),
+      weight: 2,
+    });
+  }
+
+  for (const project of socialProjects) {
+    entries.push({
+      id: `tool-socialpilot-${project.kind}`,
+      type: "tool",
+      title: project.name,
+      description: project.description,
+      href: project.slug ? `/socialpilot/${project.slug}` : "/socialpilot",
+      context: "SocialPilot",
+      haystack: `${project.name} ${project.description} ${project.keywords.join(" ")}`.toLowerCase(),
+      weight: 2,
+    });
+  }
+
+  for (const template of socialTemplates) {
+    entries.push({
+      id: `template-social-${template.id}`,
+      type: "template",
+      title: template.name,
+      description: template.description,
+      href: "/socialpilot",
+      context: "SocialPilot template",
       haystack: `${template.name} ${template.description} ${template.category} ${template.highlights.join(" ")}`.toLowerCase(),
       weight: 2,
     });

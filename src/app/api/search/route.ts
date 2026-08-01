@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { and, desc, eq, ilike, or } from "drizzle-orm";
 import { db } from "@/db";
-import { blogPosts, officeDocuments, financeCalculations } from "@/db/schema";
+import { blogPosts, officeDocuments, financeCalculations, socialProjects } from "@/db/schema";
 import { searchStatic, type SearchResult } from "@/lib/platform/search";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/request";
 import { getSession } from "@/lib/auth";
@@ -125,6 +125,35 @@ export async function GET(request: NextRequest) {
           description: `${entry.kind} · ${entry.category.replace(/-/g, " ")}`,
           href: entry.kind === "blank" ? "/financepilot" : `/financepilot/${entry.kind}`,
           context: "Your recent calculations",
+          score: 4,
+        });
+      }
+
+      const recentSocial = await db
+        .select({
+          id: socialProjects.id,
+          title: socialProjects.title,
+          kind: socialProjects.kind,
+          category: socialProjects.category,
+          updatedAt: socialProjects.updatedAt,
+        })
+        .from(socialProjects)
+        .where(
+          and(
+            eq(socialProjects.userId, user.id),
+            ilike(socialProjects.title, term)
+          )
+        )
+        .orderBy(desc(socialProjects.updatedAt))
+        .limit(8);
+      for (const entry of recentSocial) {
+        results.push({
+          id: `recent-social-${entry.id}`,
+          type: "recent",
+          title: entry.title,
+          description: `${entry.kind} · ${entry.category.replace(/-/g, " ")}`,
+          href: entry.kind === "blank" ? "/socialpilot" : `/socialpilot/${entry.kind}`,
+          context: "Your recent projects",
           score: 4,
         });
       }
