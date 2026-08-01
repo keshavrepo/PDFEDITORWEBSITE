@@ -5,7 +5,19 @@ import { Navbar } from "@/components/navbar";
 import { FinanceWorkspace } from "@/components/financepilot/workspace";
 import { BlankSurface } from "@/components/financepilot/surfaces/blank";
 import { BlankProperties } from "@/components/financepilot/properties/blank";
-import { getCalculatorBySlug, calculators, focusedCalculators } from "@/lib/financepilot";
+import { EmiSurface } from "@/components/financepilot/surfaces/emi";
+import { SipSurface } from "@/components/financepilot/surfaces/sip";
+import { CompoundInterestSurface } from "@/components/financepilot/surfaces/compound-interest";
+import { LoanSurface } from "@/components/financepilot/surfaces/loan";
+import { EmiProperties } from "@/components/financepilot/properties/emi";
+import { SipProperties } from "@/components/financepilot/properties/sip";
+import { CompoundInterestProperties } from "@/components/financepilot/properties/compound-interest";
+import { LoanProperties } from "@/components/financepilot/properties/loan";
+import {
+  getCalculatorBySlug,
+  focusedCalculators,
+  type FinanceCalculatorKind,
+} from "@/lib/financepilot";
 import { platform } from "@/lib/products";
 
 export const dynamic = "force-dynamic";
@@ -14,10 +26,6 @@ export const dynamic = "force-dynamic";
  * One route serving every FinancePilot calculator. Each kind is a
  * configuration of the same workspace shell, so they share this page
  * rather than each getting a near-identical copy of it.
- *
- * The foundation has no calculators registered yet, so this page is
- * effectively inert — it always renders a 404 — but the routing shape
- * is in place for the first calculator to plug in.
  */
 export function generateStaticParams() {
   return focusedCalculators.map((calculator) => ({
@@ -40,6 +48,36 @@ export async function generateMetadata({
   };
 }
 
+/**
+ * Resolves a calculator kind to its surface and properties components.
+ *
+ * Future calculators only need to be added to this map; the route
+ * stays the same.
+ */
+function pickCalculatorComponents(kind: FinanceCalculatorKind): {
+  Surface: React.ComponentType<{
+    calculation: Parameters<typeof EmiSurface>[0]["calculation"];
+    onChange: Parameters<typeof EmiSurface>[0]["onChange"];
+  }>;
+  Properties: React.ComponentType<{ calculation: Parameters<typeof EmiProperties>[0]["calculation"] }>;
+} | null {
+  switch (kind) {
+    case "emi":
+      return { Surface: EmiSurface, Properties: EmiProperties };
+    case "sip":
+      return { Surface: SipSurface, Properties: SipProperties };
+    case "compound-interest":
+      return {
+        Surface: CompoundInterestSurface,
+        Properties: CompoundInterestProperties,
+      };
+    case "loan":
+      return { Surface: LoanSurface, Properties: LoanProperties };
+    default:
+      return null;
+  }
+}
+
 export default async function FinancePilotCalculatorPage({
   params,
 }: {
@@ -49,10 +87,12 @@ export default async function FinancePilotCalculatorPage({
   const calc = getCalculatorBySlug(slug);
   if (!calc) notFound();
 
-  // The foundation still mounts the blank surface. The first real
-  // calculator will switch this to its own surface and properties
-  // components using the `calc.kind` discriminator.
-  void calculators;
+  const components = pickCalculatorComponents(calc.kind);
+  // The foundation keeps the blank surface as a fallback for any
+  // calculator that has not been wired up yet, so the workspace never
+  // crashes if a calculator descriptor is added without a surface.
+  const Surface = components?.Surface ?? BlankSurface;
+  const Properties = components?.Properties ?? BlankProperties;
 
   const user = await getSession();
 
@@ -64,8 +104,8 @@ export default async function FinancePilotCalculatorPage({
         <div className="h-[calc(100dvh-4rem)] min-h-[520px]">
           <FinanceWorkspace
             kind={calc.kind}
-            Surface={BlankSurface}
-            Properties={BlankProperties}
+            Surface={Surface}
+            Properties={Properties}
           />
         </div>
       </main>

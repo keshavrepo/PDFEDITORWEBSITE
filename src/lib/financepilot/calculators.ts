@@ -85,12 +85,98 @@ export const calculatorCategoryDescriptions: Record<FinanceCalculationCategory, 
 /**
  * Registered calculators.
  *
- * The foundation intentionally starts empty: no calculators ship until a
- * future PR adds the first one. The array stays here so the workspace
- * shell, the search index and the products page can iterate it without
- * branching on whether anything has been registered yet.
+ * The array is the single source of truth for which calculators the
+ * workspace shell mounts, which calculators the products page lists,
+ * and which calculators the search index surfaces. Adding a new
+ * calculator means appending one descriptor here.
  */
-export const calculators: FinanceCalculatorDefinition[] = [];
+export const calculators: FinanceCalculatorDefinition[] = [
+  {
+    id: "finance-emi",
+    kind: "emi",
+    slug: "emi",
+    name: "EMI Calculator",
+    tagline: "Monthly payments, total interest and amortisation",
+    description:
+      "Compute the Equated Monthly Instalment for any fixed-rate loan. See the total interest, the total payment, and a full amortisation schedule with a pie chart of principal versus interest.",
+    intro:
+      "Type a loan amount, an annual interest rate and a tenure. The workspace computes the EMI, the total interest, the total payment, an amortisation table and a pie chart, then lets you save the calculation or export it as a PDF.",
+    defaultCategory: "loan",
+    keywords: [
+      "EMI",
+      "loan",
+      "amortisation",
+      "monthly payment",
+      "interest",
+      "FinancePilot",
+    ],
+    highlights: ["EMI", "Amortisation schedule", "Pie chart", "Export PDF"],
+    toolCount: 1,
+  },
+  {
+    id: "finance-sip",
+    kind: "sip",
+    slug: "sip",
+    name: "SIP Calculator",
+    tagline: "Project a Systematic Investment Plan to its final value",
+    description:
+      "See how a monthly SIP grows over time. The workspace shows the total investment, the estimated returns, the final value and a year-by-year growth chart.",
+    intro:
+      "Type the monthly investment, the expected return rate and the duration. The workspace computes the final value, the total invested, the estimated returns and a growth chart, then lets you save the calculation or export it as a PDF.",
+    defaultCategory: "investment",
+    keywords: [
+      "SIP",
+      "systematic investment plan",
+      "mutual fund",
+      "growth",
+      "FinancePilot",
+    ],
+    highlights: ["Total investment", "Estimated returns", "Growth chart", "Export PDF"],
+    toolCount: 1,
+  },
+  {
+    id: "finance-compound-interest",
+    kind: "compound-interest",
+    slug: "compound-interest",
+    name: "Compound Interest Calculator",
+    tagline: "See compounding frequency reshape your returns",
+    description:
+      "Project a principal through monthly, quarterly, half-yearly or daily compounding. The workspace shows the final amount, the interest earned and a year-by-year growth chart.",
+    intro:
+      "Type a principal, an annual rate, a compounding frequency and a duration. The workspace computes the final amount, the interest earned and a growth chart, then lets you save the calculation or export it as a PDF.",
+    defaultCategory: "savings",
+    keywords: [
+      "compound interest",
+      "compounding",
+      "growth",
+      "savings",
+      "FinancePilot",
+    ],
+    highlights: ["Final amount", "Interest earned", "Growth chart", "Export PDF"],
+    toolCount: 1,
+  },
+  {
+    id: "finance-loan",
+    kind: "loan",
+    slug: "loan",
+    name: "Loan Calculator",
+    tagline: "True loan cost with down payment and processing fee",
+    description:
+      "Compute the monthly payment, total interest and total cost of a loan after the down payment and the processing fee. The workspace shows an amortisation table and a pie chart of principal versus interest.",
+    intro:
+      "Type the loan amount, the annual interest rate, the tenure, the processing fee and the down payment. The workspace computes the monthly payment, the total interest, the total cost, an amortisation table and a pie chart, then lets you save the calculation or export it as a PDF.",
+    defaultCategory: "loan",
+    keywords: [
+      "loan",
+      "down payment",
+      "processing fee",
+      "amortisation",
+      "FinancePilot",
+    ],
+    highlights: ["Monthly payment", "Total cost", "Amortisation table", "Export PDF"],
+    toolCount: 1,
+  },
+];
 
 export function getCalculator(
   kind: FinanceCalculatorKind

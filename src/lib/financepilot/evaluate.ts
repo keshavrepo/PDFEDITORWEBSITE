@@ -2,30 +2,30 @@
  * Shared calculation engine.
  *
  * The engine is the single place that knows how to turn a calculation
- * body into a user-visible result. Each future calculator registers an
- * `evaluate` function on the calculator descriptor; the workspace shell
- * and any future surface call into this module so the same input always
+ * body into a user-visible result. Each calculator registers its
+ * `evaluate` function in `calculator-runtime`; the workspace shell and
+ * any future surface call into this module so the same input always
  * produces the same result.
  *
- * The foundation ships a tiny built-in evaluator for the "blank" body
- * so the blank surface has something to render before the first real
- * calculator lands.
+ * The foundation shipped a tiny built-in evaluator for the "blank" body
+ * so the blank surface had something to render before the first real
+ * calculator landed. With batch 1 in place, every registered kind
+ * dispatches to its runtime evaluator; the blank fallback is kept for
+ * `kind === "blank"` only.
  */
 
 import type {
   FinanceCalculation,
   FinanceEvaluation,
-  FinanceCalculatorDefinition,
 } from "./types";
-import { getCalculator } from "./calculators";
+import { dispatch } from "./calculator-runtime";
 
 /**
- * Built-in evaluator used until the first real calculator registers.
+ * Built-in evaluator for the "blank" body.
  *
  * The blank surface stores a free-form `inputs` map. The built-in
- * evaluator sums numeric inputs and reports the total. This is enough to
- * exercise the engine, the shell and the autosave loop end-to-end
- * without committing to a specific calculator's algorithm.
+ * evaluator sums numeric inputs and reports the total. It is also the
+ * fallback for any kind that has not been wired up yet.
  */
 function evaluateBlank(
   calculation: FinanceCalculation
@@ -57,21 +57,17 @@ function evaluateBlank(
 }
 
 /**
- * Evaluates a calculation against the registered calculator for its
- * kind. Falls back to the built-in blank evaluator when the kind is
- * unknown, so the foundation is always usable.
+ * Evaluates a calculation against the registered runtime for its kind.
+ *
+ * Falls back to the built-in blank evaluator when the kind is unknown,
+ * so the foundation is always usable.
  */
 export function evaluate(
-  calculation: FinanceCalculation,
-  _inputs?: Record<string, string>
+  calculation: FinanceCalculation
 ): FinanceEvaluation {
-  const calculator: FinanceCalculatorDefinition | undefined = getCalculator(
-    calculation.meta.kind
-  );
-  // The foundation has no registered calculators yet. The blank
-  // evaluator handles every body so the shell never crashes.
-  if (!calculator) return evaluateBlank(calculation);
-  return evaluateBlank(calculation);
+  if (calculation.meta.kind === "blank") return evaluateBlank(calculation);
+  const runtime = dispatch(calculation);
+  return runtime.evaluate(calculation);
 }
 
 /** Formats a number with up to 4 decimal places, trimming trailing zeros. */
