@@ -41,23 +41,31 @@ import { SpreadsheetToolbar, FindReplaceDialog } from "./toolbar";
 
 /** Default row height in pixels. */
 const ROW_HEIGHT = 26;
-/** Default column width in pixels. */
-const COLUMN_WIDTH = 110;
 /** Row header width. */
 const ROW_HEADER_WIDTH = 48;
 /** Column header height. */
 const COLUMN_HEADER_HEIGHT = 24;
-/** Frozen pane thickness. */
-const FROZEN_BORDER = 2;
-
-/** Numeric default column width (Excel's default is 8.43 chars). */
-const DEFAULT_COLUMN_WIDTH = 96;
 
 /** Returns a range of integers from start to end (inclusive). */
 function range(start: number, end: number): number[] {
   const result: number[] = [];
   for (let i = start; i <= end; i++) result.push(i);
   return result;
+}
+
+/**
+ * Walks the sheet's columns and returns the index of the column that
+ * contains the given pixel offset. Hidden columns are skipped.
+ */
+function columnFromOffset(sheet: Sheet, offset: number, zoom: number): number {
+  let x = 0;
+  for (let column = 0; column < sheet.columnCount; column++) {
+    if (sheet.columns[column]?.hidden) continue;
+    const width = (sheet.columns[column]?.width ?? 9) * 8 * zoom;
+    if (x + width > offset) return column;
+    x += width;
+  }
+  return Math.max(0, sheet.columnCount - 1);
 }
 
 interface SpreadsheetEditorProps {
@@ -74,23 +82,26 @@ export function SpreadsheetEditor({ document, onChange }: SpreadsheetEditorProps
   const [scrollLeft, setScrollLeft] = useState(0);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 480 });
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const editingInputRef = useRef<HTMLInputElement | null>(null);
 
   const activeSheet = model.commands.getActiveSheet();
 
   // Visible window: determine rows/cols to render based on scroll position.
+  // The width estimator walks per-column widths so a custom-sized column
+  // does not produce a wrong "skip a column" boundary.
   const { visibleRows, visibleColumns } = useMemo(() => {
     const rowHeight = ROW_HEIGHT * zoom;
-    const columnWidth = DEFAULT_COLUMN_WIDTH * zoom;
     const startRow = Math.max(0, Math.floor(scrollTop / rowHeight) - 2);
     const endRow = Math.min(
       activeSheet.rowCount - 1,
       Math.ceil((scrollTop + containerSize.height) / rowHeight) + 2
     );
-    const startCol = Math.max(0, Math.floor(scrollLeft / columnWidth) - 2);
+    // Walk columns in order, summing the actual rendered width of each
+    // (skipping hidden ones), until we have covered the viewport plus a
+    // 2-cell buffer on each side.
+    const startCol = Math.max(0, columnFromOffset(activeSheet, scrollLeft, zoom) - 2);
     const endCol = Math.min(
       activeSheet.columnCount - 1,
-      Math.ceil((scrollLeft + containerSize.width) / columnWidth) + 2
+      columnFromOffset(activeSheet, scrollLeft + containerSize.width, zoom) + 2
     );
     return {
       visibleRows: range(startRow, endRow),
@@ -116,14 +127,6 @@ export function SpreadsheetEditor({ document, onChange }: SpreadsheetEditorProps
     setContainerSize({ width: element.clientWidth, height: element.clientHeight });
     return () => observer.disconnect();
   }, []);
-
-  // Focus the editing input when entering edit mode.
-  useEffect(() => {
-    if (editing && editingInputRef.current) {
-      editingInputRef.current.focus();
-      editingInputRef.current.select();
-    }
-  }, [editing]);
 
   /** Returns the merged-cell origin for a given address, if any. */
   const mergeOrigin = useCallback(
@@ -174,10 +177,14 @@ export function SpreadsheetEditor({ document, onChange }: SpreadsheetEditorProps
   const commitEdit = useCallback(() => {
     if (!editing) return;
     const { address, value, isFormula } = editing;
-    if (isFormula) {
-      model.commands.setCell(address.row, address.column, "", value.startsWith("=") ? value : `=${value}`);
-    } else if (value === "") {
+    if (value === "") {
       model.commands.clearCellAt(address.row, address.column);
+    } else if (isFormula || value.startsWith("=")) {
+      // Both the explicit "started with =" state and a value the user
+      // typed that begins with "=" land here. `setCellValue` will promote
+      // the value to the formula slot and clear the raw.
+      const formula = value.startsWith("=") ? value : `=${value}`;
+      model.commands.setCell(address.row, address.column, "", formula);
     } else {
       model.commands.setCell(address.row, address.column, value);
     }
@@ -274,7 +281,8 @@ export function SpreadsheetEditor({ document, onChange }: SpreadsheetEditorProps
         if (event.key === "Enter") {
           event.preventDefault();
           commitEdit();
-          moveSelection(event.shiftKey ? 0 : 1, 0, false);
+          // Shift+Enter moves up, Enter moves down — matches Excel.
+          moveSelection(event.shiftKey ? -1 : 1, 0, false);
         } else if (event.key === "Escape") {
           event.preventDefault();
           cancelEdit();
@@ -325,6 +333,18 @@ export function SpreadsheetEditor({ document, onChange }: SpreadsheetEditorProps
         if (range) model.commands.clearRange(range[0], range[1]);
         return;
       }
+      if (mod && event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        // Select the whole sheet, like Excel's Ctrl+A.
+        model.setSelection({
+          anchor: { row: 0, column: 0 },
+          focus: {
+            row: Math.max(0, activeSheet.rowCount - 1),
+            column: Math.max(0, activeSheet.columnCount - 1),
+          },
+        });
+        return;
+      }
       if (mod && event.key.toLowerCase() === "c") {
         event.preventDefault();
         copySelectionToClipboard();
@@ -360,6 +380,11 @@ export function SpreadsheetEditor({ document, onChange }: SpreadsheetEditorProps
         event.preventDefault();
         const range = getSelectionRange();
         if (range) model.commands.clearRange(range[0], range[1]);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        // Drop the selection so the user can quickly deselect without
+        // reaching for the mouse.
+        model.setSelection(null);
       } else if (event.key === "Home") {
         event.preventDefault();
         const current = model.selection?.focus ?? { row: 0, column: 0 };
@@ -378,14 +403,18 @@ export function SpreadsheetEditor({ document, onChange }: SpreadsheetEditorProps
         }
       } else if (event.key === "PageUp") {
         event.preventDefault();
-        const current = model.selection?.focus ?? { row: 0, column: 0 };
-        const pageRows = Math.floor(containerSize.height / (ROW_HEIGHT * zoom));
-        moveSelection(-pageRows, 0, false);
+        const pageRows = Math.max(
+          1,
+          Math.floor(containerSize.height / (ROW_HEIGHT * zoom))
+        );
+        moveSelection(-pageRows, 0, event.shiftKey);
       } else if (event.key === "PageDown") {
         event.preventDefault();
-        const current = model.selection?.focus ?? { row: 0, column: 0 };
-        const pageRows = Math.floor(containerSize.height / (ROW_HEIGHT * zoom));
-        moveSelection(pageRows, 0, false);
+        const pageRows = Math.max(
+          1,
+          Math.floor(containerSize.height / (ROW_HEIGHT * zoom))
+        );
+        moveSelection(pageRows, 0, event.shiftKey);
       } else if (event.key.length === 1 && !mod && !event.altKey) {
         // Begin editing with this character.
         event.preventDefault();
@@ -426,6 +455,8 @@ export function SpreadsheetEditor({ document, onChange }: SpreadsheetEditorProps
   // Render
   // ----------------------------------------------------------------
 
+  // Each character in Excel's "width" units maps to 8 CSS pixels at 1x
+  // zoom; the workbook default is 9 chars so the helper returns 9 * 8.
   const columnWidth = useCallback(
     (column: number) => (activeSheet.columns[column]?.width ?? 9) * 8,
     [activeSheet.columns]
@@ -527,6 +558,89 @@ export function SpreadsheetEditor({ document, onChange }: SpreadsheetEditorProps
     [model.commands]
   );
 
+  /**
+   * Selects an entire column. With extend=true the selection grows from
+   * the anchor; with extend=false the column becomes the only thing
+   * selected. Matches Excel/Google Sheets' click-on-column-header.
+   */
+  const selectColumn = useCallback(
+    (column: number, extend: boolean) => {
+      if (extend && model.selection) {
+        const focusColumn = Math.max(
+          0,
+          Math.min(activeSheet.columnCount - 1, column)
+        );
+        model.setSelection({
+          anchor: { row: 0, column: focusColumn },
+          focus: { row: activeSheet.rowCount - 1, column: focusColumn },
+        });
+      } else {
+        model.setSelection({
+          anchor: { row: 0, column },
+          focus: { row: activeSheet.rowCount - 1, column },
+        });
+      }
+    },
+    [activeSheet.columnCount, activeSheet.rowCount, model]
+  );
+
+  /**
+   * Selects an entire row. Same semantics as `selectColumn` but flips
+   * the row/column axes.
+   */
+  const selectRow = useCallback(
+    (row: number, extend: boolean) => {
+      if (extend && model.selection) {
+        const focusRow = Math.max(
+          0,
+          Math.min(activeSheet.rowCount - 1, row)
+        );
+        model.setSelection({
+          anchor: { row: focusRow, column: 0 },
+          focus: { row: focusRow, column: activeSheet.columnCount - 1 },
+        });
+      } else {
+        model.setSelection({
+          anchor: { row, column: 0 },
+          focus: { row, column: activeSheet.columnCount - 1 },
+        });
+      }
+    },
+    [activeSheet.columnCount, activeSheet.rowCount, model]
+  );
+
+  const isColumnSelected = useCallback(
+    (column: number) => {
+      const selection = model.selection;
+      if (!selection) return false;
+      const startCol = Math.min(selection.anchor.column, selection.focus.column);
+      const endCol = Math.max(selection.anchor.column, selection.focus.column);
+      return (
+        startCol === 0 &&
+        endCol === activeSheet.columnCount - 1 &&
+        selection.anchor.row === 0 &&
+        selection.focus.row === activeSheet.rowCount - 1
+      );
+    },
+    [activeSheet.columnCount, activeSheet.rowCount, model.selection]
+  );
+
+  const isRowSelected = useCallback(
+    (row: number) => {
+      const selection = model.selection;
+      if (!selection) return false;
+      const startRow = Math.min(selection.anchor.row, selection.focus.row);
+      const endRow = Math.max(selection.anchor.row, selection.focus.row);
+      return (
+        startRow === row &&
+        endRow === row &&
+        selection.anchor.column === 0 &&
+        selection.focus.column === activeSheet.columnCount - 1
+      );
+    },
+    [activeSheet.columnCount, model.selection]
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
       <SpreadsheetToolbar
@@ -562,12 +676,40 @@ export function SpreadsheetEditor({ document, onChange }: SpreadsheetEditorProps
           onBlur={commitEdit}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
+              event.preventDefault();
               commitEdit();
-              moveSelection(1, 0, false);
+              // Shift+Enter moves up, Enter moves down — matches Excel.
+              moveSelection(event.shiftKey ? -1 : 1, 0, false);
               (event.target as HTMLInputElement).blur();
             } else if (event.key === "Escape") {
+              event.preventDefault();
               cancelEdit();
               (event.target as HTMLInputElement).blur();
+            } else if (event.key === "Tab") {
+              event.preventDefault();
+              commitEdit();
+              moveSelection(0, event.shiftKey ? -1 : 1, false);
+              (event.target as HTMLInputElement).blur();
+            } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+              event.preventDefault();
+              commitEdit();
+              moveSelection(event.key === "ArrowUp" ? -1 : 1, 0, false);
+              (event.target as HTMLInputElement).blur();
+            } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+              // Don't hijack left/right when the cursor is in the middle
+              // of the input value; only move the selection once the
+              // cursor is at the edge, like Excel does.
+              const input = event.target as HTMLInputElement;
+              const atEdge =
+                (event.key === "ArrowLeft" && input.selectionStart === 0) ||
+                (event.key === "ArrowRight" &&
+                  input.selectionStart === input.value.length);
+              if (atEdge) {
+                event.preventDefault();
+                commitEdit();
+                moveSelection(0, event.key === "ArrowLeft" ? -1 : 1, false);
+                input.blur();
+              }
             }
           }}
           placeholder="Enter value or formula (e.g. =SUM(A1:A10))"
@@ -582,10 +724,18 @@ export function SpreadsheetEditor({ document, onChange }: SpreadsheetEditorProps
       {/* Grid container */}
       <div
         ref={containerRef}
-        className="relative min-h-0 flex-1 overflow-auto bg-background outline-none"
+        className="relative min-h-0 flex-1 overflow-auto bg-background outline-none focus-visible:ring-2 focus-visible:ring-foreground/20"
         tabIndex={0}
         onKeyDown={handleKeyDown}
         onScroll={handleScroll}
+        onMouseDown={(event) => {
+          // A mousedown on the grid background (not on a cell) should
+          // still focus the grid so the keyboard shortcuts keep working.
+          // The cell mousedown handler runs first and may stopPropagation.
+          if (event.target === event.currentTarget) {
+            (event.currentTarget as HTMLDivElement).focus();
+          }
+        }}
         role="grid"
         aria-label="Spreadsheet grid"
       >
@@ -638,8 +788,10 @@ export function SpreadsheetEditor({ document, onChange }: SpreadsheetEditorProps
                   width={width}
                   offset={offset}
                   isFrozen={column < frozenColumns}
+                  isSelected={isColumnSelected(column)}
                   zoom={zoom}
                   onResize={(delta) => resizeColumn(column, delta)}
+                  onSelect={(extend) => selectColumn(column, extend)}
                 />
               );
             })}
@@ -657,7 +809,9 @@ export function SpreadsheetEditor({ document, onChange }: SpreadsheetEditorProps
                 height={height}
                 offset={offset}
                 isFrozen={row < frozenRows}
+                isSelected={isRowSelected(row)}
                 onResize={(delta) => resizeRow(row, delta)}
+                onSelect={(extend) => selectRow(row, extend)}
               />
             );
           })}
@@ -686,6 +840,13 @@ export function SpreadsheetEditor({ document, onChange }: SpreadsheetEditorProps
                   const isEditing = Boolean(
                     editing && editing.address.row === row && editing.address.column === column
                   );
+                  // When this cell is the one being edited, prefer the
+                  // in-progress value the user is typing over the
+                  // committed display so the input does not snap back on
+                  // every keystroke.
+                  const cellDisplayedValue = isEditing
+                    ? editing!.value
+                    : getDisplayedValue({ row, column });
                   return (
                     <CellView
                       key={`${row}:${column}`}
@@ -699,8 +860,19 @@ export function SpreadsheetEditor({ document, onChange }: SpreadsheetEditorProps
                       isSelected={isSelected}
                       isEditing={isEditing}
                       zoom={zoom}
-                      displayedValue={getDisplayedValue({ row, column })}
+                      displayedValue={cellDisplayedValue}
                       onMouseDown={(event) => {
+                        // Focus the grid container on every cell click so
+                        // arrow keys, copy/paste and the other grid-level
+                        // shortcuts work without a second click somewhere
+                        // else first.
+                        const container = containerRef.current;
+                        if (container && event.currentTarget instanceof Element) {
+                          // requestAnimationFrame defers the focus call
+                          // until after the browser's default focus
+                          // management has settled.
+                          requestAnimationFrame(() => container.focus());
+                        }
                         if (event.shiftKey && model.selection) {
                           model.setSelection({
                             anchor: model.selection.anchor,
@@ -787,15 +959,18 @@ interface ColumnHeaderProps {
   offset: number;
   isFrozen: boolean;
   zoom: number;
+  isSelected: boolean;
   onResize: (delta: number) => void;
+  onSelect: (extend: boolean) => void;
 }
 
-function ColumnHeader({ column, width, offset, isFrozen, zoom, onResize }: ColumnHeaderProps) {
+function ColumnHeader({ column, width, offset, isFrozen, zoom, onResize, onSelect, isSelected }: ColumnHeaderProps) {
   return (
     <div
       className={cn(
         "flex items-center justify-end border-b border-r border-border bg-muted px-1 text-[10px] font-medium text-muted-foreground",
-        isFrozen && "z-30"
+        isFrozen && "z-30",
+        isSelected && "bg-foreground/15"
       )}
       style={{
         position: "absolute",
@@ -803,6 +978,11 @@ function ColumnHeader({ column, width, offset, isFrozen, zoom, onResize }: Colum
         left: offset,
         width,
         height: COLUMN_HEADER_HEIGHT * zoom,
+      }}
+      onMouseDown={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onSelect(event.shiftKey);
       }}
     >
       <span className="flex-1 truncate text-center">{columnLetter(column)}</span>
@@ -816,15 +996,18 @@ interface RowHeaderProps {
   height: number;
   offset: number;
   isFrozen: boolean;
+  isSelected: boolean;
   onResize: (delta: number) => void;
+  onSelect: (extend: boolean) => void;
 }
 
-function RowHeader({ row, height, offset, isFrozen, onResize }: RowHeaderProps) {
+function RowHeader({ row, height, offset, isFrozen, isSelected, onResize, onSelect }: RowHeaderProps) {
   return (
     <div
       className={cn(
         "flex items-center justify-between border-b border-r border-border bg-muted px-1 text-[10px] font-medium text-muted-foreground",
-        isFrozen && "z-30"
+        isFrozen && "z-30",
+        isSelected && "bg-foreground/15"
       )}
       style={{
         position: "absolute",
@@ -832,6 +1015,11 @@ function RowHeader({ row, height, offset, isFrozen, onResize }: RowHeaderProps) 
         left: 0,
         width: ROW_HEADER_WIDTH,
         height,
+      }}
+      onMouseDown={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onSelect(event.shiftKey);
       }}
     >
       <span className="flex-1 text-center">{row + 1}</span>
@@ -993,8 +1181,9 @@ function CellView({
       {isEditing ? (
         <input
           autoFocus
-          defaultValue={displayedValue}
+          value={displayedValue}
           onChange={(event) => onChange(event.target.value)}
+          onFocus={(event) => event.currentTarget.select()}
           onBlur={onCommit}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
@@ -1003,6 +1192,12 @@ function CellView({
             } else if (event.key === "Escape") {
               event.preventDefault();
               onCancel();
+            } else if (event.key === "Tab") {
+              // Tab is handled by the grid-level keydown listener so it
+              // can run after the cell commits, but make sure the
+              // browser does not steal focus on its own.
+              event.preventDefault();
+              onCommit();
             }
           }}
           className="absolute inset-0 w-full bg-background px-1 font-mono text-[12px] outline-none"

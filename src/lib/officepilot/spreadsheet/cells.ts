@@ -88,11 +88,20 @@ export function setActiveSheet(body: SheetBody, sheetId: string): SheetBody {
 export function addSheet(body: SheetBody, name?: string): SheetBody {
   const id = makeId("sheet");
   const usedNames = new Set(body.sheets.map((sheet) => sheet.name));
-  let candidate = name ?? `Sheet ${body.sheets.length + 1}`;
-  let suffix = body.sheets.length + 1;
-  while (usedNames.has(candidate)) {
-    suffix += 1;
-    candidate = `Sheet ${suffix}`;
+  const trimmed = name?.trim();
+  let candidate = trimmed && trimmed.length > 0 ? trimmed : `Sheet ${body.sheets.length + 1}`;
+  // Disambiguate against existing names, including the auto-derived
+  // "Sheet N" when the caller did not pass one. The suffix always moves
+  // forward so a renamed "Sheet 2" still leaves "Sheet 2" available
+  // for the new sheet.
+  if (usedNames.has(candidate)) {
+    const base = candidate;
+    let suffix = 2;
+    candidate = `${base} (${suffix})`;
+    while (usedNames.has(candidate)) {
+      suffix += 1;
+      candidate = `${base} (${suffix})`;
+    }
   }
   const sheet: Sheet = {
     id,
@@ -157,8 +166,18 @@ export function setCellValue(sheet: Sheet, row: number, column: number, raw: str
     } else {
       next.formula = formula;
     }
+  } else if (raw !== "" && !raw.startsWith("=")) {
+    // A plain (non-formula) write always supersedes any prior formula;
+    // otherwise the cell would still compute its old expression after the
+    // user overwrites it with a value.
+    delete next.formula;
   }
   if (raw === "") {
+    next.raw = undefined;
+  } else if (raw.startsWith("=") && formula === undefined) {
+    // Caller passed a `=`-prefixed raw value without a separate formula;
+    // promote it to the formula slot so the engine evaluates it.
+    next.formula = raw;
     next.raw = undefined;
   } else {
     next.raw = raw;

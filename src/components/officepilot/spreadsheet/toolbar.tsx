@@ -39,6 +39,7 @@ import type { SpreadsheetEditorCommands } from "./document-model";
 import type { CellAddress } from "@/lib/officepilot/spreadsheet/schema";
 import { printSheetDocument } from "@/lib/officepilot/spreadsheet/text-exporters";
 import { exportSheetToXlsx } from "@/lib/officepilot/spreadsheet/xlsx-export";
+import { ColorPicker } from "./color-picker";
 
 const FONT_FAMILIES = [
   "Inter",
@@ -57,27 +58,6 @@ const FONT_FAMILIES = [
 ];
 
 const FONT_SIZES = [9, 10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64];
-
-const COLORS = [
-  "#0a0a0a",
-  "#525252",
-  "#a3a3a3",
-  "#d4d4d4",
-  "#f5f5f5",
-  "#fafafa",
-  "#dc2626",
-  "#ea580c",
-  "#ca8a04",
-  "#65a30d",
-  "#16a34a",
-  "#0d9488",
-  "#0284c7",
-  "#4338ca",
-  "#7c3aed",
-  "#a21caf",
-  "#be185d",
-  "#ffffff",
-];
 
 const NUMBER_FORMATS: Array<{ value: string; label: string }> = [
   { value: "general", label: "General" },
@@ -159,13 +139,40 @@ export function SpreadsheetToolbar({
     return body.settings.fontSize;
   })();
 
-  // Close color pickers when clicking outside.
+  /** The font colour of the active cell, or null (Automatic). */
+  const activeFontColor = (() => {
+    const range = getSelectionRange();
+    if (!range) return null;
+    const [start, end] = range;
+    for (let row = start.row; row <= end.row; row++) {
+      for (let column = start.column; column <= end.column; column++) {
+        const cell = activeSheet.cells[`${row}:${column}`];
+        if (cell?.style?.fontColor) return cell.style.fontColor;
+      }
+    }
+    return null;
+  })();
+
+  /** The background colour of the active cell, or null (Automatic). */
+  const activeBackgroundColor = (() => {
+    const range = getSelectionRange();
+    if (!range) return null;
+    const [start, end] = range;
+    for (let row = start.row; row <= end.row; row++) {
+      for (let column = start.column; column <= end.column; column++) {
+        const cell = activeSheet.cells[`${row}:${column}`];
+        if (cell?.style?.backgroundColor) return cell.style.backgroundColor;
+      }
+    }
+    return null;
+  })();
+
+  // Close the number-format dropdown on outside click. The colour
+  // pickers handle their own dismissal via the ColorPicker component.
   useEffect(() => {
     function onClick(event: MouseEvent) {
       const target = event.target as HTMLElement;
-      if (!target.closest("[data-picker]")) {
-        setShowFontColor(false);
-        setShowHighlight(false);
+      if (!target.closest("[data-number-format]")) {
         setShowNumberFormat(false);
       }
     }
@@ -211,28 +218,67 @@ export function SpreadsheetToolbar({
         </ToolGroup>
 
         <ToolGroup>
-          <div className="relative" data-picker>
-            <IconButton onClick={() => setShowFontColor(!showFontColor)} aria-label="Font color" title="Font color">
-              <Palette className="h-3.5 w-3.5" />
+          <div className="relative">
+            <IconButton
+              onClick={() => {
+                setShowHighlight(false);
+                setShowFontColor(!showFontColor);
+              }}
+              aria-label="Font color"
+              title="Font color"
+            >
+              <span className="relative inline-block">
+                <Palette
+                  className="h-3.5 w-3.5"
+                  style={{ color: activeFontColor ?? undefined }}
+                />
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-x-1 bottom-0.5 h-0.5 rounded"
+                  style={{ background: activeFontColor ?? "currentColor" }}
+                />
+              </span>
             </IconButton>
             {showFontColor && (
-              <ColorPalette
+              <ColorPicker
+                key={`font-color-${activeFontColor ?? "auto"}`}
+                label="Font color"
+                value={activeFontColor}
+                open={showFontColor}
+                onClose={() => setShowFontColor(false)}
                 onPick={(color) => {
                   withSelection(getSelectionRange, body, (start, end) => commands.setFontColor(start, end, color))();
-                  setShowFontColor(false);
                 }}
               />
             )}
           </div>
-          <div className="relative" data-picker>
-            <IconButton onClick={() => setShowHighlight(!showHighlight)} aria-label="Background color" title="Background color">
-              <PaintBucket className="h-3.5 w-3.5" />
+          <div className="relative">
+            <IconButton
+              onClick={() => {
+                setShowFontColor(false);
+                setShowHighlight(!showHighlight);
+              }}
+              aria-label="Background color"
+              title="Background color"
+            >
+              <span className="relative inline-block">
+                <PaintBucket className="h-3.5 w-3.5" />
+                <span
+                  aria-hidden="true"
+                  className="absolute -bottom-0.5 left-0 right-0 h-1 rounded-sm"
+                  style={{ background: activeBackgroundColor ?? "currentColor" }}
+                />
+              </span>
             </IconButton>
             {showHighlight && (
-              <ColorPalette
+              <ColorPicker
+                key={`bg-color-${activeBackgroundColor ?? "auto"}`}
+                label="Background color"
+                value={activeBackgroundColor}
+                open={showHighlight}
+                onClose={() => setShowHighlight(false)}
                 onPick={(color) => {
                   withSelection(getSelectionRange, body, (start, end) => commands.setBackgroundColor(start, end, color))();
-                  setShowHighlight(false);
                 }}
               />
             )}
@@ -295,7 +341,7 @@ export function SpreadsheetToolbar({
         </ToolGroup>
 
         <ToolGroup>
-          <div className="relative" data-picker>
+          <div className="relative" data-number-format>
             <IconButton onClick={() => setShowNumberFormat(!showNumberFormat)} aria-label="Number format" title="Number format">
               <span className="font-mono text-[10px]">123</span>
             </IconButton>
@@ -526,30 +572,6 @@ function FontSizeSelect({ value, onChange }: { value: number; onChange: (next: n
         </option>
       ))}
     </select>
-  );
-}
-
-function ColorPalette({ onPick }: { onPick: (color: string | undefined) => void }) {
-  return (
-    <div className="absolute left-0 top-full z-50 mt-1 grid grid-cols-6 gap-1 rounded-lg border border-border bg-popover p-2 shadow-md">
-      {COLORS.map((color) => (
-        <button
-          key={color}
-          type="button"
-          onClick={() => onPick(color)}
-          className="h-6 w-6 rounded border border-border"
-          style={{ backgroundColor: color }}
-          aria-label={`Pick color ${color}`}
-        />
-      ))}
-      <button
-        type="button"
-        onClick={() => onPick(undefined)}
-        className="col-span-6 mt-1 w-full rounded border border-border px-2 py-1 text-xs hover:bg-accent"
-      >
-        Clear color
-      </button>
-    </div>
   );
 }
 

@@ -111,10 +111,10 @@ export interface SpreadsheetEditorCommands {
   setFontFamily: (start: CellAddress, end: CellAddress, family: string) => void;
   /** Sets font size. */
   setFontSize: (start: CellAddress, end: CellAddress, size: number) => void;
-  /** Sets font color. */
-  setFontColor: (start: CellAddress, end: CellAddress, color: string | undefined) => void;
-  /** Sets background color. */
-  setBackgroundColor: (start: CellAddress, end: CellAddress, color: string | undefined) => void;
+  /** Sets font color. `null` clears the colour back to automatic. */
+  setFontColor: (start: CellAddress, end: CellAddress, color: string | null | undefined) => void;
+  /** Sets background color. `null` clears the colour back to automatic. */
+  setBackgroundColor: (start: CellAddress, end: CellAddress, color: string | null | undefined) => void;
   /** Toggles a boolean mark. */
   toggleMark: (start: CellAddress, end: CellAddress, mark: "bold" | "italic" | "underline" | "strikethrough") => void;
   /** Insert rows. */
@@ -526,7 +526,12 @@ export function useSpreadsheetEditorModel({
       selectSheet: (id) => {
         const nextBody = setActiveSheet(body, id);
         if (nextBody === body) return;
+        // Re-evaluate so cross-sheet formula refs resolve against the
+        // new active sheet. Reset the local selection so the next render
+        // does not try to highlight a cell that may be out of bounds in
+        // the new sheet.
         commitBody(evaluateBody(nextBody), "Sheet", false);
+        setSelection(null);
       },
       sortRange: (start, end, column, direction) => {
         applyToSheet(activeSheetId(), (sheet) => sortRange(sheet, start, end, column, direction), "Sort", false);
@@ -562,11 +567,14 @@ export function useSpreadsheetEditorModel({
           }
         }
         const nextSheet = { ...sheet, cells: nextCells };
+        // Re-evaluate so any formulas that depend on the replaced cells
+        // pick up the new values; without this, dependent cells keep
+        // their stale cached display until the next user edit.
         const nextBody: SheetBody = {
           ...body,
           sheets: body.sheets.map((s) => (s.id === sheet.id ? nextSheet : s)),
         };
-        commitBody(nextBody, "Replace", false);
+        commitBody(evaluateBody(nextBody), "Replace", false);
         return count;
       },
       duplicateRow: (row) => {
