@@ -29,6 +29,13 @@
       "when": 1785520346762,
       "tag": "0003_perpetual_power_pack",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785576001921,
+      "tag": "0004_dazzling_chronomancer",
+      "breakpoints": true
     }
   ]
 }
