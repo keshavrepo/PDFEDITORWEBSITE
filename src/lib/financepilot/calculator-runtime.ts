@@ -312,10 +312,19 @@ export function sipFutureValue(
   const totalInvested = monthlyInvestment * n;
   const estimatedReturns = futureValue - totalInvested;
   const schedule: FinanceScheduleRow[] = [];
-  let balance = 0;
+  // Annuity-due timing: each contribution is made at the start of the
+  // period so it earns interest for the rest of the month. The first
+  // contribution therefore earns interest for `n` months, the last one
+  // for one month; this matches the `(1 + r)` factor in the future
+  // value formula and keeps the running balance aligned with
+  // `futureValue` to the rupee.
+  let balance = monthlyInvestment;
   for (let period = 1; period <= n; period++) {
     const interest = balance * r;
-    balance = balance + interest + monthlyInvestment;
+    balance = balance + interest;
+    if (period < n) {
+      balance = balance + monthlyInvestment;
+    }
     schedule.push({
       period,
       payment: monthlyInvestment,

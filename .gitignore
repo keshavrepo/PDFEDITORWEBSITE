@@ -44,3 +44,4 @@ pnpm-debug.log*
 # run a real Postgres 18 instance for migrations and tests without needing
 # a system-installed server).
 .pgdata/
+docs/financepilot/

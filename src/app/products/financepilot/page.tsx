@@ -14,7 +14,7 @@ const product = getProduct("financepilot");
 const url = `${getAppUrl()}/products/financepilot`;
 const description =
   product?.description ??
-  "FinancePilot is the next LaunchStack product: a browser-based workspace for the financial calculators you reach for every day. The reusable workspace is live; the first calculators ship in the next batch.";
+  "FinancePilot is LaunchStack's workspace for the financial calculators you reach for every day. The EMI, SIP, compound interest and loan calculators are live, with autosave, recent calculations and PDF export.";
 
 export const metadata: Metadata = {
   title: `FinancePilot — Financial calculators | ${platform.name}`,
@@ -65,21 +65,21 @@ const structuredData = {
   ],
 };
 
-/** The features the product page advertises while the foundation is empty. */
-const FOUNDATION_HIGHLIGHTS = [
-  "Reusable workspace shell with the LaunchStack chrome",
-  "Sidebar, recent calculations, categories and search integrated",
-  "Autosave to IndexedDB with a server-side recent mirror",
-  "Export pipeline (JSON) ready for richer exporters",
-  "Shared calculation engine that every future calculator plugs into",
+/** The features the product page advertises. */
+const FEATURE_HIGHLIGHTS = [
+  "EMI, SIP, compound interest and loan calculators, all in the same workspace",
+  "Amortisation and growth schedules with a virtualised scroll for long tenures",
+  "Pure-SVG pie and line charts that match the LaunchStack visual language",
+  "Autosave to IndexedDB with a server-side recent mirror and full rename / duplicate / delete",
+  "Print-to-PDF export for every calculation, using the same browser pipeline as OfficePilot",
 ];
 
-const FOUNDATION_CHECKLIST = [
+const LAUNCHED_CHECKLIST = [
   "Workspace shell, navigation rail, status bar and shortcuts dialog",
   "Per-document autosave, save / open / rename / duplicate / delete lifecycle",
   "Recent-calculations mirror, dashboard and search integration",
   "Type-safe calculation registry, templates and storage layer",
-  "First calculator (loan, mortgage, savings, …) — coming next",
+  "Four live calculators: EMI, SIP, compound interest, loan",
 ];
 
 export default async function FinancePilotProductPage() {
@@ -150,7 +150,9 @@ export default async function FinancePilotProductPage() {
 
               <Card className="p-6">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Foundation status
+                  {calculators.length === 0
+                    ? "Foundation status"
+                    : "Batch 1 status"}
                 </p>
                 <p className="mt-3 text-2xl font-semibold tracking-tight">
                   {calculators.length === 0
@@ -158,10 +160,9 @@ export default async function FinancePilotProductPage() {
                     : `${calculators.length} calculator${calculators.length === 1 ? "" : "s"} live`}
                 </p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  The reusable FinancePilot workspace is live. The first
-                  calculator lands in the next batch and will plug straight
-                  into the same shell, sidebar, autosave loop and export
-                  pipeline.
+                  {calculators.length === 0
+                    ? "The reusable FinancePilot workspace is live. The first calculator lands in the next batch and will plug straight into the same shell, sidebar, autosave loop and export pipeline."
+                    : "The reusable FinancePilot workspace is live with the first batch of calculators: EMI, SIP, compound interest and loan. Each one uses the same shell, sidebar, autosave loop and export pipeline; more calculators plug into the same engine in the next batches."}
                 </p>
               </Card>
             </div>
@@ -171,7 +172,7 @@ export default async function FinancePilotProductPage() {
         <section className="border-b border-border/40">
           <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
             <div className="grid gap-6 sm:grid-cols-2">
-              {FOUNDATION_HIGHLIGHTS.map((highlight) => (
+              {FEATURE_HIGHLIGHTS.map((highlight) => (
                 <div key={highlight} className="flex items-start gap-3">
                   <Check
                     className="mt-0.5 h-4 w-4 shrink-0 text-primary"
@@ -188,11 +189,11 @@ export default async function FinancePilotProductPage() {
           <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
             <div className="mb-6 flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <h2 className="text-lg font-semibold">What ships in the foundation</h2>
+              <h2 className="text-lg font-semibold">What ships in batch 1</h2>
             </div>
             <Card className="p-6">
               <ul className="space-y-3 text-sm">
-                {FOUNDATION_CHECKLIST.map((item) => (
+                {LAUNCHED_CHECKLIST.map((item) => (
                   <li key={item} className="flex items-start gap-2">
                     <Check
                       className="mt-0.5 h-4 w-4 shrink-0 text-primary"
@@ -203,6 +204,31 @@ export default async function FinancePilotProductPage() {
                 ))}
               </ul>
             </Card>
+            {calculators.length > 0 && (
+              <div className="mt-8">
+                <h3 className="mb-4 text-sm font-semibold text-muted-foreground">
+                  Live calculators
+                </h3>
+                <ul className="grid gap-3 sm:grid-cols-2">
+                  {calculators.map((calc) => (
+                    <li key={calc.kind}>
+                      <Link
+                        href={`/financepilot/${calc.slug}`}
+                        className="block rounded-lg border border-border/60 p-4 transition-colors hover:border-foreground/30 hover:bg-accent"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Calculator className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                          <p className="text-sm font-semibold">{calc.name}</p>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {calc.tagline}
+                        </p>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </section>
 
@@ -212,9 +238,9 @@ export default async function FinancePilotProductPage() {
               <div>
                 <h2 className="text-lg font-semibold">Open the FinancePilot workspace</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  The foundation is already usable. Open the workspace to
-                  explore the chrome while the first calculators are being
-                  built.
+                  Pick a calculator from the workspace rail or jump straight to
+                  one of the four live calculators below. Calculations save
+                  themselves and export as a PDF in one click.
                 </p>
               </div>
               <Button asChild size="lg">

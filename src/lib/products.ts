@@ -214,18 +214,27 @@ export const products: Product[] = [
     name: "FinancePilot",
     tagline: "Financial calculators in your browser",
     description:
-      "Run the financial calculators you reach for every day — loans, mortgages, savings, compound interest, ROI and more — inside the LaunchStack workspace, with autosave and the same shared chrome as OfficePilot.",
+      "Run the financial calculators you reach for every day — EMI, SIP, compound interest, loans and more — inside the LaunchStack workspace, with autosave, the same shared chrome as OfficePilot, and print-to-PDF export.",
     status: "active",
     category: "Finance",
-    version: "0.1.0",
+    version: "0.2.0",
     href: "/financepilot",
     accent: "text-primary",
     highlights: [
-      "Calculator workspace",
+      "EMI, SIP, compound interest and loan calculators",
       "Autosave and recent mirror",
-      "Export to JSON",
+      "Print-to-PDF export",
     ],
     releaseNotes: [
+      {
+        version: "0.2.0",
+        date: "2026-08-02",
+        changes: [
+          "Four live calculators: EMI, SIP, compound interest, loan",
+          "Reusable inputs, charts and schedule-table components shared by every calculator",
+          "Print-to-PDF export via the browser's native print pipeline (matches OfficePilot's `printWordDocument` pattern)",
+        ],
+      },
       {
         version: "0.1.0",
         date: "2026-08-01",
