@@ -12,7 +12,7 @@
  *    editor switcher
  *  - the right properties panel with kind-specific controls
  *  - the status bar with document state, autosave status and zoom
- *  - the shared save / open / rename / duplicate / delete lifecycle
+ *  - the shared save / open / rename / delete lifecycle
  *  - the shared autosave loop and the shared keyboard shortcut system
  *
  * The actual editing surface for each kind is delegated to a child
@@ -47,7 +47,7 @@ import {
   autosaveOfficeDocument,
   createOfficeDocument,
   deleteOfficeDocument,
-  duplicateOfficeDocument,
+  editorHref,
   editors,
   getEditor,
   listOfficeDocuments,
@@ -98,7 +98,7 @@ export function OfficeWorkspace({ kind, Surface, Properties }: OfficeWorkspacePr
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
 
-  const autosaveTimer = useRef<number | null>(null);
+  const autosaveTimers = useRef<Map<string, number>>(new Map());
   const openTabsRef = useRef<OfficeDocument[]>([]);
   const saveStatesRef = useRef<Record<string, SaveState>>({});
   useEffect(() => {
@@ -107,6 +107,16 @@ export function OfficeWorkspace({ kind, Surface, Properties }: OfficeWorkspacePr
   useEffect(() => {
     saveStatesRef.current = saveStates;
   }, [saveStates]);
+  // Drop timer entries for tabs that are no longer open.
+  useEffect(() => {
+    const openIds = new Set(openTabs.map((doc) => doc.meta.id));
+    for (const [id, handle] of autosaveTimers.current) {
+      if (!openIds.has(id)) {
+        window.clearTimeout(handle);
+        autosaveTimers.current.delete(id);
+      }
+    }
+  }, [openTabs]);
 
   const activeDocument = useMemo(
     () => openTabs.find((doc) => doc.meta.id === activeId) ?? null,
@@ -198,7 +208,16 @@ export function OfficeWorkspace({ kind, Surface, Properties }: OfficeWorkspacePr
    */
   const closeTab = useCallback(
     async (id: string) => {
-      const state = saveStates[id];
+      // Cancel any pending autosave so the explicit save is the only
+      // write in flight for this tab.
+      const pending = autosaveTimers.current.get(id);
+      if (pending !== undefined) {
+        window.clearTimeout(pending);
+        autosaveTimers.current.delete(id);
+      }
+      // Read the live dirty flag from the ref so the keyboard shortcut
+      // does not race a stale `saveStates` snapshot.
+      const state = saveStatesRef.current[id] ?? "saved";
       const doc = openTabsRef.current.find((d) => d.meta.id === id);
       if (doc && state === "dirty") {
         const saved = await saveOfficeDocument(doc);
@@ -235,7 +254,7 @@ export function OfficeWorkspace({ kind, Surface, Properties }: OfficeWorkspacePr
         return rest;
       });
     },
-    [activeId, refreshRecent, saveStates, toast]
+    [activeId, refreshRecent, toast]
   );
 
   /** Renames a document. */
@@ -257,22 +276,16 @@ export function OfficeWorkspace({ kind, Surface, Properties }: OfficeWorkspacePr
     [refreshRecent, toast]
   );
 
-  /** Duplicates a document and opens the copy. */
-  const duplicateActive = useCallback(async () => {
-    if (!activeDocument) return;
-    const copy = await duplicateOfficeDocument(activeDocument.meta.id);
-    if (!copy) {
-      toast({ message: "Could not duplicate that document.", tone: "error" });
-      return;
-    }
-    setOpenTabs((current) => [...current, copy]);
-    setActiveId(copy.meta.id);
-    await refreshRecent();
-  }, [activeDocument, refreshRecent, toast]);
-
   /** Deletes a document and closes any open tab pointing at it. */
   const deleteDocument = useCallback(
     async (id: string) => {
+      // Cancel any pending autosave so a deleted document cannot be
+      // resurrected by a stale timer.
+      const pending = autosaveTimers.current.get(id);
+      if (pending !== undefined) {
+        window.clearTimeout(pending);
+        autosaveTimers.current.delete(id);
+      }
       const ok = await deleteOfficeDocument(id);
       if (!ok) {
         toast({ message: "Could not delete that document.", tone: "error" });
@@ -346,42 +359,67 @@ export function OfficeWorkspace({ kind, Surface, Properties }: OfficeWorkspacePr
     URL.revokeObjectURL(url);
   }, [activeDocument, editor.slug, toast]);
 
-  /** Schedules an autosave for the active document. */
+  /**
+   * Schedules an autosave for every dirty open document. The timer is
+   * per-document so a tab the user is not currently looking at is still
+   * flushed to storage, and switching tabs does not cancel a save that
+   * is already in flight for the previously-active document.
+   */
   useEffect(() => {
-    if (!activeDocument || activeSaveState !== "dirty") return;
-    const documentId = activeDocument.meta.id;
-    if (autosaveTimer.current !== null) {
-      window.clearTimeout(autosaveTimer.current);
-    }
-    autosaveTimer.current = window.setTimeout(async () => {
-      // Read the current document at fire time so we never overwrite
-      // a newer edit that landed after the timer was scheduled.
-      const latest = openTabsRef.current.find((doc) => doc.meta.id === documentId);
-      if (!latest) return;
-      if (saveStatesRef.current[documentId] !== "dirty") return;
-      setSaveStates((current) => ({ ...current, [documentId]: "saving" }));
-      const saved = await autosaveOfficeDocument(latest);
-      setOpenTabs((current) =>
-        current.map((doc) => (doc.meta.id === saved.meta.id ? saved : doc))
-      );
-      setSaveStates((current) => {
-        // If the user kept editing during the save, go back to dirty so
-        // the next round of edits gets saved again.
-        const latestNow = openTabsRef.current.find((doc) => doc.meta.id === documentId);
-        const nextState: SaveState =
-          latestNow && JSON.stringify(latestNow.body) !== JSON.stringify(saved.body)
-            ? "dirty"
-            : "saved";
-        return { ...current, [saved.meta.id]: nextState };
-      });
-    }, AUTOSAVE_INTERVAL_MS);
-    return () => {
-      if (autosaveTimer.current !== null) {
-        window.clearTimeout(autosaveTimer.current);
-        autosaveTimer.current = null;
+    for (const doc of openTabs) {
+      const state = saveStates[doc.meta.id] ?? "saved";
+      if (state !== "dirty") {
+        // The document is no longer dirty; cancel any pending timer for it.
+        const pending = autosaveTimers.current.get(doc.meta.id);
+        if (pending !== undefined) {
+          window.clearTimeout(pending);
+          autosaveTimers.current.delete(doc.meta.id);
+        }
+        continue;
       }
+      // A dirty document already has a timer running; the next edit will
+      // re-fire this effect and we want to keep the existing one so the
+      // user gets a stable delay before the write.
+      if (autosaveTimers.current.has(doc.meta.id)) continue;
+      const documentId = doc.meta.id;
+      const handle = window.setTimeout(async () => {
+        // The timer fired; remove the entry so a follow-up edit can re-arm.
+        autosaveTimers.current.delete(documentId);
+        // Read the current document at fire time so we never overwrite a
+        // newer edit that landed after the timer was scheduled.
+        const latest = openTabsRef.current.find((d) => d.meta.id === documentId);
+        if (!latest) return;
+        if (saveStatesRef.current[documentId] !== "dirty") return;
+        setSaveStates((current) => ({ ...current, [documentId]: "saving" }));
+        const saved = await autosaveOfficeDocument(latest);
+        setOpenTabs((current) =>
+          current.map((d) => (d.meta.id === saved.meta.id ? saved : d))
+        );
+        setSaveStates((current) => {
+          // If the user kept editing during the save, go back to dirty so
+          // the next round of edits gets saved again.
+          const latestNow = openTabsRef.current.find((d) => d.meta.id === documentId);
+          const nextState: SaveState =
+            latestNow && JSON.stringify(latestNow.body) !== JSON.stringify(saved.body)
+              ? "dirty"
+              : "saved";
+          return { ...current, [saved.meta.id]: nextState };
+        });
+      }, AUTOSAVE_INTERVAL_MS);
+      autosaveTimers.current.set(documentId, handle);
+    }
+  }, [openTabs, saveStates]);
+
+  /** Clear every pending timer on unmount. */
+  useEffect(() => {
+    const timers = autosaveTimers.current;
+    return () => {
+      for (const handle of timers.values()) {
+        window.clearTimeout(handle);
+      }
+      timers.clear();
     };
-  }, [activeDocument, activeSaveState]);
+  }, []);
 
   /**
    * Browser-level guard: if the user closes the tab while a document is
@@ -846,7 +884,7 @@ function NavigationRail({
           {otherEditors.map((other) => (
             <li key={other.kind}>
               <Link
-                href={other.kind === "word" ? "/officepilot" : `/officepilot/${other.kind}`}
+                href={editorHref(other)}
                 className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 <ChevronLeft className="h-3.5 w-3.5 -rotate-180" aria-hidden="true" />
@@ -945,8 +983,16 @@ function EmptyState({
 /* -------------------------------------------------------------------------- */
 
 function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
     if (!open) return;
+    // Park focus on the close button so keyboard users can dismiss with
+    // Enter, and remember the previously-focused element so we can
+    // restore it when the dialog closes.
+    const previous = document.activeElement as HTMLElement | null;
+    const handle = window.setTimeout(() => {
+      closeButtonRef.current?.focus();
+    }, 0);
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -954,7 +1000,14 @@ function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void
       }
     }
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.clearTimeout(handle);
+      window.removeEventListener("keydown", onKeyDown);
+      // Restore focus to the element that opened the dialog.
+      if (previous && typeof previous.focus === "function") {
+        previous.focus();
+      }
+    };
   }, [open, onClose]);
   if (!open) return null;
   const shortcuts: Array<[string, string]> = [
@@ -977,6 +1030,7 @@ function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold">Keyboard shortcuts</h2>
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={onClose}
             className="rounded-lg p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
