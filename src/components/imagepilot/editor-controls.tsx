@@ -205,7 +205,7 @@ function SliderFieldImpl({
         onChange={(event) => onChange(Number(event.target.value))}
         onPointerUp={() => onCommit?.()}
         onKeyUp={() => onCommit?.()}
-        className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary disabled:cursor-not-allowed disabled:opacity-50"
+        className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
       />
     </div>
   );
@@ -594,7 +594,7 @@ function ToolbarButtonImpl({
       className={cn(
         "flex h-8 w-8 items-center justify-center rounded-lg transition-colors",
         active
-          ? "bg-primary text-primary-foreground"
+          ? "bg-foreground text-background"
           : variant === "danger"
             ? "text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
             : "text-muted-foreground hover:bg-accent hover:text-foreground",

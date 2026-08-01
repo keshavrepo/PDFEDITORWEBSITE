@@ -5,10 +5,12 @@ import {
   ArrowRight,
   Clock,
   Download,
+  FileSpreadsheet,
   FileText,
   HardDrive,
   Layers,
   LogIn,
+  Presentation,
   Star,
   TrendingUp,
   UserCog,
@@ -21,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { getActivityTimeline, type ActivityKind } from "@/lib/platform/activity";
 import { getStorageSummary, listFiles } from "@/lib/platform/files";
 import { getFavorites, getUsageStatistics } from "@/lib/platform/usage";
+import { listRecentDocuments } from "@/lib/officepilot/recent";
 import { platform } from "@/lib/products";
 import { tools } from "@/lib/tools";
 import { formatBytes } from "@/lib/format";
@@ -47,6 +50,12 @@ const ACTIVITY_ICON: Record<ActivityKind, typeof FileText> = {
   account: UserCog,
 };
 
+const OFFICE_KIND_ICON = {
+  word: FileText,
+  spreadsheet: FileSpreadsheet,
+  presentation: Presentation,
+} as const;
+
 
 function formatWhen(value: Date): string {
   return value.toLocaleDateString(undefined, {
@@ -62,12 +71,13 @@ export default async function DashboardPage() {
   if (!user) redirect("/login");
 
   // Everything below is derived from this user's own rows; nothing is sampled.
-  const [storage, recentFiles, activity, usage, favorites] = await Promise.all([
+  const [storage, recentFiles, activity, usage, favorites, recentOffice] = await Promise.all([
     getStorageSummary(user.id),
     listFiles(user.id, { limit: 5 }),
     getActivityTimeline(user.id, 8),
     getUsageStatistics(user.id),
     getFavorites(user.id),
+    listRecentDocuments(user.id, { limit: 5 }),
   ]);
 
   const allowance = PLAN_STORAGE[user.plan] ?? PLAN_STORAGE.free;
@@ -251,6 +261,35 @@ export default async function DashboardPage() {
 
           {/* Sidebar */}
           <div className="space-y-8">
+            {/* Recent OfficePilot documents */}
+            {recentOffice.length > 0 && (
+              <section>
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+                  Recent OfficePilot documents
+                </h2>
+                <div className="space-y-2">
+                  {recentOffice.map((doc) => {
+                    const Icon = OFFICE_KIND_ICON[doc.kind];
+                    const href =
+                      doc.kind === "word" ? "/officepilot" : `/officepilot/${doc.kind}`;
+                    return (
+                      <Link key={doc.id} href={href}>
+                        <Card className="p-4 hover:bg-accent transition-colors cursor-pointer group flex items-center gap-2">
+                          <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium truncate">{doc.title}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {new Date(doc.updatedAt).toLocaleDateString()} · v{doc.version}
+                            </p>
+                          </div>
+                        </Card>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
             {/* Favourite tools */}
             <section>
               <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-4">

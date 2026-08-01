@@ -357,6 +357,16 @@ export function EditorCanvas({
     const active = previewRef.current ?? doc;
     const toScreen = (x: number, y: number) => documentToScreen(viewport, x, y);
 
+    // Selection accent is a neutral foreground colour so the editor never
+    // reads as "blue UI" regardless of theme; the chrome is the brand, the
+    // canvas is the document.
+    const accent = "#9ca3af";
+    const accentSoft = "rgba(156,163,175,0.55)";
+    const accentFill = "rgba(156,163,175,0.12)";
+    const snap = "#a3a3a3";
+    const locked = "#a16207";
+    const handleFill = "#ffffff";
+
     // Canvas border.
     const origin = toScreen(0, 0);
     ctx.strokeStyle = "rgba(140,140,160,0.55)";
@@ -383,7 +393,7 @@ export function EditorCanvas({
       ctx.fill("evenodd");
       ctx.restore();
 
-      ctx.strokeStyle = "#ffffff";
+      ctx.strokeStyle = handleFill;
       ctx.lineWidth = 1.5;
       ctx.strokeRect(topLeft.x, topLeft.y, cropWidth, cropHeight);
 
@@ -399,7 +409,7 @@ export function EditorCanvas({
       }
       ctx.stroke();
 
-      ctx.fillStyle = "#ffffff";
+      ctx.fillStyle = handleFill;
       for (const [hx, hy] of [
         [topLeft.x, topLeft.y],
         [topLeft.x + cropWidth / 2, topLeft.y],
@@ -418,7 +428,7 @@ export function EditorCanvas({
     if (marquee) {
       const topLeft = toScreen(marquee.x, marquee.y);
       ctx.save();
-      ctx.strokeStyle = "#2563eb";
+      ctx.strokeStyle = accent;
       ctx.lineWidth = 1;
       ctx.setLineDash([5, 4]);
       ctx.strokeRect(
@@ -427,7 +437,7 @@ export function EditorCanvas({
         marquee.width * viewport.zoom,
         marquee.height * viewport.zoom
       );
-      ctx.fillStyle = "rgba(37,99,235,0.08)";
+      ctx.fillStyle = accentFill;
       ctx.fillRect(topLeft.x, topLeft.y, marquee.width * viewport.zoom, marquee.height * viewport.zoom);
       ctx.restore();
     }
@@ -435,7 +445,7 @@ export function EditorCanvas({
     // Snap guides.
     for (const guide of guidesRef.current) {
       ctx.save();
-      ctx.strokeStyle = "#ec4899";
+      ctx.strokeStyle = snap;
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 3]);
       ctx.beginPath();
@@ -460,7 +470,7 @@ export function EditorCanvas({
         const h = entry.rect.height * viewport.zoom;
 
         ctx.save();
-        ctx.strokeStyle = entry.selected ? "#2563eb" : "rgba(37,99,235,0.55)";
+        ctx.strokeStyle = entry.selected ? accent : accentSoft;
         ctx.lineWidth = entry.selected ? 2 : 1.5;
         ctx.setLineDash(entry.selected ? [] : [5, 4]);
         if (entry.ellipse) {
@@ -479,11 +489,11 @@ export function EditorCanvas({
       const rect = previewRectRef.current;
       const topLeft = toScreen(rect.x, rect.y);
       ctx.save();
-      ctx.strokeStyle = "#2563eb";
+      ctx.strokeStyle = accent;
       ctx.lineWidth = 1.5;
       ctx.setLineDash([5, 4]);
       ctx.strokeRect(topLeft.x, topLeft.y, rect.width * viewport.zoom, rect.height * viewport.zoom);
-      ctx.fillStyle = "rgba(37,99,235,0.1)";
+      ctx.fillStyle = accentFill;
       ctx.fillRect(topLeft.x, topLeft.y, rect.width * viewport.zoom, rect.height * viewport.zoom);
       ctx.restore();
     }
@@ -492,7 +502,7 @@ export function EditorCanvas({
     if (overlay?.mode === "brush" && overlay.brushRadius && pointerDoc) {
       const centre = toScreen(pointerDoc.x, pointerDoc.y);
       ctx.save();
-      ctx.strokeStyle = "#2563eb";
+      ctx.strokeStyle = accent;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.arc(centre.x, centre.y, overlay.brushRadius * viewport.zoom, 0, Math.PI * 2);
@@ -517,7 +527,7 @@ export function EditorCanvas({
         };
 
         ctx.save();
-        ctx.strokeStyle = layer.locked ? "#f59e0b" : "#2563eb";
+        ctx.strokeStyle = layer.locked ? locked : accent;
         ctx.lineWidth = 1.5;
         if (layer.locked) ctx.setLineDash([4, 3]);
         ctx.beginPath();
@@ -538,15 +548,15 @@ export function EditorCanvas({
         const gripX = north.x + Math.sin(angle) * ROTATE_OFFSET;
         const gripY = north.y - Math.cos(angle) * ROTATE_OFFSET;
 
-        ctx.strokeStyle = "#2563eb";
+        ctx.strokeStyle = accent;
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.moveTo(north.x, north.y);
         ctx.lineTo(gripX, gripY);
         ctx.stroke();
 
-        ctx.fillStyle = "#ffffff";
-        ctx.strokeStyle = "#2563eb";
+        ctx.fillStyle = handleFill;
+        ctx.strokeStyle = accent;
         ctx.beginPath();
         ctx.arc(gripX, gripY, HANDLE_SIZE / 2, 0, Math.PI * 2);
         ctx.fill();
@@ -1471,7 +1481,7 @@ function InlineTextEditor({
         textAlign: layer.align,
         color: layer.color,
         background: "transparent",
-        border: "1px dashed #2563eb",
+        border: "1px dashed #9ca3af",
         outline: "none",
         resize: "none",
         overflow: "hidden",
@@ -1480,7 +1490,7 @@ function InlineTextEditor({
         // Match the renderer's alphabetic baseline placement.
         transform: `rotate(${layer.rotation}deg)`,
         transformOrigin: "center",
-        caretColor: "#2563eb",
+        caretColor: "currentColor",
       }}
     />
   );

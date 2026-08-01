@@ -11,6 +11,7 @@
 import { EXPORT_FORMATS, EXPORT_RASTER_CAP } from "./constants";
 import { measureTextLayer, renderDocument, type CanvasFactory } from "./renderer";
 import { hasAdjustments, toCssFilter } from "./adjustments";
+import { optimizeSvg } from "./svg";
 import type {
   EditorDocument,
   ExportFormat,
@@ -411,4 +412,36 @@ export function sanitizeFileName(name: string): string {
 export function exportFileName(base: string, format: ExportFormat): string {
   const descriptor = formatDescriptor(format);
   return `${sanitizeFileName(base)}.${descriptor.extension}`;
+}
+
+/* -------------------------------------------------------------------------- */
+/* SVG optimisation                                                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Re-exported from a sibling module so callers do not need to know that the
+ * optimiser lives in its own file.
+ */
+export { optimizeSvg, defaultOptimizeOptions, type OptimizeOptions, type OptimizeResult } from "./svg";
+
+/**
+ * Convenience wrapper that combines {@link documentToSvg} and the optimiser.
+ *
+ * The image hrefs are encoded once, the resulting SVG is optimised, and the
+ * byte saving is reported back so the UI can show "from 48 kB to 32 kB"
+ * rather than just the final size.
+ */
+export function exportOptimizedSvg(
+  doc: EditorDocument,
+  imageHrefs: Map<string, string>,
+  ctx: CanvasRenderingContext2D | null,
+  options: { transparent?: boolean } = {},
+  optimizeOptions?: import("./svg").OptimizeOptions
+): {
+  svg: string;
+  optimized: import("./svg").OptimizeResult;
+} {
+  const svg = documentToSvg(doc, imageHrefs, ctx, options);
+  const optimized = optimizeSvg(svg, optimizeOptions);
+  return { svg: optimized.svg, optimized };
 }

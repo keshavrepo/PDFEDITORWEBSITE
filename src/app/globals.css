@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/*
+ * Tailwind v4 auto-detects the content to scan, but Next.js's source layout
+ * occasionally leaves utility classes hidden behind barrel exports or
+ * `useState` closures. The explicit `@source` below makes the scanner
+ * walk the entire source tree so every class the components reference
+ * ends up in the production stylesheet.
+ */
+@source "../**/*.{ts,tsx,js,jsx}";
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -8,7 +17,12 @@
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
-    --primary: 221 83% 53%;
+    /*
+     * Accent is a near-neutral gray. The brand stays monochrome; colour
+     * (destructive red, link/CTA blue) is handled by the components that
+     * actually need it, so the chrome never reads as "blue UI".
+     */
+    --primary: 240 5.9% 10%;
     --primary-foreground: 0 0% 100%;
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
@@ -20,30 +34,30 @@
     --destructive-foreground: 0 0% 98%;
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
-    --ring: 221 83% 53%;
+    --ring: 240 5.9% 10%;
     --radius: 0.75rem;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
+    --background: 0 0% 4%;
     --foreground: 0 0% 98%;
-    --card: 240 10% 8%;
+    --card: 0 0% 7%;
     --card-foreground: 0 0% 98%;
-    --popover: 240 10% 8%;
+    --popover: 0 0% 7%;
     --popover-foreground: 0 0% 98%;
-    --primary: 221 83% 53%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 240 3.7% 15.9%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 240 3.7% 12%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
+    --muted: 240 3.7% 12%;
     --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
+    --accent: 240 3.7% 14%;
     --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 62.8% 45%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 221 83% 53%;
+    --border: 240 3.7% 14%;
+    --input: 240 3.7% 14%;
+    --ring: 0 0% 98%;
   }
 }
 
@@ -51,7 +65,7 @@
   * {
     border-color: hsl(var(--border));
   }
-  
+
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
@@ -67,7 +81,45 @@
   }
 }
 
-/* Custom scrollbar */
+/* -------------------------------------------------------------------------- */
+/* Theme registrations (Tailwind v4)                                         */
+/* -------------------------------------------------------------------------- */
+/*                                                                            */
+/* Tailwind v4 generates a `bg-*` / `text-*` / `border-*` utility for every    */
+/* `--color-*` name declared here. The pre-existing components already use    */
+/* `bg-popover`, `text-popover-foreground`, `bg-card`, `border-border`, etc.   */
+/* — the @theme block below makes those classes actually emit CSS so the      */
+/* dropdown menus, popovers, cards and modals render with the solid          */
+/* backgrounds the original design uses.                                     */
+/* -------------------------------------------------------------------------- */
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --radius: 0.75rem;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Custom scrollbar                                                           */
+/* -------------------------------------------------------------------------- */
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -92,7 +144,10 @@
   color: hsl(var(--foreground));
 }
 
-/* Fade in animation */
+/* -------------------------------------------------------------------------- */
+/* Fade in animation                                                          */
+/* -------------------------------------------------------------------------- */
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -106,4 +161,118 @@
 
 .animate-fade-in {
   animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Dropdown menu animation primitives                                         */
+/* -------------------------------------------------------------------------- */
+/*                                                                            */
+/* The Radix `DropdownMenuContent` component (see src/components/ui/dropdown- */
+/* menu.tsx) attaches `data-state=open` and `data-state=closed` to its surface */
+/* and applies `data-[state=open]:animate-in`, `data-[state=open]:fade-in-0`,  */
+/* `data-[state=open]:zoom-in-95`, `data-[side=*]:slide-in-from-*-2` so the    */
+/* menu animates in and out as it opens. The keyframes and the utility rules  */
+/* below are what those classes collapse to; without them the menu still      */
+/* appears, but the open/close animation does not play.                      */
+/* -------------------------------------------------------------------------- */
+
+@keyframes ui-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ui-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes ui-zoom-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes ui-zoom-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.96); }
+}
+
+@keyframes ui-slide-from-top {
+  from { transform: translateY(-0.5rem); }
+  to { transform: translateY(0); }
+}
+
+@keyframes ui-slide-from-bottom {
+  from { transform: translateY(0.5rem); }
+  to { transform: translateY(0); }
+}
+
+@keyframes ui-slide-from-left {
+  from { transform: translateX(-0.5rem); }
+  to { transform: translateX(0); }
+}
+
+@keyframes ui-slide-from-right {
+  from { transform: translateX(0.5rem); }
+  to { transform: translateX(0); }
+}
+
+@layer utilities {
+  .animate-in { animation-duration: 200ms; animation-fill-mode: both; animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+  .animate-out { animation-duration: 150ms; animation-fill-mode: both; animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+  .fade-in-0 { animation-name: ui-fade-in; }
+  .fade-out-0 { animation-name: ui-fade-out; }
+  .zoom-in-95 { animation-name: ui-zoom-in; }
+  .zoom-out-95 { animation-name: ui-zoom-out; }
+  .slide-in-from-top-2 { animation-name: ui-slide-from-top; }
+  .slide-in-from-bottom-2 { animation-name: ui-slide-from-bottom; }
+  .slide-in-from-left-2 { animation-name: ui-slide-from-left; }
+  .slide-in-from-right-2 { animation-name: ui-slide-from-right; }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Radix data-state attribute selectors                                        */
+/* -------------------------------------------------------------------------- */
+/*                                                                            */
+/* Tailwind v4 only generates the `data-[state=open]:<utility>` variant when  */
+/* the bare `<utility>` class is also referenced in source. The dropdown      */
+/* menu only ever composes the variant form, so the rules below duplicate   */
+/* the open/close animation as plain attribute selectors. This way the menu   */
+/* still animates, regardless of whether the JIT scan saw the bare class.   */
+/* -------------------------------------------------------------------------- */
+
+@layer base {
+  [data-state=open].animate-in,
+  [data-state=open].fade-in-0,
+  [data-state=open].zoom-in-95,
+  [data-state=open].slide-in-from-top-2,
+  [data-state=open].slide-in-from-bottom-2,
+  [data-state=open].slide-in-from-left-2,
+  [data-state=open].slide-in-from-right-2 {
+    animation-duration: 200ms;
+    animation-fill-mode: both;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  [data-state=closed].animate-out,
+  [data-state=closed].fade-out-0,
+  [data-state=closed].zoom-out-95,
+  [data-state=closed].slide-out-to-top-2,
+  [data-state=closed].slide-out-to-bottom-2,
+  [data-state=closed].slide-out-to-left-2,
+  [data-state=closed].slide-out-to-right-2 {
+    animation-duration: 150ms;
+    animation-fill-mode: both;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  [data-state=open].fade-in-0 { animation-name: ui-fade-in; }
+  [data-state=closed].fade-out-0 { animation-name: ui-fade-out; }
+  [data-state=open].zoom-in-95 { animation-name: ui-zoom-in; }
+  [data-state=closed].zoom-out-95 { animation-name: ui-zoom-out; }
+  [data-state=open].slide-in-from-top-2 { animation-name: ui-slide-from-top; }
+  [data-state=open].slide-in-from-bottom-2 { animation-name: ui-slide-from-bottom; }
+  [data-state=open].slide-in-from-left-2 { animation-name: ui-slide-from-left; }
+  [data-state=open].slide-in-from-right-2 { animation-name: ui-slide-from-right; }
+  [data-side=bottom].slide-in-from-top-2 { animation-name: ui-slide-from-top; }
+  [data-side=top].slide-in-from-bottom-2 { animation-name: ui-slide-from-bottom; }
+  [data-side=left].slide-in-from-right-2 { animation-name: ui-slide-from-right; }
+  [data-side=right].slide-in-from-left-2 { animation-name: ui-slide-from-left; }
 }

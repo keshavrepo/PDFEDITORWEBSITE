@@ -1,18 +1,26 @@
 /**
  * Global search index.
  *
- * Products, tools and documentation are static, so their index is built once
- * at module load and matched in memory — that keeps search instant without a
- * network round trip. Blog articles live in the database and are merged in by
- * the search endpoint.
+ * Products, tools, templates and documentation are static, so their index
+ * is built once at module load and matched in memory — that keeps search
+ * instant without a network round trip. Blog articles and the user's
+ * recent office documents live in the database and are merged in by the
+ * search endpoint.
  */
 
 import { products } from "@/lib/products";
 import { tools } from "@/lib/tools";
 import { imageTools } from "@/lib/imagepilot/tools";
+import { editors, templates } from "@/lib/officepilot";
 import { documentationSections } from "@/lib/platform/documentation";
 
-export type SearchResultType = "product" | "tool" | "article" | "documentation";
+export type SearchResultType =
+  | "product"
+  | "tool"
+  | "template"
+  | "article"
+  | "documentation"
+  | "recent";
 
 export interface SearchResult {
   id: string;
@@ -91,6 +99,38 @@ function buildStaticIndex(): IndexEntry[] {
     });
   }
 
+  for (const editor of editors) {
+    entries.push({
+      id: `tool-officepilot-${editor.kind}`,
+      type: "tool",
+      title: editor.name,
+      description: editor.description,
+      href: editor.kind === "word" ? "/officepilot" : `/officepilot/${editor.kind}`,
+      context: `OfficePilot`,
+      haystack: `${editor.name} ${editor.description} ${editor.keywords.join(" ")}`.toLowerCase(),
+      weight: 2,
+    });
+  }
+
+  for (const template of templates) {
+    const kindLabel = template.kind === "word" ? "Word" : template.kind === "spreadsheet" ? "Spreadsheet" : "Presentation";
+    entries.push({
+      id: `template-${template.id}`,
+      type: "template",
+      title: template.name,
+      description: template.description,
+      href:
+        template.kind === "word"
+          ? "/officepilot"
+          : template.kind === "spreadsheet"
+            ? "/officepilot/spreadsheet"
+            : "/officepilot/presentation",
+      context: `${kindLabel} template`,
+      haystack: `${template.name} ${template.description} ${template.category} ${template.highlights.join(" ")}`.toLowerCase(),
+      weight: 2,
+    });
+  }
+
   for (const section of documentationSections) {
     entries.push({
       id: `doc-${section.id}`,
@@ -157,14 +197,18 @@ export function searchStatic(query: string, limit = 20): SearchResult[] {
 /** Ordering used when grouping results in the UI. */
 export const searchTypeOrder: SearchResultType[] = [
   "tool",
+  "template",
   "product",
   "article",
   "documentation",
+  "recent",
 ];
 
 export const searchTypeLabels: Record<SearchResultType, string> = {
   tool: "Tools",
+  template: "Templates",
   product: "Products",
   article: "Articles",
   documentation: "Documentation",
+  recent: "Recent",
 };

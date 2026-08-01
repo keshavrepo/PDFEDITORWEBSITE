@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Layers, Loader2, Search, BookOpen, Newspaper } from "lucide-react";
+import { FileText, Layers, Loader2, Search, BookOpen, Newspaper, FilePlus, Clock } from "lucide-react";
 import {
   searchTypeLabels,
   searchTypeOrder,
@@ -13,9 +13,11 @@ import { cn } from "@/lib/utils";
 
 const TYPE_ICON: Record<SearchResultType, typeof Search> = {
   tool: FileText,
+  template: FilePlus,
   product: Layers,
   article: Newspaper,
   documentation: BookOpen,
+  recent: Clock,
 };
 
 /**

@@ -66,6 +66,8 @@ import {
   CROP_RATIOS,
   EDITOR_TOOLS,
   EXPORT_FORMATS,
+  EXPORT_PRESETS,
+  getExportPreset,
   IMPORT_ACCEPT,
   MAX_CANVAS_DIMENSION,
   SHORTCUT_REFERENCE,
@@ -78,6 +80,7 @@ import {
   cropDocument,
   documentToSvg,
   exportFileName,
+  exportOptimizedSvg,
   fitToViewport,
   flipDocument,
   formatDescriptor,
@@ -853,9 +856,20 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
           hrefs.set(layer.id, await canvasToDataUrl(buffer.canvas, "image/png"));
         }
         const measure = browserCanvasFactory.create(8, 8).ctx;
-        const svg = documentToSvg(exportDoc, hrefs, measure, {
-          transparent: exportTransparent && descriptor.supportsAlpha,
-        });
+        // Build, then run the SVG through the optimiser. The byte saving is
+        // shown in the status message; optimisation is on by default because
+        // it never changes the rendered output.
+        const { svg, optimized } = exportOptimizedSvg(
+          exportDoc,
+          hrefs,
+          measure,
+          { transparent: exportTransparent && descriptor.supportsAlpha }
+        );
+        if (optimized.optimizedBytes < optimized.originalBytes) {
+          notify(
+            `Exported ${fileName} (${formatBytes(optimized.optimizedBytes)}, ${Math.round((1 - optimized.optimizedBytes / optimized.originalBytes) * 100)}% smaller after SVG optimisation).`
+          );
+        }
         blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
       } else {
         const scale = clampExportScale(exportDoc, undefined, exportScale);
@@ -2446,7 +2460,7 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
 
       {/* Crop bar, shown only while cropping */}
       {state.tool === "crop" && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-primary/5 px-3 py-1.5">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-muted/40 px-3 py-1.5">
           <span className="text-xs font-medium">Crop</span>
           <div className="flex flex-wrap items-center gap-1">
             {CROP_RATIOS.map((entry) => (
@@ -2457,7 +2471,7 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
                 className={cn(
                   "rounded-md px-2 py-1 text-[11px] font-medium transition-colors",
                   cropRatio === entry.ratio
-                    ? "bg-primary text-primary-foreground"
+                    ? "bg-foreground text-background"
                     : "text-muted-foreground hover:bg-accent"
                 )}
               >
@@ -2513,7 +2527,7 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
                 className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-lg transition-colors",
                   state.tool === tool.id
-                    ? "bg-primary text-primary-foreground"
+                    ? "bg-foreground text-background"
                     : "text-muted-foreground hover:bg-accent hover:text-foreground"
                 )}
               >
@@ -2541,8 +2555,8 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
           {!doc.layers.length && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
               <div className="pointer-events-auto max-w-sm rounded-2xl border border-border/60 bg-card/95 p-6 text-center shadow-lg backdrop-blur">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                  <ImagePlus className="h-6 w-6 text-primary" aria-hidden="true" />
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-foreground">
+                  <ImagePlus className="h-6 w-6" aria-hidden="true" />
                 </div>
                 <h2 className="mb-1.5 font-semibold">Start editing</h2>
                 <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
@@ -2565,7 +2579,7 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
 
           {/* Drop overlay */}
           {dragActive && (
-            <div className="pointer-events-none absolute inset-2 z-30 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary bg-primary/10">
+            <div className="pointer-events-none absolute inset-2 z-30 flex items-center justify-center rounded-2xl border-2 border-dashed border-foreground/40 bg-foreground/5">
               <p className="rounded-lg bg-background px-3 py-1.5 text-sm font-medium shadow">
                 Drop images to add them as layers
               </p>
@@ -2575,7 +2589,7 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
           {/* Busy indicator */}
           {busy && (
             <div className="pointer-events-none absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-background/95 px-3 py-1.5 text-xs shadow-lg">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" aria-hidden="true" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-foreground" aria-hidden="true" />
               {busy}
             </div>
           )}
@@ -2616,7 +2630,7 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
                 className={cn(
                   "flex flex-1 items-center justify-center gap-1.5 px-2 py-2 text-[11px] font-medium transition-colors",
                   rightTab === panelId
-                    ? "border-b-2 border-primary text-foreground"
+                    ? "border-b-2 border-foreground text-foreground"
                     : "border-b-2 border-transparent text-muted-foreground hover:text-foreground"
                 )}
               >
@@ -2874,6 +2888,28 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
       {dialog === "export" && (
         <EditorDialog title="Export image" onClose={() => setDialog("none")}>
           <div className="space-y-4">
+            <div className="space-y-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Quick presets</span>
+              <div className="flex flex-wrap gap-1.5">
+                {EXPORT_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => {
+                      setExportFormat(preset.format);
+                      setExportQuality(preset.quality);
+                      setExportScale(preset.scale);
+                      setExportTransparent(preset.transparent);
+                    }}
+                    className="rounded-md border border-border/60 px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    title={preset.description}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
               {EXPORT_FORMATS.map((format) => (
                 <button
@@ -2883,7 +2919,7 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
                   className={cn(
                     "rounded-xl border p-3 text-left transition-colors",
                     exportFormat === format.value
-                      ? "border-primary bg-primary/5"
+                      ? "border-foreground bg-foreground/5"
                       : "border-border/60 hover:bg-accent"
                   )}
                 >

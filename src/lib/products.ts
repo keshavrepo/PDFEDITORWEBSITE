@@ -170,15 +170,31 @@ export const products: Product[] = [
   {
     id: "officepilot",
     name: "OfficePilot",
-    tagline: "Documents, sheets and slides",
+    tagline: "One workspace for Word, Excel and PowerPoint",
     description:
-      "Create and transform Word, Excel and PowerPoint files directly in the browser, building on the OOXML engine behind PDFPilot.",
-    status: "coming-soon",
+      "A single Office workspace inside LaunchStack: write documents, build spreadsheets and assemble slide decks, then export to the standard Office formats. Everything runs in the browser with autosave and a shared template library.",
+    status: "active",
     category: "Documents",
-    version: "0.0.0",
-    accent: "text-muted-foreground",
-    highlights: ["Office formats", "Templates", "Batch processing"],
-    releaseNotes: [],
+    version: "0.1.0",
+    href: "/officepilot",
+    accent: "text-primary",
+    highlights: [
+      "Word, Excel and PowerPoint in one workspace",
+      "Autosave in the browser",
+      "Shared template library",
+    ],
+    releaseNotes: [
+      {
+        version: "0.1.0",
+        date: "2026-08-01",
+        changes: [
+          "Added the OfficePilot workspace shell with a shared toolbar, sidebar, properties panel and status bar",
+          "Added the document engine with create, open, save, rename, duplicate and delete",
+          "Added browser-first autosave with a server-side recent-documents mirror",
+          "Added the template registry covering resume, invoice, letter, meeting notes, budget, planner, checklist and presentation",
+        ],
+      },
+    ],
   },
   {
     id: "webpilot",

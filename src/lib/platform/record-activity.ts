@@ -3,15 +3,18 @@
  *
  * Products call this after finishing an operation so the file manager,
  * activity timeline and dashboard statistics stay in sync. Only the file name
- * and size are sent — PDFPilot processes documents in the browser, so no
- * document content ever leaves the device.
+ * and size are sent — PDFPilot and OfficePilot both process documents in the
+ * browser, so no document content ever leaves the device.
  *
  * Reporting is best-effort: a signed-out user or a failed request must never
  * interfere with the download the user actually asked for.
  */
 
 export interface ActivityReport {
-  /** Defaults to PDFPilot; future products pass their own id. */
+  /**
+   * Owning product. Defaults to `pdfpilot` for backwards compatibility with
+   * existing PDFPilot callers; new products should pass their own id.
+   */
   productId?: string;
   toolName: string;
   status?: "completed" | "failed";
@@ -28,7 +31,8 @@ export async function recordActivity(report: ActivityReport): Promise<void> {
     await fetch("/api/activity", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productId: "pdfpilot", status: "completed", ...report }),
+      // Spread last so the caller's productId is honoured over the default.
+      body: JSON.stringify({ status: "completed", productId: "pdfpilot", ...report }),
       // Allows the request to complete even if the page is navigating away.
       keepalive: true,
     });

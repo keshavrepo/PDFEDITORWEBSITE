@@ -23,3 +23,6 @@ export * from "./segmentation";
 export * from "./regions";
 export * from "./metadata";
 export * from "./convert";
+export * from "./palette";
+export * from "./favicon";
+export * from "./print-layout";

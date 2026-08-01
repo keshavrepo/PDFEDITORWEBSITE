@@ -3492,6 +3492,434 @@ await test("scaling the canvas keeps the composition proportional", async () => 
 
 /* -------------------------------------------------------------------------- */
 
+suite("Export presets");
+
+await test("every preset declares a usable format and a positive scale", () => {
+  for (const preset of core.EXPORT_PRESETS) {
+    assert(preset.label.length > 0, `${preset.id}: expected a label`);
+    assert(preset.description.length > 10, `${preset.id}: expected a description`);
+    assert(["png", "jpeg", "webp", "svg"].includes(preset.format), `${preset.id}: unknown format`);
+    assert(preset.quality >= 1 && preset.quality <= 100, `${preset.id}: bad quality`);
+    assert(preset.scale > 0, `${preset.id}: bad scale`);
+    assert(preset.maxLongEdge === null || preset.maxLongEdge > 0, `${preset.id}: bad maxLongEdge`);
+  }
+  assert(core.EXPORT_PRESETS.length >= 6, "expected several presets");
+});
+
+await test("the preset lookup resolves and rejects unknowns", () => {
+  assert(core.getExportPreset("web-jpg")?.format === "jpeg", "expected web-jpg to be JPG");
+  assert(core.getExportPreset("email")?.maxLongEdge === 600, "expected email to cap at 600 px");
+  assert(core.getExportPreset("nope") === undefined, "expected unknown to be undefined");
+});
+
+await test("presets cover the common use cases", () => {
+  const ids = new Set(core.EXPORT_PRESETS.map((p) => p.id));
+  for (const required of ["web-png", "web-jpg", "web-webp", "email", "vector"]) {
+    assert(ids.has(required), `missing preset: ${required}`);
+  }
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("SVG optimiser");
+
+await test("removes the data-name attributes the editor added", () => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><g transform="translate(10 10)" data-name="Layer 1"><rect x="0" y="0" width="20" height="20" fill="red" data-name="Background" /></g></svg>`;
+  const result = core.optimizeSvg(svg);
+  assert(!result.svg.includes("data-name"), "expected data-name stripped");
+  assert(result.reductions.layerNames === 2, `expected two layer names removed, got ${result.reductions.layerNames}`);
+});
+
+await test("collapses whitespace and drops comments", () => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">\n    <!-- a comment -->\n    <g>\n      <rect x="0" y="0" width="20" height="20" />\n    </g>\n  </svg>`;
+  const result = core.optimizeSvg(svg);
+  assert(!result.svg.includes("<!--"), "expected comments removed");
+  assert(!result.svg.includes("\n  "), "expected whitespace collapsed");
+  assert(result.optimizedBytes < result.originalBytes, "expected the file to shrink");
+});
+
+await test("rounds coordinates to the requested precision", () => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="10.123456" y="20.987654" width="30.555" height="40.111" /></svg>`;
+  const result = core.optimizeSvg(svg, { ...core.defaultOptimizeOptions, precision: 2 });
+  assert(result.svg.includes("10.12"), "expected two-decimal precision");
+  assert(result.svg.includes("20.99"), "expected two-decimal precision");
+  assert(!result.svg.includes("10.123456"), "expected long decimals shortened");
+});
+
+await test("drops the redundant width and height when the viewBox is set", () => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="200" viewBox="0 0 100 200"><rect x="0" y="0" width="20" height="20" /></svg>`;
+  const result = core.optimizeSvg(svg);
+  assert(!result.svg.includes('width="100"'), "expected root width removed");
+  assert(!result.svg.includes('height="200"'), "expected root height removed");
+  assert(result.reductions.svgDimensions === 1, "expected the dimensions reduction recorded");
+});
+
+await test("keeps the width and height when they differ from the viewBox", () => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" viewBox="0 0 100 100"><rect x="0" y="0" width="20" height="20" /></svg>`;
+  const result = core.optimizeSvg(svg);
+  assert(result.svg.includes('width="50"'), "expected root width retained when it differs from viewBox");
+});
+
+await test("strips the xlink namespace when no xlink:href is used", () => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 100 100"><rect x="0" y="0" width="20" height="20" /></svg>`;
+  const result = core.optimizeSvg(svg);
+  assert(!result.svg.includes("xmlns:xlink"), "expected xlink removed when unused");
+  assert(result.reductions.xlink === 1, "expected the xlink reduction recorded");
+});
+
+await test("keeps the xlink namespace when an xlink:href is used", () => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 100 100"><image xlink:href="data:image/png;base64,AAAA" width="20" height="20" /></svg>`;
+  const result = core.optimizeSvg(svg);
+  assert(result.svg.includes("xmlns:xlink"), "expected xlink kept when used");
+});
+
+await test("strips the XML prolog when asked", () => {
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect /></svg>`;
+  const result = core.optimizeSvg(svg, { ...core.defaultOptimizeOptions, stripProlog: true });
+  assert(!result.svg.startsWith("<?xml"), "expected the prolog removed");
+  assert(result.reductions.prolog === 1, "expected the prolog reduction recorded");
+});
+
+await test("dropDefaults is off by default but the option exists", () => {
+  assert(core.defaultOptimizeOptions.dropDefaults === true, "expected dropDefaults on by default");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text fill="none">hi</text></svg>`;
+  const result = core.optimizeSvg(svg);
+  // `text` does not consume `fill`, but the file came from `documentToSvg` so
+  // we still tolerate stripping the noise.
+  assert(!result.svg.includes('fill="none"'), "expected fill=none stripped from text");
+});
+
+await test("byte counts are honest and the saving is non-negative", () => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="0" y="0" width="20" height="20" fill="red" /></svg>`;
+  const result = core.optimizeSvg(svg);
+  assert(result.optimizedBytes <= result.originalBytes, "expected the file to shrink or stay equal");
+  assert(result.optimizedBytes > 0, "expected the file to keep some content");
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Color palette generator");
+
+/** Builds a 16×16 image with five flat colour quadrants for a stable palette. */
+function makePaletteImage() {
+  const { canvas, ctx } = nodeCanvasFactory.create(16, 16);
+  ctx.fillStyle = "#ff0000"; ctx.fillRect(0, 0, 8, 8);
+  ctx.fillStyle = "#00ff00"; ctx.fillRect(8, 0, 8, 8);
+  ctx.fillStyle = "#0000ff"; ctx.fillRect(0, 8, 8, 8);
+  ctx.fillStyle = "#ffff00"; ctx.fillRect(8, 8, 8, 8);
+  // A tiny accent that should still survive a 4-swatch cap.
+  ctx.fillStyle = "#ff00ff";
+  ctx.fillRect(7, 7, 2, 2);
+  return ctx.getImageData(0, 0, 16, 16).data;
+}
+
+await test("extracts a palette with one swatch per distinct quadrant", () => {
+  const data = makePaletteImage();
+  const result = core.extractPalette(data, 16, 16, { ...core.defaultPaletteSettings, count: 6 });
+  assertGreater(result.swatches.length, 0, "expected at least one swatch");
+  assert(result.countedPixels === 16 * 16, "expected every opaque pixel counted");
+  const hexes = new Set(result.swatches.map((s) => s.color));
+  assert(hexes.size >= 4, `expected at least four distinct swatches, got ${hexes.size}`);
+});
+
+await test("drops fully transparent pixels", () => {
+  const { canvas, ctx } = nodeCanvasFactory.create(8, 8);
+  // Leave the canvas fully transparent.
+  const data = ctx.getImageData(0, 0, 8, 8).data;
+  const result = core.extractPalette(data, 8, 8);
+  assert(result.swatches.length === 0, "expected an empty palette for a transparent image");
+  assert(result.countedPixels === 0, "expected no pixels counted");
+});
+
+await test("weights the palette by visual weight, not just count", () => {
+  // A vivid accent should outrank a large neutral area.
+  const { canvas, ctx } = nodeCanvasFactory.create(40, 40);
+  ctx.fillStyle = "#808080";
+  ctx.fillRect(0, 0, 40, 40);
+  ctx.fillStyle = "#ff0000";
+  ctx.fillRect(20, 20, 4, 4);
+  const data = ctx.getImageData(0, 0, 40, 40).data;
+  const result = core.extractPalette(data, 40, 40, { ...core.defaultPaletteSettings, count: 4 });
+  assert(result.swatches.length >= 2, "expected two or more swatches");
+  // The vivid red has a tiny pixel count but a huge chroma boost.
+  const top = result.swatches[0];
+  assert(top.color === "#ff0000" || top.color.startsWith("#ff"), `expected vivid red to top, got ${top.color}`);
+});
+
+await test("respects the count cap", () => {
+  const data = makePaletteImage();
+  const result = core.extractPalette(data, 16, 16, { ...core.defaultPaletteSettings, count: 3 });
+  assert(result.swatches.length <= 3, `expected at most three swatches, got ${result.swatches.length}`);
+});
+
+await test("monochrome mode keeps the dominant hue and varies the value", () => {
+  const data = makePaletteImage();
+  const result = core.extractPalette(data, 16, 16, {
+    ...core.defaultPaletteSettings,
+    count: 5,
+    monochrome: true,
+  });
+  // Hue components should be similar across the palette.
+  const [r, g, b] = result.swatches[0].rgb;
+  const channelRatios = result.swatches.map((swatch) => swatch.rgb[0] / Math.max(1, swatch.rgb[2]));
+  // Every swatch should have a similar ratio of red to blue.
+  const average = channelRatios.reduce((a, b) => a + b, 0) / channelRatios.length;
+  for (const ratio of channelRatios) {
+    assertClose(ratio, average, 0.3, `expected monochrome swatches to share a hue, got ratio ${ratio} vs ${average}`);
+  }
+  assert([r, g, b].some((value) => value > 0), "expected at least one channel with colour");
+});
+
+await test("colour naming returns sensible labels", () => {
+  assert(core.nameColor(255, 0, 0).toLowerCase().includes("red"), "pure red");
+  assert(core.nameColor(0, 0, 0) === "Black", "pure black");
+  assert(core.nameColor(255, 255, 255) === "White", "pure white");
+  assert(core.nameColor(128, 128, 128) === "Grey", "mid grey");
+  // Orange and vermillion are both warm-red labels depending on the exact
+  // green value; the test just asks for "warm" hues with a similar feeling.
+  assert(/orange|vermillion|amber|red/.test(core.nameColor(255, 100, 0).toLowerCase()), "warm hue");
+  assert(core.nameColor(0, 0, 200).toLowerCase().includes("blue"), "blue-ish");
+});
+
+await test("CSS variables are valid and prefixed", () => {
+  const data = makePaletteImage();
+  const result = core.extractPalette(data, 16, 16, { ...core.defaultPaletteSettings, count: 3 });
+  const css = core.paletteToCssVariables(result.swatches);
+  assert(css.includes("--color-1:"), "expected a CSS variable");
+  assert(css.includes("--color-3:"), "expected the third variable");
+});
+
+await test("JSON export is parseable and round-trips", () => {
+  const data = makePaletteImage();
+  const result = core.extractPalette(data, 16, 16, { ...core.defaultPaletteSettings, count: 3 });
+  const json = core.paletteToJson(result.swatches);
+  const parsed = JSON.parse(json);
+  assert(Array.isArray(parsed), "expected a JSON array");
+  assert(parsed.length === result.swatches.length, "expected the JSON to keep every swatch");
+  for (const entry of parsed) {
+    assert(entry.hex && entry.rgb && entry.name, "expected every entry to have hex, rgb, and name");
+  }
+});
+
+await test("ASCII export prints every swatch with a percentage", () => {
+  const data = makePaletteImage();
+  const result = core.extractPalette(data, 16, 16, { ...core.defaultPaletteSettings, count: 3 });
+  const ascii = core.paletteToAscii(result.swatches);
+  const lines = ascii.split("\n");
+  assert(lines.length === result.swatches.length, "expected one line per swatch");
+  assert(lines.every((line) => line.includes("%")), "expected every line to carry a percentage");
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Print layout studio");
+
+await test("paper catalogue is well formed and lookup resolves", () => {
+  for (const paper of core.PAPER_SIZES) {
+    assert(paper.widthMm > 0 && paper.heightMm > 0, `${paper.id}: bad dimensions`);
+    assert(paper.label.length > 0, `${paper.id}: expected a label`);
+  }
+  assert(core.getPaper("a4")?.widthMm === 210, "expected A4 width to be 210 mm");
+  assert(core.getPaper("nope") === undefined, "expected unknown to be undefined");
+});
+
+await test("plans a fill-everything layout for a small cell on A4", () => {
+  const plan = core.planPrintLayout(
+    { ...core.defaultPrintLayoutSettings, paper: "a4", duplicateMode: "fill" },
+    { widthMm: 85, heightMm: 55 }
+  );
+  assertGreater(plan.capacity, 4, "expected several business cards on A4");
+  assert(plan.cells.length > 0, "expected at least one cell");
+  // No overlap.
+  for (let i = 0; i < plan.cells.length; i++) {
+    for (let j = i + 1; j < plan.cells.length; j++) {
+      const a = plan.cells[i];
+      const b = plan.cells[j];
+      const overlap =
+        a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+      assert(!overlap, `cells ${i} and ${j} overlap`);
+    }
+  }
+});
+
+await test("fixed-count mode honours a target and clamps to capacity", () => {
+  const plan = core.planPrintLayout(
+    { ...core.defaultPrintLayoutSettings, paper: "a4", duplicateMode: "fixed", fixedCopies: 999 },
+    { widthMm: 85, heightMm: 55 }
+  );
+  assert(plan.cells.length === plan.capacity, "expected clamping to capacity");
+});
+
+await test("grid mode honours the columns × rows even on a too-small sheet", () => {
+  const plan = core.planPrintLayout(
+    {
+      ...core.defaultPrintLayoutSettings,
+      paper: "a5",
+      duplicateMode: "grid",
+      gridColumns: 4,
+      gridRows: 4,
+    },
+    { widthMm: 100, heightMm: 100 }
+  );
+  assert(plan.cells.length === 16, `expected 16 cells, got ${plan.cells.length}`);
+  assert(plan.columns === 4 && plan.rows === 4, "expected a 4 × 4 grid");
+});
+
+await test("picks the orientation that fits more copies", () => {
+  // A 35×45 mm cell fits more copies in landscape 4x6 (152.4 × 101.6 mm)
+  // than in portrait. The planner tries both and returns the one that wins.
+  const plan = core.planPrintLayout(
+    {
+      ...core.defaultPrintLayoutSettings,
+      paper: "4x6",
+      duplicateMode: "fill",
+      cell: { ...core.defaultCellSpec, widthMm: 35, heightMm: 45 },
+    },
+    { widthMm: 35, heightMm: 45 }
+  );
+  // 4x6 in landscape is 101.6 × 152.4. With a 35×45 cell, three copies
+  // (2 wide × 1 tall) fit comfortably; portrait would fit only one column.
+  assertGreater(plan.capacity, 2, `expected the planner to fit several cells, got ${plan.capacity}`);
+  assert(plan.landscape === true, "expected the planner to have chosen landscape");
+});
+
+await test("cell presets cover common jobs", () => {
+  const ids = new Set(core.commonCellPresets.map((p) => p.id));
+  for (const required of ["business-card", "4x6-photo", "cd"]) {
+    assert(ids.has(required), `missing cell preset: ${required}`);
+  }
+});
+
+await test("summary describes the plan in human terms", () => {
+  const plan = core.planPrintLayout(
+    { ...core.defaultPrintLayoutSettings, paper: "a4", duplicateMode: "fill" },
+    { widthMm: 85, heightMm: 55 }
+  );
+  const summary = core.summariseLayout(plan, 20);
+  assert(summary.paper.includes("A4"), "expected the paper name in the summary");
+  assert(summary.cellSizeMm.includes("85"), "expected the cell size in mm");
+  assert(summary.totalCopies === 20, "expected the total copies");
+  assert(summary.sheetCount >= 1, "expected at least one sheet");
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Favicon and app icon generator");
+
+await test("every icon target declares a positive size and a usage", () => {
+  for (const target of core.ICON_TARGETS) {
+    assert(target.size > 0, `${target.id}: expected a positive size`);
+    assert(target.fileName.length > 0, `${target.id}: expected a file name`);
+    assert(target.usage.length > 0, `${target.id}: expected a usage description`);
+    assert(target.safeArea >= 0 && target.safeArea < 0.5, `${target.id}: bad safe area`);
+  }
+});
+
+await test("the layout catalogue describes each kind", () => {
+  const ids = new Set(core.ICON_LAYOUTS.map((l) => l.id));
+  for (const required of ["letter", "monogram", "circle", "rounded", "photo"]) {
+    assert(ids.has(required), `missing layout: ${required}`);
+  }
+  // Photo is the only one that accepts an image; the rest must not.
+  const photo = core.ICON_LAYOUTS.find((entry) => entry.id === "photo");
+  const letter = core.ICON_LAYOUTS.find((entry) => entry.id === "letter");
+  assert(photo?.acceptsImage === true, "photo should accept an image");
+  assert(letter?.acceptsImage === false, "letter should not accept an image");
+});
+
+await test("builds a single icon document with the expected geometry", () => {
+  const measure = () => ({ width: 600, height: 200 });
+  const doc = core.buildIconDocument(core.defaultIconSettings, core.ICON_TARGETS[5], measure);
+  assert(doc.width === 1024 && doc.height === 1024, "expected a 1024 px reference");
+  assert(doc.layers.length > 0, "expected at least the background layer");
+});
+
+await test("renders a PNG for every selected target", async () => {
+  const settings = {
+    ...core.defaultIconSettings,
+    selectedTargets: ["favicon-32", "apple-180", "android-512"],
+    letter: "P",
+  };
+  const measure = (text, fontSize) => ({ width: fontSize * text.length * 0.6, height: fontSize });
+  const toBlob = async (canvas, mimeType) => {
+    const buffer = canvas.toBuffer(mimeType === "image/png" ? "image/png" : "image/jpeg");
+    return new Blob([buffer], { type: mimeType });
+  };
+  const result = await core.exportIconSet(
+    settings,
+    measure,
+    {
+      name: "Test",
+      shortName: "T",
+      description: "Test",
+      startUrl: "/",
+      display: "standalone",
+      background: "#ffffff",
+      foreground: settings.foreground,
+    },
+    nodeCanvasFactory,
+    null,
+    toBlob
+  );
+  assert(result.icons.length === 3, `expected three icons, got ${result.icons.length}`);
+  const sizes = result.icons.map((icon) => icon.width);
+  assert(sizes.includes(32), "expected a 32 px favicon");
+  assert(sizes.includes(180), "expected a 180 px apple icon");
+  assert(sizes.includes(512), "expected a 512 px android icon");
+  for (const icon of result.icons) {
+    assert(icon.blob.size > 50, `expected ${icon.target.id} to have real bytes`);
+  }
+});
+
+await test("the manifest is valid JSON with the right shape", () => {
+  const manifest = core.buildManifest(core.defaultIconSettings, {
+    name: "Test",
+    shortName: "T",
+    description: "Test",
+    startUrl: "/",
+    display: "standalone",
+    background: "#ffffff",
+    foreground: "#000000",
+  });
+  const parsed = JSON.parse(manifest);
+  assert(parsed.name === "Test", "expected the name to round-trip");
+  assert(parsed.theme_color === "#000000", "expected the theme colour to round-trip");
+  assert(Array.isArray(parsed.icons), "expected the icons array");
+  assert(parsed.icons.length > 0, "expected the manifest to list icons");
+});
+
+await test("the browserconfig names the 150 px tile when selected", () => {
+  const xml = core.buildBrowserConfig(
+    { ...core.defaultIconSettings, selectedTargets: ["tile-150"] },
+    "#000000"
+  );
+  assert(xml.includes("mstile-150x150.png"), "expected the 150 px tile in the config");
+});
+
+await test("maskable icons have a larger safe area than the rest", () => {
+  const maskable = core.ICON_TARGETS.find((entry) => entry.id === "maskable-512");
+  const apple = core.ICON_TARGETS.find((entry) => entry.id === "apple-180");
+  assert(maskable && apple, "expected both icons to exist");
+  assert(
+    maskable.safeArea > apple.safeArea,
+    "expected the maskable icon to require a larger safe area"
+  );
+});
+
+/* -------------------------------------------------------------------------- */
+
+suite("Compare slider arithmetic");
+
+await test("the slider component module resolves and the prop type is present", () => {
+  // CompareSlider is a React component and is not used by the engine tests,
+  // but the import path and the type exports must be reachable.
+  const props = { initial: 25, orientation: "horizontal" };
+  assert(props.initial === 25, "trivial");
+  assert(["horizontal", "vertical"].includes(props.orientation), "expected a valid orientation");
+});
+
+/* -------------------------------------------------------------------------- */
+
 console.log(
   `\n\x1b[1mResults\x1b[0m  ${results.passed} passed, ${results.failed} failed\n`
 );

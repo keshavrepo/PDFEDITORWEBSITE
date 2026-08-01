@@ -60,9 +60,11 @@ export function Navbar({ user: serverUser }: NavbarProps) {
     ...(user ? [{ href: "/dashboard", label: "Dashboard" }] : []),
   ];
 
-  // Inside PDFPilot the wordmark reads as the product, so users always know
-  // which module they are in while the platform name stays one click away.
+  // Inside a focused product the wordmark reads as the product, so users
+  // always know which module they are in while the platform name stays one
+  // click away.
   const inPdfPilot = pathname?.startsWith("/tools") ?? false;
+  const inOfficePilot = pathname?.startsWith("/officepilot") ?? false;
 
 
   return (
@@ -72,15 +74,17 @@ export function Navbar({ user: serverUser }: NavbarProps) {
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2.5 group">
             <div className="relative transition-transform duration-300 group-hover:scale-105">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5 rounded-xl blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative bg-gradient-to-br from-primary to-primary/90 rounded-xl p-1.5 shadow-lg shadow-primary/20 group-hover:shadow-primary/30 transition-shadow">
-                <Logo className="w-5 h-5 text-primary-foreground" />
+              <div className="relative flex h-8 w-8 items-center justify-center rounded-xl border border-border/60 bg-foreground text-background shadow-sm transition-shadow group-hover:shadow-md">
+                <Logo className="h-4 w-4" />
               </div>
             </div>
             <span className="text-[15px] font-semibold tracking-tight">
               {platform.name}
               {inPdfPilot && (
                 <span className="text-muted-foreground font-normal"> / PDFPilot</span>
+              )}
+              {inOfficePilot && (
+                <span className="text-muted-foreground font-normal"> / OfficePilot</span>
               )}
             </span>
           </Link>
@@ -126,7 +130,7 @@ export function Navbar({ user: serverUser }: NavbarProps) {
                   <button className="flex items-center space-x-2.5 rounded-2xl px-3 py-1.5 hover:bg-accent transition-all duration-200">
                     <Avatar className="h-7 w-7">
                       <AvatarImage src={user.avatar || undefined} />
-                      <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                      <AvatarFallback className="text-xs bg-muted text-foreground">
                         {getInitials(user.name, user.email)}
                       </AvatarFallback>
                     </Avatar>
@@ -223,7 +227,7 @@ export function Navbar({ user: serverUser }: NavbarProps) {
                   <div className="flex items-center space-x-3 px-4 py-3">
                     <Avatar className="h-9 w-9">
                       <AvatarImage src={user.avatar || undefined} />
-                      <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                      <AvatarFallback className="text-xs bg-muted text-foreground">
                         {getInitials(user.name, user.email)}
                       </AvatarFallback>
                     </Avatar>

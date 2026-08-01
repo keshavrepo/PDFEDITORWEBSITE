@@ -208,6 +208,118 @@ export const EXPORT_FORMATS: Array<{
   },
 ];
 
+/**
+ * One-click export presets.
+ *
+ * Each preset bundles the format, quality, scale and a sensible default for
+ * the matte/transparent switch — the same set of decisions the user would
+ * otherwise make by hand. The export dialog applies one with a single click
+ * and the user can still tweak afterwards.
+ *
+ * The numbers are what real-world consumers actually want: emails need a
+ * 600-pixel long-edge cap because mail clients downscale aggressively, web
+ * images target 2× device pixels for retina sharpness, and print keeps the
+ * native resolution.
+ */
+export interface ExportPreset {
+  id: string;
+  label: string;
+  description: string;
+  format: ExportFormat;
+  quality: number;
+  scale: number;
+  transparent: boolean;
+  /** Longest edge in pixels, applied on top of `scale`. `null` means no cap. */
+  maxLongEdge: number | null;
+}
+
+export const EXPORT_PRESETS: ExportPreset[] = [
+  {
+    id: "web-png",
+    label: "Web — PNG",
+    description: "Transparent PNG at 2× for retina screens",
+    format: "png",
+    quality: 100,
+    scale: 2,
+    transparent: true,
+    maxLongEdge: 2400,
+  },
+  {
+    id: "web-jpg",
+    label: "Web — JPG",
+    description: "Compressed JPG, matte white, suitable for most websites",
+    format: "jpeg",
+    quality: 82,
+    scale: 1,
+    transparent: false,
+    maxLongEdge: 1920,
+  },
+  {
+    id: "web-webp",
+    label: "Web — WEBP",
+    description: "Modern WEBP with transparency, smallest payload",
+    format: "webp",
+    quality: 80,
+    scale: 1,
+    transparent: true,
+    maxLongEdge: 1920,
+  },
+  {
+    id: "email",
+    label: "Email",
+    description: "JPG at 600 px long edge — fits every mail client",
+    format: "jpeg",
+    quality: 80,
+    scale: 1,
+    transparent: false,
+    maxLongEdge: 600,
+  },
+  {
+    id: "print-png",
+    label: "Print — PNG",
+    description: "Lossless PNG at native resolution",
+    format: "png",
+    quality: 100,
+    scale: 1,
+    transparent: true,
+    maxLongEdge: null,
+  },
+  {
+    id: "vector",
+    label: "Vector — SVG",
+    description: "SVG with shapes and text as real vector elements",
+    format: "svg",
+    quality: 100,
+    scale: 1,
+    transparent: true,
+    maxLongEdge: null,
+  },
+  {
+    id: "social-square",
+    label: "Social — Square",
+    description: "1080 × 1080 PNG for Instagram and similar",
+    format: "png",
+    quality: 95,
+    scale: 1,
+    transparent: true,
+    maxLongEdge: 1080,
+  },
+  {
+    id: "social-story",
+    label: "Social — Story",
+    description: "1080 × 1920 PNG for stories and reels",
+    format: "png",
+    quality: 95,
+    scale: 1,
+    transparent: true,
+    maxLongEdge: 1920,
+  },
+];
+
+export function getExportPreset(id: string): ExportPreset | undefined {
+  return EXPORT_PRESETS.find((entry) => entry.id === id);
+}
+
 /** Tool rail definition, also used to resolve keyboard shortcuts. */
 export const EDITOR_TOOLS: Array<{
   id: EditorToolId;

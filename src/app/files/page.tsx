@@ -6,6 +6,7 @@ import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { FileManager } from "@/components/platform/file-manager";
 import { getStorageSummary, listFiles } from "@/lib/platform/files";
+import { listRecentDocuments } from "@/lib/officepilot/recent";
 import { platform } from "@/lib/products";
 
 export const metadata: Metadata = {
@@ -20,10 +21,31 @@ export default async function FilesPage() {
   const user = await getSession();
   if (!user) redirect("/login?callbackUrl=/files");
 
-  const [files, storage] = await Promise.all([
+  const [files, storage, recentOffice] = await Promise.all([
     listFiles(user.id, { limit: 100 }),
     getStorageSummary(user.id),
+    listRecentDocuments(user.id, { limit: 100 }),
   ]);
+
+  // OfficePilot documents are stored in the browser and mirrored here as a
+  // recent index. Surface them with the same shape the file manager already
+  // understands, so they appear in the unified history.
+  const officeFiles = recentOffice.map((entry) => ({
+    id: entry.id,
+    productId: "officepilot",
+    productName: "OfficePilot",
+    originalName: entry.title,
+    size: entry.size,
+    mimeType: null,
+    status: "completed",
+    downloadCount: 0,
+    isFavorite: false,
+    createdAt: new Date(entry.updatedAt),
+  }));
+
+  const merged = [...files, ...officeFiles].sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+  ).slice(0, 100);
 
   return (
     <>
@@ -58,12 +80,17 @@ export default async function FilesPage() {
 
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-24">
           <FileManager
-            initialFiles={files}
+            initialFiles={merged}
             // Only offer filters for products that actually have files.
-            productFilters={storage.byProduct.map((entry) => ({
-              id: entry.productId,
-              name: entry.productName,
-            }))}
+            productFilters={[
+              ...storage.byProduct.map((entry) => ({
+                id: entry.productId,
+                name: entry.productName,
+              })),
+              ...(recentOffice.length > 0
+                ? [{ id: "officepilot", name: "OfficePilot" }]
+                : []),
+            ]}
           />
         </section>
       </main>
