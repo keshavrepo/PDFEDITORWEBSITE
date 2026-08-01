@@ -389,3 +389,141 @@ export function ChartLegend({
     </ul>
   );
 }
+
+interface BarChartProps {
+  series: FinanceChartSeries[];
+  height?: number;
+  ariaLabel?: string;
+}
+
+/**
+ * A multi-series bar chart. Each series renders as a row of bars
+ * stacked horizontally with the same x-axis. Used by the goal
+ * planner's progress chart and any future module that needs to
+ * compare values across categories.
+ */
+export function BarChart({ series, height = 200, ariaLabel }: BarChartProps) {
+  const allPoints = series.flatMap((entry) => entry.points);
+  if (series.length === 0 || allPoints.length === 0) {
+    return (
+      <div
+        className="flex h-32 items-center justify-center text-xs text-muted-foreground"
+        style={{ height }}
+        aria-label={ariaLabel}
+      >
+        No data yet
+      </div>
+    );
+  }
+  const labels = Array.from(new Set(allPoints.map((entry) => entry.label)));
+  const allValues = allPoints.map((entry) => entry.value);
+  const maxValue = Math.max(...allValues, 1);
+  const width = 360;
+  const padding = { top: 12, right: 12, bottom: 28, left: 48 };
+  const innerWidth = width - padding.left - padding.right;
+  const innerHeight = height - padding.top - padding.bottom;
+  const groupCount = labels.length;
+  const groupWidth = groupCount === 0 ? innerWidth : innerWidth / groupCount;
+  const barGap = 4;
+  const barWidth = Math.max(
+    2,
+    (groupWidth - barGap * (series.length - 1)) / Math.max(1, series.length)
+  );
+  return (
+    <svg
+      role="img"
+      aria-label={ariaLabel ?? "Bar chart"}
+      viewBox={`0 0 ${width} ${height}`}
+      className="w-full"
+      preserveAspectRatio="none"
+    >
+      <g transform={`translate(${padding.left} ${padding.top})`}>
+        {/* Y grid */}
+        {Array.from({ length: 5 }, (_, i) => {
+          const y = innerHeight - (innerHeight * i) / 4;
+          return (
+            <line
+              key={`grid-${i}`}
+              x1={0}
+              y1={y}
+              x2={innerWidth}
+              y2={y}
+              stroke="var(--border)"
+              strokeWidth={0.5}
+              strokeDasharray={i === 0 ? "0" : "2 2"}
+            />
+          );
+        })}
+        {/* Bars */}
+        {series.map((entry, seriesIndex) =>
+          entry.points.map((point) => {
+            const groupIndex = labels.indexOf(point.label);
+            if (groupIndex < 0) return null;
+            const x = groupIndex * groupWidth + seriesIndex * barWidth + barGap / 2;
+            const h = innerHeight * (point.value / maxValue);
+            const y = innerHeight - h;
+            return (
+              <rect
+                key={`${entry.name}-${point.label}`}
+                x={x}
+                y={y}
+                width={Math.max(0, barWidth - barGap / 2)}
+                height={Math.max(0, h)}
+                fill={colorFor(seriesIndex)}
+                rx={2}
+              />
+            );
+          })
+        )}
+        {/* X labels */}
+        {labels.map((label, index) => (
+          <g key={label}>
+            <line
+              x1={index * groupWidth + groupWidth / 2}
+              y1={innerHeight}
+              x2={index * groupWidth + groupWidth / 2}
+              y2={innerHeight + 4}
+              stroke="var(--muted-foreground)"
+              strokeWidth={0.5}
+            />
+            <text
+              x={index * groupWidth + groupWidth / 2}
+              y={innerHeight + 16}
+              textAnchor="middle"
+              fontSize={9}
+              fill="var(--muted-foreground)"
+              fontFamily="ui-monospace, SFMono-Regular, monospace"
+            >
+              {truncate(label, 10)}
+            </text>
+          </g>
+        ))}
+        <text
+          x={0}
+          y={-4}
+          textAnchor="start"
+          fontSize={9}
+          fill="var(--muted-foreground)"
+          fontFamily="ui-monospace, SFMono-Regular, monospace"
+        >
+          {formatTickValue(maxValue)}
+        </text>
+        <text
+          x={0}
+          y={innerHeight + 2}
+          textAnchor="start"
+          fontSize={9}
+          fill="var(--muted-foreground)"
+          fontFamily="ui-monospace, SFMono-Regular, monospace"
+        >
+          0
+        </text>
+      </g>
+    </svg>
+  );
+}
+
+function truncate(value: string, max: number): string {
+  if (value.length <= max) return value;
+  return `${value.slice(0, max - 1)}…`;
+}

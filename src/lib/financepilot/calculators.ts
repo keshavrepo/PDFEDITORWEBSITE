@@ -262,6 +262,100 @@ export const calculators: FinanceCalculatorDefinition[] = [
     highlights: ["Assets & liabilities", "Net worth", "Historical timeline", "Export PDF"],
     toolCount: 1,
   },
+  {
+    id: "finance-retirement",
+    kind: "retirement",
+    slug: "retirement",
+    name: "Retirement Planner",
+    tagline: "Project the corpus, the income and the on-track flag",
+    description:
+      "Set the current age, retirement age, current savings, monthly contribution, expected return, inflation rate and years in retirement. The workspace shows the corpus at retirement, the required corpus, the estimated monthly income, a yearly projection and an on-track flag.",
+    intro:
+      "Type the current age, retirement age, current savings, monthly contribution, expected return, inflation rate, years in retirement, replacement ratio and current income. The workspace computes the corpus at retirement, the required corpus, the inflation-adjusted corpus, the estimated monthly income, a yearly projection and an on-track flag, then lets you save the plan or export it as a PDF.",
+    defaultCategory: "retirement",
+    keywords: [
+      "retirement",
+      "retirement planner",
+      "corpus",
+      "pension",
+      "FinancePilot",
+    ],
+    highlights: [
+      "Required corpus",
+      "Inflation adjustment",
+      "Yearly projection",
+      "Export PDF",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "finance-investment",
+    kind: "investment",
+    slug: "investment",
+    name: "Investment Planner",
+    tagline: "Project an investment goal with risk profile and allocation",
+    description:
+      "Set a goal name, target amount, time horizon, monthly contribution, risk profile and allocation. The workspace shows the projected value, the expected return, the progress, the allocation breakdown, a yearly projection and a suggested monthly contribution.",
+    intro:
+      "Type the goal name, target amount, time horizon, monthly contribution, risk profile and allocation. The workspace computes the projected value, the expected return, the progress, the allocation breakdown, a yearly projection and a suggested monthly contribution, then lets you save the plan or export it as a PDF.",
+    defaultCategory: "investment",
+    keywords: [
+      "investment",
+      "investment planner",
+      "portfolio",
+      "allocation",
+      "FinancePilot",
+    ],
+    highlights: [
+      "Risk profile",
+      "Allocation summary",
+      "Growth projection",
+      "Export PDF",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "finance-goal",
+    kind: "goal",
+    slug: "goal",
+    name: "Goal Planner",
+    tagline: "Track every financial goal in one place",
+    description:
+      "Add as many financial goals as you like with a target amount, current amount, target date, monthly contribution, expected return and priority. The workspace shows the progress, the on-track flag, the timeline and the monthly requirement for each goal.",
+    intro:
+      "Add financial goals with a target amount, current amount, target date, monthly contribution, expected return and priority. The workspace computes the progress, the on-track flag, the timeline and the monthly requirement for each goal, then lets you save the plan or export it as a PDF.",
+    defaultCategory: "savings",
+    keywords: [
+      "goal",
+      "goal planner",
+      "financial goal",
+      "target",
+      "FinancePilot",
+    ],
+    highlights: ["Multiple goals", "Priority", "Timeline", "Export PDF"],
+    toolCount: 1,
+  },
+  {
+    id: "finance-dashboard",
+    kind: "dashboard",
+    slug: "dashboard",
+    name: "Financial Dashboard",
+    tagline: "A single screen for every FinancePilot metric",
+    description:
+      "See total assets, total liabilities, net worth, monthly savings, budget status, active goals, investment summary, charts and quick insights on one page.",
+    intro:
+      "The dashboard surfaces every FinancePilot metric on a single page: total assets, total liabilities, net worth, monthly savings, budget status, active goals, investment summary, a net worth trend chart, a monthly savings chart and a list of quick insights. Save the dashboard or export it as a PDF.",
+    defaultCategory: "savings",
+    keywords: [
+      "dashboard",
+      "financial dashboard",
+      "net worth",
+      "savings",
+      "FinancePilot",
+    ],
+    highlights: ["Net worth", "Budget status", "Charts", "Quick insights"],
+    toolCount: 1,
+  },
 ];
 
 export function getCalculator(

@@ -20,10 +20,14 @@ import { calculatorCategoryOrder } from "./calculators";
 import {
   defaultBudgetBody,
   defaultCompoundInterestBody,
+  defaultDashboardBody,
   defaultEmiBody,
   defaultExpenseBody,
+  defaultGoalBody,
+  defaultInvestmentBody,
   defaultLoanBody,
   defaultNetWorthBody,
+  defaultRetirementBody,
   defaultSavingsBody,
   defaultSipBody,
 } from "./calculator-runtime";
@@ -115,6 +119,42 @@ export const templates: FinanceTemplate[] = [
     hasStarter: true,
     highlights: ["6 assets", "3 liabilities", "6-month trend"],
   },
+  {
+    id: "finance-retirement",
+    kind: "retirement",
+    category: "retirement",
+    name: "Retire at 60",
+    description: "A 30-year-old planning to retire at 60 with a 70% income replacement.",
+    hasStarter: true,
+    highlights: ["30 → 60", "₹20K / month", "10% expected return"],
+  },
+  {
+    id: "finance-investment",
+    kind: "investment",
+    category: "investment",
+    name: "Wealth building",
+    description: "A 15-year wealth-building plan with a 60/30/10 equity / debt / gold allocation.",
+    hasStarter: true,
+    highlights: ["₹50L target", "15 years", "60/30/10 allocation"],
+  },
+  {
+    id: "finance-goal",
+    kind: "goal",
+    category: "savings",
+    name: "Three-goal plan",
+    description: "Three sample goals: home down payment, child's education and a world tour.",
+    hasStarter: true,
+    highlights: ["3 goals", "Mixed priorities", "Mixed horizons"],
+  },
+  {
+    id: "finance-dashboard",
+    kind: "dashboard",
+    category: "savings",
+    name: "Personal finance cockpit",
+    description: "A pre-populated dashboard with assets, liabilities, savings history and insights.",
+    hasStarter: true,
+    highlights: ["Net worth + savings", "12-month history", "Quick insights"],
+  },
 ];
 
 /** Templates for one calculator kind, in the canonical category order. */
@@ -166,6 +206,14 @@ export function loadTemplateBody(template: FinanceTemplate): unknown {
         return defaultSavingsBody();
       case "finance-net-worth":
         return defaultNetWorthBody();
+      case "finance-retirement":
+        return defaultRetirementBody();
+      case "finance-investment":
+        return defaultInvestmentBody();
+      case "finance-goal":
+        return defaultGoalBody();
+      case "finance-dashboard":
+        return defaultDashboardBody();
       default:
         if (template.kind === "blank") return {};
         return {};
@@ -193,6 +241,14 @@ export function createBlankBody(kind: string): unknown {
       return defaultSavingsBody();
     case "net-worth":
       return defaultNetWorthBody();
+    case "retirement":
+      return defaultRetirementBody();
+    case "investment":
+      return defaultInvestmentBody();
+    case "goal":
+      return defaultGoalBody();
+    case "dashboard":
+      return defaultDashboardBody();
     default:
       return {};
   }

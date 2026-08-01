@@ -111,12 +111,12 @@ export function IntegerField(
   );
 }
 
-interface SelectInputProps {
+interface SelectInputProps<T extends string | number> {
   label: string;
   field: string;
-  value: number;
-  options: ReadonlyArray<{ value: number; label: string; hint?: string }>;
-  onChange: (field: string, value: number) => void;
+  value: T;
+  options: ReadonlyArray<{ value: T; label: string; hint?: string }>;
+  onChange: (field: string, value: T) => void;
 }
 
 /**
@@ -124,27 +124,37 @@ interface SelectInputProps {
  * the control works without any extra state, the keyboard accessibility
  * is built in and the visual matches the existing selects in the
  * OfficePilot toolbar.
+ *
+ * The component is generic over the option value type, so callers can
+ * use `SelectField<RiskProfile>` for string-valued selects without
+ * having to cast through `unknown` or `Number(...)`.
  */
-export function SelectField({
+export function SelectField<T extends string | number>({
   label,
   field,
   value,
   options,
   onChange,
-}: SelectInputProps) {
+}: SelectInputProps<T>) {
   return (
     <label className="flex flex-col gap-1 text-xs">
       <span className="font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">
         {label}
       </span>
       <select
-        value={value}
-        onChange={(event) => onChange(field, Number(event.target.value))}
+        value={String(value)}
+        onChange={(event) => {
+          const raw = event.target.value;
+          const next = (
+            typeof options[0]?.value === "number" ? Number(raw) : raw
+          ) as T;
+          onChange(field, next);
+        }}
         aria-label={label}
         className="h-9 rounded-lg border border-border bg-background px-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20"
       >
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option key={String(option.value)} value={String(option.value)}>
             {option.label}
           </option>
         ))}

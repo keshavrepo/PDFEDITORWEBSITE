@@ -13,6 +13,10 @@ import { BudgetSurface } from "@/components/financepilot/surfaces/budget";
 import { ExpenseSurface } from "@/components/financepilot/surfaces/expense";
 import { SavingsSurface } from "@/components/financepilot/surfaces/savings";
 import { NetWorthSurface } from "@/components/financepilot/surfaces/net-worth";
+import { RetirementSurface } from "@/components/financepilot/surfaces/retirement";
+import { InvestmentSurface } from "@/components/financepilot/surfaces/investment";
+import { GoalSurface } from "@/components/financepilot/surfaces/goal";
+import { DashboardSurface } from "@/components/financepilot/surfaces/dashboard";
 import { EmiProperties } from "@/components/financepilot/properties/emi";
 import { SipProperties } from "@/components/financepilot/properties/sip";
 import { CompoundInterestProperties } from "@/components/financepilot/properties/compound-interest";
@@ -21,6 +25,10 @@ import { BudgetProperties } from "@/components/financepilot/properties/budget";
 import { ExpenseProperties } from "@/components/financepilot/properties/expense";
 import { SavingsProperties } from "@/components/financepilot/properties/savings";
 import { NetWorthProperties } from "@/components/financepilot/properties/net-worth";
+import { RetirementProperties } from "@/components/financepilot/properties/retirement";
+import { InvestmentProperties } from "@/components/financepilot/properties/investment";
+import { GoalProperties } from "@/components/financepilot/properties/goal";
+import { DashboardProperties } from "@/components/financepilot/properties/dashboard";
 import {
   getCalculatorBySlug,
   focusedCalculators,
@@ -89,6 +97,14 @@ function pickCalculatorComponents(kind: FinanceCalculatorKind): {
       return { Surface: SavingsSurface, Properties: SavingsProperties };
     case "net-worth":
       return { Surface: NetWorthSurface, Properties: NetWorthProperties };
+    case "retirement":
+      return { Surface: RetirementSurface, Properties: RetirementProperties };
+    case "investment":
+      return { Surface: InvestmentSurface, Properties: InvestmentProperties };
+    case "goal":
+      return { Surface: GoalSurface, Properties: GoalProperties };
+    case "dashboard":
+      return { Surface: DashboardSurface, Properties: DashboardProperties };
     default:
       return null;
   }

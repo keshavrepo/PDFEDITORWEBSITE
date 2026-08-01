@@ -1464,6 +1464,871 @@ export function evaluateNetWorth(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Retirement Planner                                                         */
+/* -------------------------------------------------------------------------- */
+
+export interface RetirementBody {
+  /** Current age in years. */
+  currentAge: number;
+  /** Target retirement age in years. */
+  retirementAge: number;
+  /** Existing retirement savings in rupees. */
+  currentSavings: number;
+  /** Monthly contribution in rupees. */
+  monthlyContribution: number;
+  /** Expected annual return (%). */
+  expectedReturn: number;
+  /** Inflation rate (%). */
+  inflationRate: number;
+  /** Expected years in retirement (used to compute the corpus). */
+  yearsInRetirement: number;
+  /** Replacement ratio: target retirement income as a fraction of current salary. */
+  replacementRatio: number;
+  /** Current annual income in rupees (used to compute the corpus). */
+  currentIncome: number;
+}
+
+export function defaultRetirementBody(): RetirementBody {
+  return {
+    currentAge: 30,
+    retirementAge: 60,
+    currentSavings: 500_000,
+    monthlyContribution: 20_000,
+    expectedReturn: 10,
+    inflationRate: 6,
+    yearsInRetirement: 25,
+    replacementRatio: 0.7,
+    currentIncome: 1_500_000,
+  };
+}
+
+export function readRetirementBody(body: unknown): RetirementBody {
+  if (!body || typeof body !== "object") return defaultRetirementBody();
+  const raw = body as Record<string, unknown>;
+  return {
+    currentAge: readNumber(raw, "currentAge", 30),
+    retirementAge: readNumber(raw, "retirementAge", 60),
+    currentSavings: readNumber(raw, "currentSavings", 0),
+    monthlyContribution: readNumber(raw, "monthlyContribution", 0),
+    expectedReturn: readNumber(raw, "expectedReturn", 0),
+    inflationRate: readNumber(raw, "inflationRate", 0),
+    yearsInRetirement: readNumber(raw, "yearsInRetirement", 25),
+    replacementRatio: readNumber(raw, "replacementRatio", 0.7),
+    currentIncome: readNumber(raw, "currentIncome", 0),
+  };
+}
+
+export interface RetirementSummary {
+  yearsToRetirement: number;
+  /** Total corpus at retirement, in today's rupees (pre-inflation). */
+  corpusAtRetirement: number;
+  /** Required corpus in today's rupees. */
+  requiredCorpus: number;
+  /** Required corpus adjusted for inflation between today and retirement. */
+  inflationAdjustedCorpus: number;
+  /** Estimated annual retirement income in today's rupees. */
+  estimatedAnnualIncome: number;
+  /** Monthly retirement income in today's rupees. */
+  estimatedMonthlyIncome: number;
+  /** Yearly projection of the balance. */
+  yearly: Array<{
+    year: number;
+    age: number;
+    balance: number;
+    contributed: number;
+    interest: number;
+  }>;
+  onTrack: boolean;
+  surplus: number;
+}
+
+export function summariseRetirement(body: RetirementBody): RetirementSummary {
+  const yearsToRetirement = Math.max(0, body.retirementAge - body.currentAge);
+  const monthlyRate = Math.max(0, body.expectedReturn) / 100 / 12;
+  const monthlyContribution = Math.max(0, body.monthlyContribution);
+  const principal = Math.max(0, body.currentSavings);
+  const months = yearsToRetirement * 12;
+  const yearly = projectRetirement(principal, monthlyContribution, monthlyRate, yearsToRetirement);
+  const corpusAtRetirement = yearly.length > 0 ? yearly[yearly.length - 1]!.balance : principal;
+  const inflationRate = Math.max(0, body.inflationRate) / 100;
+  // Required corpus = annual retirement income × years in retirement (4% safe
+  // withdrawal rule of thumb). We compute the annual retirement income as
+  // replacementRatio × currentIncome, then discount to today's rupees
+  // and multiply by years in retirement.
+  const annualRetirementIncomeToday = Math.max(0, body.replacementRatio) * Math.max(0, body.currentIncome);
+  const inflationAdjustedIncome = annualRetirementIncomeToday * Math.pow(1 + inflationRate, yearsToRetirement);
+  const requiredCorpus = annualRetirementIncomeToday * Math.max(1, body.yearsInRetirement);
+  const inflationAdjustedCorpus = inflationAdjustedIncome * Math.max(1, body.yearsInRetirement);
+  const onTrack = corpusAtRetirement >= requiredCorpus;
+  const surplus = corpusAtRetirement - requiredCorpus;
+  return {
+    yearsToRetirement,
+    corpusAtRetirement,
+    requiredCorpus,
+    inflationAdjustedCorpus,
+    estimatedAnnualIncome: annualRetirementIncomeToday,
+    estimatedMonthlyIncome: annualRetirementIncomeToday / 12,
+    yearly,
+    onTrack,
+    surplus,
+  };
+}
+
+function projectRetirement(
+  principal: number,
+  monthly: number,
+  monthlyRate: number,
+  years: number
+): RetirementSummary["yearly"] {
+  const result: RetirementSummary["yearly"] = [];
+  if (years <= 0) return result;
+  let balance = principal;
+  let contributed = 0;
+  let totalInterest = 0;
+  const months = Math.min(years, 60) * 12;
+  for (let m = 1; m <= months; m++) {
+    const interest = balance * monthlyRate;
+    balance = balance + interest + monthly;
+    totalInterest += interest;
+    contributed += monthly;
+    if (m % 12 === 0) {
+      result.push({
+        year: m / 12,
+        age: 0, // patched in by caller
+        balance: Math.round(balance),
+        contributed: Math.round(contributed),
+        interest: Math.round(totalInterest),
+      });
+    }
+  }
+  return result;
+}
+
+export function evaluateRetirement(
+  calculation: FinanceCalculation
+): FinanceEvaluation {
+  const body = readRetirementBody(calculation.body);
+  if (body.retirementAge <= body.currentAge) {
+    return {
+      ok: false,
+      error: "Retirement age must be greater than current age.",
+      lines: [],
+    };
+  }
+  const summary = summariseRetirement(body);
+  // Patch the ages on the yearly projection
+  summary.yearly = summary.yearly.map((entry, i) => ({
+    ...entry,
+    age: body.currentAge + i + 1,
+  }));
+  const balanceSeries: FinanceChartSeries = {
+    name: "Projected balance",
+    points: summary.yearly.map((entry) => ({
+      label: `Age ${entry.age}`,
+      value: entry.balance,
+    })),
+  };
+  const contributedSeries: FinanceChartSeries = {
+    name: "Cumulative contribution",
+    points: summary.yearly.map((entry) => ({
+      label: `Age ${entry.age}`,
+      value: entry.contributed,
+    })),
+  };
+  return {
+    ok: true,
+    lines: [
+      { label: "Years to retirement", value: String(summary.yearsToRetirement) },
+      { label: "Corpus at retirement", value: formatCurrency(summary.corpusAtRetirement) },
+      { label: "Required corpus", value: formatCurrency(summary.requiredCorpus) },
+      {
+        label: "Inflation-adjusted corpus",
+        value: formatCurrency(summary.inflationAdjustedCorpus),
+      },
+      {
+        label: "Estimated monthly income",
+        value: formatCurrencyPrecise(summary.estimatedMonthlyIncome),
+      },
+      { label: "Surplus / shortfall", value: formatCurrency(summary.surplus) },
+      { label: "On track", value: summary.onTrack ? "Yes" : "No" },
+    ],
+    series: [contributedSeries, balanceSeries],
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Investment Planner                                                         */
+/* -------------------------------------------------------------------------- */
+
+export type RiskProfile = "conservative" | "moderate" | "aggressive";
+
+export interface InvestmentBody {
+  /** A name for the goal (e.g. "Wealth building", "Child's education"). */
+  goalName: string;
+  /** Target amount in rupees. */
+  targetAmount: number;
+  /** Years until the goal. */
+  timeHorizon: number;
+  /** Monthly contribution in rupees. */
+  monthlyContribution: number;
+  /** Risk profile. Drives the default expected return. */
+  riskProfile: RiskProfile;
+  /** Custom expected return, used when set; otherwise derived from risk. */
+  customReturn: number | null;
+  /** Allocation buckets (e.g. equity 60%, debt 30%, gold 10%). */
+  allocation: Array<{ id: string; name: string; weight: number; expectedReturn: number }>;
+}
+
+export const RISK_DEFAULTS: Record<RiskProfile, number> = {
+  conservative: 7,
+  moderate: 10,
+  aggressive: 13,
+};
+
+export function defaultInvestmentBody(): InvestmentBody {
+  return {
+    goalName: "Wealth building",
+    targetAmount: 5_000_000,
+    timeHorizon: 15,
+    monthlyContribution: 25_000,
+    riskProfile: "moderate",
+    customReturn: null,
+    allocation: [
+      { id: "al-1", name: "Equity", weight: 60, expectedReturn: 12 },
+      { id: "al-2", name: "Debt", weight: 30, expectedReturn: 7 },
+      { id: "al-3", name: "Gold", weight: 10, expectedReturn: 8 },
+    ],
+  };
+}
+
+export function readInvestmentBody(body: unknown): InvestmentBody {
+  if (!body || typeof body !== "object") return defaultInvestmentBody();
+  const raw = body as Record<string, unknown>;
+  const riskValue = raw.riskProfile;
+  const riskProfile: RiskProfile =
+    riskValue === "conservative" || riskValue === "aggressive" || riskValue === "moderate"
+      ? riskValue
+      : "moderate";
+  const allocation = Array.isArray(raw.allocation)
+    ? raw.allocation
+        .map((entry, index) => normaliseAllocationEntry(entry, index))
+        .filter((entry): entry is InvestmentBody["allocation"][number] => entry !== null)
+    : defaultInvestmentBody().allocation;
+  const customReturnRaw = raw.customReturn;
+  const customReturn =
+    customReturnRaw === null || customReturnRaw === undefined
+      ? null
+      : Number(customReturnRaw);
+  return {
+    goalName: typeof raw.goalName === "string" ? raw.goalName : "Investment goal",
+    targetAmount: readNumber(raw, "targetAmount", 0),
+    timeHorizon: readNumber(raw, "timeHorizon", 0),
+    monthlyContribution: readNumber(raw, "monthlyContribution", 0),
+    riskProfile,
+    customReturn: Number.isFinite(customReturn) ? (customReturn as number) : null,
+    allocation,
+  };
+}
+
+function normaliseAllocationEntry(
+  value: unknown,
+  index: number
+): InvestmentBody["allocation"][number] | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const name = typeof raw.name === "string" ? raw.name : "";
+  if (!name) return null;
+  const weight = readNumber(raw, "weight", 0);
+  const expectedReturn = readNumber(raw, "expectedReturn", 0);
+  return {
+    id: typeof raw.id === "string" ? raw.id : `al-${index}-${Math.random().toString(36).slice(2, 6)}`,
+    name,
+    weight,
+    expectedReturn,
+  };
+}
+
+export interface InvestmentSummary {
+  /** Portfolio expected return (weighted by allocation). */
+  expectedReturn: number;
+  /** Future value at the horizon. */
+  futureValue: number;
+  /** Total contribution over the horizon. */
+  totalContribution: number;
+  /** Estimated returns (FV - contribution). */
+  estimatedReturns: number;
+  /** Progress as 0..1+ (FV / target). */
+  progressFraction: number;
+  /** Yearly projection. */
+  yearly: Array<{ year: number; balance: number; contributed: number; interest: number }>;
+  /** Suggested monthly contribution to reach the target. */
+  suggestedMonthly: number;
+  onTrack: boolean;
+  allocation: InvestmentBody["allocation"];
+}
+
+export function summariseInvestment(body: InvestmentBody): InvestmentSummary {
+  const expectedReturn =
+    body.customReturn !== null
+      ? body.customReturn
+      : body.allocation.length === 0
+        ? RISK_DEFAULTS[body.riskProfile]
+        : weightedAverage(
+            body.allocation.map((entry) => [entry.weight, entry.expectedReturn] as [number, number])
+          );
+  const monthlyRate = Math.max(0, expectedReturn) / 100 / 12;
+  const months = Math.max(0, Math.round(body.timeHorizon * 12));
+  const monthly = Math.max(0, body.monthlyContribution);
+  let balance = 0;
+  let contributed = 0;
+  let totalInterest = 0;
+  const yearly: InvestmentSummary["yearly"] = [];
+  for (let m = 1; m <= months; m++) {
+    const interest = balance * monthlyRate;
+    balance = balance + interest + monthly;
+    totalInterest += interest;
+    contributed += monthly;
+    if (m % 12 === 0) {
+      yearly.push({
+        year: m / 12,
+        balance: Math.round(balance),
+        contributed: Math.round(contributed),
+        interest: Math.round(totalInterest),
+      });
+    }
+  }
+  const futureValue = balance;
+  const progress = body.targetAmount > 0 ? Math.min(1.5, futureValue / body.targetAmount) : 0;
+  // Solve for the monthly contribution that lands on the target with the
+  // same rate. Closed-form: target = PMT * ((1+r)^n - 1) / r, so
+  // PMT = target * r / ((1+r)^n - 1). The (1+r) end-of-period factor
+  // from the SIP formula is folded in here for consistency.
+  let suggestedMonthly = 0;
+  if (body.targetAmount > 0 && monthlyRate > 0 && months > 0) {
+    const factor = Math.pow(1 + monthlyRate, months);
+    suggestedMonthly = Math.max(
+      0,
+      (body.targetAmount * monthlyRate) / (factor - 1) / (1 + monthlyRate)
+    );
+  } else if (body.targetAmount > 0 && monthlyRate === 0 && months > 0) {
+    suggestedMonthly = body.targetAmount / months;
+  }
+  return {
+    expectedReturn,
+    futureValue,
+    totalContribution: contributed,
+    estimatedReturns: futureValue - contributed,
+    progressFraction: progress,
+    yearly,
+    suggestedMonthly,
+    onTrack: futureValue >= body.targetAmount,
+    allocation: body.allocation,
+  };
+}
+
+function weightedAverage(entries: Array<[number, number]>): number {
+  let totalWeight = 0;
+  let weightedSum = 0;
+  for (const [weight, value] of entries) {
+    if (weight <= 0) continue;
+    totalWeight += weight;
+    weightedSum += weight * value;
+  }
+  if (totalWeight === 0) return 0;
+  return weightedSum / totalWeight;
+}
+
+export function evaluateInvestment(
+  calculation: FinanceCalculation
+): FinanceEvaluation {
+  const body = readInvestmentBody(calculation.body);
+  if (body.targetAmount <= 0 || body.timeHorizon <= 0) {
+    return {
+      ok: false,
+      error: "Set a target amount and a time horizon above zero.",
+      lines: [],
+    };
+  }
+  const summary = summariseInvestment(body);
+  const balanceSeries: FinanceChartSeries = {
+    name: "Projected balance",
+    points: summary.yearly.map((entry) => ({
+      label: `Year ${entry.year}`,
+      value: entry.balance,
+    })),
+  };
+  const contributedSeries: FinanceChartSeries = {
+    name: "Cumulative contribution",
+    points: summary.yearly.map((entry) => ({
+      label: `Year ${entry.year}`,
+      value: entry.contributed,
+    })),
+  };
+  const allocationPie: FinanceChartSeries = {
+    name: "Allocation",
+    points: summary.allocation.map((entry) => ({
+      label: entry.name,
+      value: entry.weight,
+    })),
+  };
+  return {
+    ok: true,
+    lines: [
+      { label: "Goal", value: body.goalName || "Investment goal" },
+      { label: "Risk profile", value: body.riskProfile[0]!.toUpperCase() + body.riskProfile.slice(1) },
+      { label: "Time horizon", value: `${body.timeHorizon} years` },
+      { label: "Expected return", value: formatPercent(summary.expectedReturn) },
+      { label: "Projected value", value: formatCurrency(summary.futureValue) },
+      { label: "Total contribution", value: formatCurrency(summary.totalContribution) },
+      { label: "Estimated returns", value: formatCurrency(summary.estimatedReturns) },
+      { label: "Progress", value: formatPercent(Math.max(0, summary.progressFraction * 100)) },
+      {
+        label: "Suggested monthly",
+        value: formatCurrencyPrecise(summary.suggestedMonthly),
+      },
+      { label: "On track", value: summary.onTrack ? "Yes" : "No" },
+    ],
+    series: [contributedSeries, balanceSeries, allocationPie],
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Goal Planner                                                               */
+/* -------------------------------------------------------------------------- */
+
+export type GoalPriority = "high" | "medium" | "low";
+
+export interface GoalItem {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  /** YYYY-MM-DD target date. */
+  targetDate: string;
+  /** Monthly contribution towards this goal. */
+  monthlyContribution: number;
+  /** Expected annual return (%). */
+  expectedReturn: number;
+  /** "high" | "medium" | "low" */
+  priority: GoalPriority;
+  notes?: string;
+}
+
+export interface GoalBody {
+  goals: GoalItem[];
+}
+
+export const GOAL_PRIORITY_LABELS: Record<GoalPriority, string> = {
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+};
+
+export function defaultGoalBody(): GoalBody {
+  const today = new Date();
+  const f = (years: number) => {
+    const d = new Date(today.getFullYear() + years, today.getMonth(), today.getDate());
+    return d.toISOString().slice(0, 10);
+  };
+  return {
+    goals: [
+      {
+        id: "g-1",
+        name: "Down payment on a home",
+        targetAmount: 2_500_000,
+        currentAmount: 600_000,
+        targetDate: f(3),
+        monthlyContribution: 35_000,
+        expectedReturn: 7,
+        priority: "high",
+      },
+      {
+        id: "g-2",
+        name: "Child's higher education",
+        targetAmount: 3_000_000,
+        currentAmount: 250_000,
+        targetDate: f(8),
+        monthlyContribution: 12_000,
+        expectedReturn: 11,
+        priority: "high",
+      },
+      {
+        id: "g-3",
+        name: "World tour",
+        targetAmount: 800_000,
+        currentAmount: 120_000,
+        targetDate: f(2),
+        monthlyContribution: 18_000,
+        expectedReturn: 5,
+        priority: "low",
+      },
+    ],
+  };
+}
+
+export function readGoalBody(body: unknown): GoalBody {
+  if (!body || typeof body !== "object") return defaultGoalBody();
+  const raw = body as Record<string, unknown>;
+  const goals = Array.isArray(raw.goals)
+    ? raw.goals
+        .map((entry, index) => normaliseGoalEntry(entry, index))
+        .filter((entry): entry is GoalItem => entry !== null)
+    : defaultGoalBody().goals;
+  return { goals };
+}
+
+function normaliseGoalEntry(value: unknown, index: number): GoalItem | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const name = typeof raw.name === "string" ? raw.name : "";
+  if (!name) return null;
+  const priorityValue = raw.priority;
+  const priority: GoalPriority =
+    priorityValue === "high" || priorityValue === "medium" || priorityValue === "low"
+      ? priorityValue
+      : "medium";
+  return {
+    id: typeof raw.id === "string" ? raw.id : `g-${index}-${Math.random().toString(36).slice(2, 6)}`,
+    name,
+    targetAmount: readNumber(raw, "targetAmount", 0),
+    currentAmount: readNumber(raw, "currentAmount", 0),
+    targetDate: typeof raw.targetDate === "string" ? raw.targetDate : "",
+    monthlyContribution: readNumber(raw, "monthlyContribution", 0),
+    expectedReturn: readNumber(raw, "expectedReturn", 0),
+    priority,
+    notes: typeof raw.notes === "string" ? raw.notes : undefined,
+  };
+}
+
+export interface GoalSummary {
+  totalGoals: number;
+  totalTarget: number;
+  totalCurrent: number;
+  totalRequired: number;
+  totalMonthly: number;
+  highPriorityCount: number;
+  onTrackCount: number;
+  goals: Array<{
+    goal: GoalItem;
+    progress: number;
+    onTrack: boolean;
+    monthsToGoal: number;
+    estimatedCompletion: string;
+  }>;
+}
+
+export function summariseGoals(body: GoalBody): GoalSummary {
+  let totalTarget = 0;
+  let totalCurrent = 0;
+  let totalRequired = 0;
+  let totalMonthly = 0;
+  let highPriorityCount = 0;
+  let onTrackCount = 0;
+  const goals = body.goals.map((goal) => {
+    const summary = summariseSingleGoal(goal);
+    totalTarget += goal.targetAmount;
+    totalCurrent += goal.currentAmount;
+    totalRequired += Math.max(0, goal.targetAmount - goal.currentAmount);
+    totalMonthly += goal.monthlyContribution;
+    if (goal.priority === "high") highPriorityCount += 1;
+    if (summary.onTrack) onTrackCount += 1;
+    return { goal, ...summary };
+  });
+  return {
+    totalGoals: body.goals.length,
+    totalTarget,
+    totalCurrent,
+    totalRequired,
+    totalMonthly,
+    highPriorityCount,
+    onTrackCount,
+    goals,
+  };
+}
+
+function summariseSingleGoal(goal: GoalItem): {
+  progress: number;
+  onTrack: boolean;
+  monthsToGoal: number;
+  estimatedCompletion: string;
+} {
+  const target = Math.max(0, goal.targetAmount);
+  const current = Math.max(0, goal.currentAmount);
+  const monthly = Math.max(0, goal.monthlyContribution);
+  const monthlyRate = Math.max(0, goal.expectedReturn) / 100 / 12;
+  let monthsToGoal = 0;
+  if (target > current) {
+    if (monthlyRate === 0) {
+      monthsToGoal = monthly > 0 ? Math.ceil((target - current) / monthly) : Number.POSITIVE_INFINITY;
+    } else {
+      let balance = current;
+      monthsToGoal = 0;
+      while (balance < target && monthsToGoal < 12 * 100) {
+        balance = balance * (1 + monthlyRate) + monthly;
+        monthsToGoal += 1;
+      }
+      if (monthsToGoal === 12 * 100) monthsToGoal = Number.POSITIVE_INFINITY;
+    }
+  }
+  const completion = new Date();
+  if (Number.isFinite(monthsToGoal)) {
+    completion.setMonth(completion.getMonth() + monthsToGoal);
+  }
+  const estimatedCompletion = completion.toISOString().slice(0, 10);
+  let onTrack = false;
+  if (goal.targetDate) {
+    const target = new Date(goal.targetDate);
+    if (Number.isFinite(monthsToGoal)) {
+      onTrack = completion <= target;
+    }
+  } else {
+    onTrack = current >= target;
+  }
+  const progress = target > 0 ? Math.min(1.5, current / target) : 0;
+  return { progress, onTrack, monthsToGoal, estimatedCompletion };
+}
+
+export function evaluateGoal(
+  calculation: FinanceCalculation
+): FinanceEvaluation {
+  const body = readGoalBody(calculation.body);
+  const summary = summariseGoals(body);
+  if (summary.totalGoals === 0) {
+    return {
+      ok: false,
+      error: "Add at least one financial goal.",
+      lines: [],
+    };
+  }
+  const progressSeries: FinanceChartSeries = {
+    name: "Progress",
+    points: summary.goals.map((entry) => ({
+      label: entry.goal.name,
+      value: Math.round(entry.progress * 1000) / 10, // percent with 1 decimal
+    })),
+  };
+  const targetSeries: FinanceChartSeries = {
+    name: "Target",
+    points: summary.goals.map((entry) => ({
+      label: entry.goal.name,
+      value: entry.goal.targetAmount,
+    })),
+  };
+  return {
+    ok: true,
+    lines: [
+      { label: "Active goals", value: String(summary.totalGoals) },
+      { label: "Total target", value: formatCurrency(summary.totalTarget) },
+      { label: "Total current", value: formatCurrency(summary.totalCurrent) },
+      { label: "Total required", value: formatCurrency(summary.totalRequired) },
+      { label: "Total monthly", value: formatCurrency(summary.totalMonthly) },
+      { label: "High priority", value: String(summary.highPriorityCount) },
+      { label: "On track", value: `${summary.onTrackCount} / ${summary.totalGoals}` },
+    ],
+    series: [progressSeries, targetSeries],
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Financial Dashboard                                                        */
+/* -------------------------------------------------------------------------- */
+
+export interface DashboardBody {
+  /** Total assets in rupees. */
+  totalAssets: number;
+  /** Total liabilities in rupees. */
+  totalLiabilities: number;
+  /** Average monthly savings in rupees. */
+  monthlySavings: number;
+  /** Average monthly income in rupees. */
+  monthlyIncome: number;
+  /** Average monthly expenses in rupees. */
+  monthlyExpenses: number;
+  /** Number of active investment goals. */
+  activeGoals: number;
+  /** Total amount invested across active goals. */
+  totalInvested: number;
+  /** Six-month history of net worth snapshots. */
+  history: Array<{ id: string; month: string; netWorth: number }>;
+  /** Twelve-month history of monthly savings. */
+  savingsHistory: Array<{ id: string; month: string; savings: number }>;
+  /** Quick insights: free-text bullets. */
+  insights: string[];
+}
+
+export function defaultDashboardBody(): DashboardBody {
+  const today = new Date();
+  const monthLabel = (monthsAgo: number) => {
+    const d = new Date(today.getFullYear(), today.getMonth() - monthsAgo, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  };
+  return {
+    totalAssets: 10_070_000,
+    totalLiabilities: 4_868_000,
+    monthlySavings: 25_000,
+    monthlyIncome: 145_000,
+    monthlyExpenses: 120_000,
+    activeGoals: 3,
+    totalInvested: 1_500_000,
+    history: [6, 5, 4, 3, 2, 1, 0].map((monthsAgo, i) => ({
+      id: `h-${i}`,
+      month: monthLabel(monthsAgo),
+      netWorth: Math.round(10_070_000 - 4_868_000 - monthsAgo * 50_000),
+    })),
+    savingsHistory: [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0].map((monthsAgo, i) => ({
+      id: `s-${i}`,
+      month: monthLabel(monthsAgo),
+      savings: Math.round(18_000 + monthsAgo * 700),
+    })),
+    insights: [
+      "Net worth has grown ₹50,000 / month on average over the last 7 months.",
+      "Savings rate is 17% of income — aim for 20% to be on a stronger footing.",
+      "Three active goals, two are on track for the target date.",
+    ],
+  };
+}
+
+export function readDashboardBody(body: unknown): DashboardBody {
+  if (!body || typeof body !== "object") return defaultDashboardBody();
+  const raw = body as Record<string, unknown>;
+  const history = Array.isArray(raw.history)
+    ? raw.history
+        .map((entry, index) => normaliseDashboardHistoryEntry(entry, index))
+        .filter((entry): entry is DashboardBody["history"][number] => entry !== null)
+    : defaultDashboardBody().history;
+  const savingsHistory = Array.isArray(raw.savingsHistory)
+    ? raw.savingsHistory
+        .map((entry, index) => normaliseSavingsEntry(entry, index))
+        .filter((entry): entry is DashboardBody["savingsHistory"][number] => entry !== null)
+    : defaultDashboardBody().savingsHistory;
+  const insights = Array.isArray(raw.insights)
+    ? raw.insights.filter((value): value is string => typeof value === "string")
+    : defaultDashboardBody().insights;
+  return {
+    totalAssets: readNumber(raw, "totalAssets", 0),
+    totalLiabilities: readNumber(raw, "totalLiabilities", 0),
+    monthlySavings: readNumber(raw, "monthlySavings", 0),
+    monthlyIncome: readNumber(raw, "monthlyIncome", 0),
+    monthlyExpenses: readNumber(raw, "monthlyExpenses", 0),
+    activeGoals: readNumber(raw, "activeGoals", 0),
+    totalInvested: readNumber(raw, "totalInvested", 0),
+    history,
+    savingsHistory,
+    insights,
+  };
+}
+
+function normaliseDashboardHistoryEntry(
+  value: unknown,
+  index: number
+): DashboardBody["history"][number] | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const month = typeof raw.month === "string" ? raw.month : "";
+  if (!month) return null;
+  const netWorth = readNumber(raw, "netWorth", 0);
+  return {
+    id: typeof raw.id === "string" ? raw.id : `h-${index}`,
+    month,
+    netWorth,
+  };
+}
+
+function normaliseSavingsEntry(
+  value: unknown,
+  index: number
+): DashboardBody["savingsHistory"][number] | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const month = typeof raw.month === "string" ? raw.month : "";
+  if (!month) return null;
+  const savings = readNumber(raw, "savings", 0);
+  return {
+    id: typeof raw.id === "string" ? raw.id : `s-${index}`,
+    month,
+    savings,
+  };
+}
+
+export interface DashboardSummary {
+  netWorth: number;
+  savingsRate: number;
+  budgetStatus: "surplus" | "balanced" | "deficit";
+  investmentCoverage: number;
+  history: DashboardBody["history"];
+  savingsHistory: DashboardBody["savingsHistory"];
+  insights: string[];
+}
+
+export function summariseDashboard(body: DashboardBody): DashboardSummary {
+  const netWorth = body.totalAssets - body.totalLiabilities;
+  const savingsRate =
+    body.monthlyIncome > 0 ? body.monthlySavings / body.monthlyIncome : 0;
+  const budgetStatus: DashboardSummary["budgetStatus"] =
+    body.monthlySavings > body.monthlyExpenses * 0.1
+      ? "surplus"
+      : body.monthlySavings >= 0
+        ? "balanced"
+        : "deficit";
+  const investmentCoverage =
+    body.totalInvested > 0
+      ? Math.min(1, body.monthlySavings / Math.max(1, body.totalInvested * 0.01))
+      : 0;
+  return {
+    netWorth,
+    savingsRate,
+    budgetStatus,
+    investmentCoverage,
+    history: body.history,
+    savingsHistory: body.savingsHistory,
+    insights: body.insights,
+  };
+}
+
+export function evaluateDashboard(
+  calculation: FinanceCalculation
+): FinanceEvaluation {
+  const body = readDashboardBody(calculation.body);
+  const summary = summariseDashboard(body);
+  const netWorthSeries: FinanceChartSeries = {
+    name: "Net worth",
+    points: summary.history.map((entry) => ({
+      label: entry.month,
+      value: Math.round(entry.netWorth),
+    })),
+  };
+  const savingsSeries: FinanceChartSeries = {
+    name: "Monthly savings",
+    points: summary.savingsHistory.map((entry) => ({
+      label: entry.month,
+      value: Math.round(entry.savings),
+    })),
+  };
+  const budgetStatusLabel =
+    summary.budgetStatus === "surplus"
+      ? "Surplus"
+      : summary.budgetStatus === "deficit"
+        ? "Deficit"
+        : "Balanced";
+  return {
+    ok: true,
+    lines: [
+      { label: "Total assets", value: formatCurrency(body.totalAssets) },
+      { label: "Total liabilities", value: formatCurrency(body.totalLiabilities) },
+      { label: "Net worth", value: formatCurrency(summary.netWorth) },
+      { label: "Monthly income", value: formatCurrency(body.monthlyIncome) },
+      { label: "Monthly expenses", value: formatCurrency(body.monthlyExpenses) },
+      { label: "Monthly savings", value: formatCurrency(body.monthlySavings) },
+      { label: "Savings rate", value: formatPercent(Math.max(0, summary.savingsRate * 100)) },
+      { label: "Budget status", value: budgetStatusLabel },
+      { label: "Active goals", value: String(body.activeGoals) },
+      { label: "Total invested", value: formatCurrency(body.totalInvested) },
+    ],
+    series: [netWorthSeries, savingsSeries],
+  };
+}
+
+/* -------------------------------------------------------------------------- */
 /* Dispatcher                                                                 */
 /* -------------------------------------------------------------------------- */
 
@@ -1475,7 +2340,11 @@ export type CalculatorKind =
   | "budget"
   | "expense"
   | "savings"
-  | "net-worth";
+  | "net-worth"
+  | "retirement"
+  | "investment"
+  | "goal"
+  | "dashboard";
 
 /**
  * Resolves a calculation to its runtime evaluator.
@@ -1525,6 +2394,30 @@ export function dispatch(calculation: FinanceCalculation): {
         kind: "net-worth",
         body: calculation.body,
         evaluate: evaluateNetWorth,
+      };
+    case "retirement":
+      return {
+        kind: "retirement",
+        body: calculation.body,
+        evaluate: evaluateRetirement,
+      };
+    case "investment":
+      return {
+        kind: "investment",
+        body: calculation.body,
+        evaluate: evaluateInvestment,
+      };
+    case "goal":
+      return {
+        kind: "goal",
+        body: calculation.body,
+        evaluate: evaluateGoal,
+      };
+    case "dashboard":
+      return {
+        kind: "dashboard",
+        body: calculation.body,
+        evaluate: evaluateDashboard,
       };
     default:
       return { kind: "emi", body: calculation.body, evaluate: evaluateEmi };

@@ -214,18 +214,30 @@ export const products: Product[] = [
     name: "FinancePilot",
     tagline: "Financial calculators in your browser",
     description:
-      "Run the financial calculators you reach for every day — EMI, SIP, compound interest, loans, budgets, expenses, savings goals and net worth — inside the LaunchStack workspace, with autosave, the same shared chrome as OfficePilot, and print-to-PDF export.",
+      "Run the financial calculators you reach for every day — EMI, SIP, compound interest, loans, budgets, expenses, savings goals, net worth, retirement, investment, multi-goal planning and a one-screen financial dashboard — inside the LaunchStack workspace, with autosave, the same shared chrome as OfficePilot, and print-to-PDF export.",
     status: "active",
     category: "Finance",
-    version: "0.3.0",
+    version: "0.4.0",
     href: "/financepilot",
     accent: "text-primary",
     highlights: [
-      "8 calculators: EMI, SIP, compound interest, loan, budget, expense, savings, net worth",
+      "12 calculators: EMI, SIP, compound interest, loan, budget, expense, savings, net worth, retirement, investment, goal, dashboard",
       "Autosave and recent mirror",
       "Print-to-PDF export",
     ],
     releaseNotes: [
+      {
+        version: "0.4.0",
+        date: "2026-08-03",
+        changes: [
+          "Four investment & retirement modules: Retirement Planner, Investment Planner, Goal Planner, Financial Dashboard",
+          "Reusable BarChart component shared by the goal planner's progress visualisation",
+          "Retirement planner projects corpus, required corpus, inflation-adjusted corpus, monthly income, surplus / shortfall, on-track flag and a yearly chart",
+          "Investment planner supports a risk profile, a custom return, an allocation list and a suggested monthly contribution",
+          "Goal planner tracks multiple goals with priority, target date, monthly contribution, on-track flag, estimated completion and a multi-goal progress chart",
+          "Financial dashboard surfaces total assets, total liabilities, net worth, monthly savings, savings rate, budget status, active goals, investment summary, KPI cards, history charts and quick insights",
+        ],
+      },
       {
         version: "0.3.0",
         date: "2026-08-02",
