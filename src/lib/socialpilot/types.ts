@@ -24,6 +24,10 @@ export type SocialProjectCategory =
   | "reel"
   | "thread"
   | "podcast"
+  | "caption"
+  | "hashtag"
+  | "calendar"
+  | "note"
   | "custom";
 
 /** A media-asset kind: image, video or audio. */
@@ -198,4 +202,147 @@ export interface SocialProjectDefinition {
   highlights: string[];
   /** Marketing-grade count for the product card. */
   toolCount: number;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batch 2: core creator tools                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A rich-text run, the atomic unit of the Post Creator and Notes
+ * editors. The format mirrors a tiny subset of the common rich-text
+ * representation: a string with optional marks (bold, italic, code,
+ * link, mention, hashtag).
+ */
+export interface SocialRichTextMark {
+  type: "bold" | "italic" | "code" | "link" | "mention" | "hashtag";
+  /** Optional URL for links. */
+  href?: string;
+  /** Optional label, e.g. the username for a mention. */
+  label?: string;
+  /** Character offset into the run text. */
+  start: number;
+  /** Character offset (exclusive) into the run text. */
+  end: number;
+}
+
+/** A single paragraph in the rich-text body. */
+export interface SocialRichTextParagraph {
+  /** Optional list-item prefix, e.g. "-" for bullet, "1." for ordered. */
+  listKind?: "bullet" | "ordered" | "checklist";
+  /** Whether the check is filled in (only for checklist lists). */
+  checked?: boolean;
+  /** Run text. Marks are applied in order; overlapping marks are allowed. */
+  text: string;
+  marks: SocialRichTextMark[];
+}
+
+/**
+ * The Post Creator body. A draft has a plain-text mirror so the
+ * character counter, search and caption-manager import can work
+ * without parsing rich text, and a structured representation so the
+ * rich-text editor can render bold / italic / links / mentions /
+ * hashtags faithfully.
+ */
+export interface SocialPostBody {
+  /** "plain" or "rich". */
+  format: "plain" | "rich";
+  /** Plain-text mirror, always populated. */
+  plainText: string;
+  /** Rich-text structure, only used when format === "rich". */
+  paragraphs: SocialRichTextParagraph[];
+  /** Hashtags, derived from the body or typed manually. */
+  hashtags: string[];
+  /** Mentions, derived from the body or typed manually. */
+  mentions: string[];
+  /** Optional call to action. */
+  callToAction: string;
+  /** Linked media-asset ids, drawn from the media library. */
+  mediaIds: string[];
+  /** Target platform (e.g. "Instagram"). Used by the character limit. */
+  platform: string;
+  /** Optional category (mirrors the caption-manager vocabulary). */
+  category: string;
+}
+
+/**
+ * A saved caption. Captions are first-class projects so they reuse
+ * the autosave loop, search index, recent mirror and favourites
+ * flag, but the body is constrained to the caption-manager schema.
+ */
+export interface SocialCaptionBody {
+  /** The caption text. */
+  text: string;
+  /** Free-form category, e.g. "Launches", "Promos", "Behind the scenes". */
+  category: string;
+  /** Optional tags for finer-grained search. */
+  tags: string[];
+  /** Favourite flag; the dedicated favourites table mirrors it. */
+  isFavorite: boolean;
+}
+
+/**
+ * A saved hashtag group. Hashtag groups are first-class projects so
+ * they reuse the autosave loop, search index and favourites flag.
+ */
+export interface SocialHashtagGroupBody {
+  /** Group name, e.g. "Launches" or "Always-on". */
+  name: string;
+  /** Free-form category. */
+  category: string;
+  /** The hashtags in the group. */
+  tags: string[];
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/**
+ * A single plan in the Content Calendar. The calendar is a
+ * first-class project; the body holds the ordered list of plans.
+ */
+export interface SocialContentPlan {
+  id: string;
+  /** Display title, shown in the calendar cell. */
+  title: string;
+  /** Target platform, e.g. "Instagram", "TikTok", "YouTube", "X". */
+  platform: string;
+  /** ISO date for the plan, anchored to midnight in the user's locale. */
+  date: string;
+  /** Optional time of day, "HH:MM" 24h. */
+  time: string;
+  /** Notes about the plan, free-form. */
+  notes: string;
+  /** Color label, one of a fixed palette; maps to a CSS class. */
+  color: "primary" | "blue" | "green" | "yellow" | "pink" | "purple" | "orange";
+  /** Whether the plan is published (a manual toggle, not a real publish). */
+  published: boolean;
+}
+
+/** The Content Calendar body. */
+export interface SocialContentCalendarBody {
+  /** The plans. */
+  plans: SocialContentPlan[];
+  /** Default view, persisted between sessions. */
+  view: "month" | "week" | "day";
+  /** Default platform filter, persisted between sessions. */
+  platform: string;
+}
+
+/**
+ * A creator note. Notes are first-class projects so they reuse the
+ * autosave loop, search index and favourites flag.
+ */
+export interface SocialNoteBody {
+  /** "plain" or "rich". */
+  format: "plain" | "rich";
+  /** Plain-text mirror, always populated. */
+  plainText: string;
+  /** Rich-text structure, only used when format === "rich". */
+  paragraphs: SocialRichTextParagraph[];
+  /** Whether the note is a checklist. When true, every paragraph is rendered as a checklist row. */
+  isChecklist: boolean;
+  /** Free-form tags. */
+  tags: string[];
+  /** Favourite flag. */
+  isFavorite: boolean;
 }

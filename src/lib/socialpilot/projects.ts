@@ -28,6 +28,10 @@ export const projectCategoryOrder: SocialProjectCategory[] = [
   "thread",
   "campaign",
   "podcast",
+  "caption",
+  "hashtag",
+  "calendar",
+  "note",
   "custom",
 ];
 
@@ -43,6 +47,10 @@ export const projectCategoryLabels: Record<SocialProjectCategory, string> = {
   thread: "Thread",
   campaign: "Campaign",
   podcast: "Podcast",
+  caption: "Caption",
+  hashtag: "Hashtag",
+  calendar: "Calendar",
+  note: "Note",
   custom: "Custom",
 };
 
@@ -58,6 +66,10 @@ export const projectCategoryDescriptions: Record<SocialProjectCategory, string> 
   thread: "Threaded text post",
   campaign: "Multi-asset campaign",
   podcast: "Audio-first episode",
+  caption: "Reusable caption for the Post Creator",
+  hashtag: "Reusable hashtag group",
+  calendar: "Multi-platform content plan",
+  note: "Creator note with rich text and tags",
   custom: "Anything else you build",
 };
 
@@ -223,6 +235,77 @@ export const projects: SocialProjectDefinition[] = [
     defaultCategory: "podcast",
     keywords: ["podcast", "audio", "episode", "SocialPilot"],
     highlights: ["Audio reference", "Autosave", "Server mirror"],
+    toolCount: 1,
+  },
+  {
+    id: "social-caption",
+    kind: "caption",
+    slug: "captions",
+    name: "Caption manager",
+    tagline: "Reusable captions with categories, search and favourites",
+    description:
+      "Save the captions you reach for every day. Group them by category, search across the library, favourite the ones you reuse, duplicate a caption to branch from it, and drop the chosen caption straight into the Post Creator with one click.",
+    intro:
+      "The Caption Manager holds the captions you reuse. Create a new caption from the new-project menu, give it a category, and find it from the Post Creator. The autosave loop keeps the library up to date.",
+    defaultCategory: "caption",
+    keywords: ["caption", "social", "library", "SocialPilot"],
+    highlights: ["Categories", "Search", "Favourite", "Insert into Post Creator"],
+    toolCount: 1,
+  },
+  {
+    id: "social-hashtag",
+    kind: "hashtag",
+    slug: "hashtags",
+    name: "Hashtag manager",
+    tagline: "Save hashtag groups and insert them with one click",
+    description:
+      "Group the hashtags you reach for into named collections, search across the library, favourite the ones you always want at hand, duplicate a group to branch from it, and insert the whole group into the Post Creator with one click.",
+    intro:
+      "The Hashtag Manager holds the hashtag groups you reuse. Create a new group from the new-project menu, name it, and find it from the Post Creator. The autosave loop keeps the library up to date.",
+    defaultCategory: "hashtag",
+    keywords: ["hashtag", "social", "tags", "SocialPilot"],
+    highlights: ["Named groups", "Search", "Favourite", "One-click insert"],
+    toolCount: 1,
+  },
+  {
+    id: "social-calendar",
+    kind: "calendar",
+    slug: "calendar",
+    name: "Content calendar",
+    tagline: "Plan your posts across platforms",
+    description:
+      "See every planned post on a monthly, weekly or daily view. Filter by platform, edit a plan in place, drag a plan to a new date, color-label by campaign, and create new plans from the cell you click.",
+    intro:
+      "The Content Calendar is a planning surface, not a scheduler. Click a day to add a plan, click a plan to edit it, drag a plan to move it, and use the platform filter to focus on one channel at a time. The autosave loop keeps the calendar up to date.",
+    defaultCategory: "calendar",
+    keywords: ["calendar", "plan", "schedule", "SocialPilot"],
+    highlights: [
+      "Monthly, weekly and daily views",
+      "Platform filter",
+      "Color labels",
+      "Drag to move",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "social-note",
+    kind: "note",
+    slug: "notes",
+    name: "Notes",
+    tagline: "Creator notes with rich text, checklists and tags",
+    description:
+      "Capture ideas, scripts and to-dos as first-class notes. Switch a note into checklist mode to track tasks, tag it so you can find it later, and favourite the notes you reach for every day.",
+    intro:
+      "The Notes surface holds the ideas, scripts and to-dos you need to keep close. Toggle checklist mode for to-dos, tag a note so you can find it later, and favourite the ones you reach for every day. The autosave loop keeps the library up to date.",
+    defaultCategory: "note",
+    keywords: ["note", "checklist", "todo", "SocialPilot"],
+    highlights: [
+      "Rich text",
+      "Checklist mode",
+      "Tags",
+      "Search",
+      "Favourite",
+    ],
     toolCount: 1,
   },
 ];

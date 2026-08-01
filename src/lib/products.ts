@@ -214,19 +214,31 @@ export const products: Product[] = [
     name: "SocialPilot",
     tagline: "A professional creator workspace in your browser",
     description:
-      "A creator workspace for every future SocialPilot tool. Batch 1 ships the foundation: a Social workspace shell, a project system, a media library and a reusable brand kit. The next batches add the creator tools (post designer, scheduler, AI assistant) on top of the same shell.",
+      "A creator workspace for every future SocialPilot tool. Batch 1 ships the foundation (workspace shell, project system, media library, brand kit). Batch 2 adds the core creator tools: a full Post Creator with rich text, the Caption Manager, the Hashtag Manager, the Content Calendar and Notes. Future batches add the scheduler, AI assistant and publishing on top of the same shell.",
     status: "active",
     category: "Media",
-    version: "0.1.0",
+    version: "0.2.0",
     href: "/socialpilot",
     accent: "text-primary",
     highlights: [
-      "Creator workspace shell",
-      "Project system with autosave",
-      "Media library for images, video and audio",
-      "Reusable brand kit",
+      "Post Creator with rich text, mentions, hashtags and a character counter",
+      "Caption Manager and Hashtag Manager with categories, search and favourites",
+      "Content Calendar with monthly, weekly and daily views",
+      "Notes with rich text, checklists and tags",
     ],
     releaseNotes: [
+      {
+        version: "0.2.0",
+        date: "2026-08-04",
+        changes: [
+          "Added the Post Creator: plain / rich text, bold / italic / code / link / mention / hashtag marks, bullet / ordered / checklist lists, character counter, live preview, autosave, duplicate draft, media attachment and one-click insertion of saved captions and hashtag groups",
+          "Added the Caption Manager: saved captions with categories, tags, search, favourite, duplicate and delete; one-click insertion into the Post Creator",
+          "Added the Hashtag Manager: named hashtag groups with categories, search, favourite, duplicate and delete; one-click insertion of the whole group into the Post Creator",
+          "Added the Content Calendar: monthly, weekly and daily views, platform filter, color labels, create / edit / delete / move plans, and a list of all plans with search",
+          "Added Notes: rich text, plain text, optional checklist mode, tags, search and favourite, with the same autosave loop as the other tools",
+          "Added a shared rich-text editor component reused by the Post Creator and Notes (dependency-free, content-editable-based)",
+        ],
+      },
       {
         version: "0.1.0",
         date: "2026-08-02",

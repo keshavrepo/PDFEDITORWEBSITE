@@ -14,7 +14,35 @@ const product = getProduct("socialpilot");
 const url = `${getAppUrl()}/products/socialpilot`;
 const description =
   product?.description ??
-  "SocialPilot is LaunchStack's creator workspace. The foundation is live: a reusable workspace shell, a project system, a media library and a brand kit. Future batches add the creator tools (post designer, video editor, scheduler, AI assistant) on top of the same shell.";
+  "SocialPilot is LaunchStack's creator workspace. The foundation is live: a reusable workspace shell, a project system, a media library and a brand kit. Batch 2 adds the core creator tools: a full Post Creator, Caption Manager, Hashtag Manager, Content Calendar and Notes. Future batches add the scheduler, AI assistant and publishing on top of the same shell.";
+
+/** The features the product page advertises. */
+const FEATURE_HIGHLIGHTS = [
+  "Reusable creator-workspace shell with a left navigation rail, workspace header, tool switcher, status bar, recent projects, favourites, autosave and keyboard shortcuts",
+  "Project system: create, rename, duplicate, delete, favourite, recent mirror and dashboard integration",
+  "Media library: upload images, video and audio; organise, search, filter, preview and delete assets; reuses the existing upload infrastructure",
+  "Reusable brand kit: logos, brand colours, fonts and default social profiles (reusable across every future SocialPilot tool)",
+  "Full Post Creator: plain / rich text, bold / italic / code / link / mention / hashtag marks, bullet / ordered / checklist lists, character counter, live preview and one-click insertion of saved captions and hashtag groups",
+  "Caption Manager: saved captions with categories, tags, search, favourite, duplicate and delete",
+  "Hashtag Manager: named hashtag groups with categories, tags, search, favourite, duplicate and delete",
+  "Content Calendar: monthly, weekly and daily views, platform filter, color labels, create / edit / delete / move plans",
+  "Notes: rich text, plain text, optional checklist mode, tags, search and favourite",
+  "IndexedDB-backed autosave loop and server-side recent-projects mirror, the same architecture proven by OfficePilot and FinancePilot",
+  "Right-rail tabbed panel with project properties, brand kit, media library and activity timeline (reuses the platform-level activity feed)",
+];
+
+/** What ships in batches 1 and 2. */
+const LAUNCHED_CHECKLIST = [
+  "Batch 1 — Social workspace shell with left navigation, workspace header, tool switcher, recent projects, favourites, activity panel, properties panel, search, autosave and keyboard shortcuts",
+  "Batch 1 — Project system: create, rename, duplicate, delete, favourite, recent mirror and dashboard integration",
+  "Batch 1 — Media library for images, video and audio: upload, organise, search, filter, preview and delete",
+  "Batch 1 — Reusable brand kit with logos, brand colours, fonts and default social profiles",
+  "Batch 2 — Post Creator: plain / rich text, mentions, hashtags, bullet / ordered / checklist lists, character counter, live preview, autosave, duplicate draft, media attachment",
+  "Batch 2 — Caption Manager: categories, tags, search, favourite, duplicate, delete and one-click insertion into the Post Creator",
+  "Batch 2 — Hashtag Manager: named groups, categories, tags, search, favourite, duplicate, delete and one-click group insertion into the Post Creator",
+  "Batch 2 — Content Calendar: monthly, weekly and daily views, platform filter, color labels, create / edit / delete / move plans and a list of all plans with search",
+  "Batch 2 — Notes: rich text, plain text, optional checklist mode, tags, search and favourite",
+];
 
 export const metadata: Metadata = {
   title: `SocialPilot — Creator workspace | ${platform.name}`,
@@ -63,24 +91,6 @@ const structuredData = {
     },
   ],
 };
-
-/** The features the product page advertises. */
-const FEATURE_HIGHLIGHTS = [
-  "Reusable creator-workspace shell with a left navigation rail, workspace header, tool switcher, status bar, recent projects, favourites, autosave and keyboard shortcuts",
-  "Project system: create, rename, duplicate, delete, favourite, recent mirror and dashboard integration",
-  "Media library: upload images, video and audio; organise, search, filter, preview and delete assets; reuses the existing upload infrastructure",
-  "Reusable brand kit: logos, brand colours, fonts and default social profiles (reusable across every future SocialPilot tool)",
-  "IndexedDB-backed autosave loop and server-side recent-projects mirror, the same architecture proven by OfficePilot and FinancePilot",
-  "Right-rail tabbed panel with project properties, brand kit, media library and activity timeline (reuses the platform-level activity feed)",
-];
-
-/** What ships in batch 1. */
-const LAUNCHED_CHECKLIST = [
-  "Social Workspace shell with left navigation, workspace header, tool switcher, recent projects, favourites, activity panel, properties panel, search, autosave and keyboard shortcuts",
-  "Project system: create, rename, duplicate, delete, favourite, recent mirror and dashboard integration",
-  "Media library for images, video and audio: upload, organise, search, filter, preview and delete",
-  "Reusable brand kit with logos, brand colours, fonts and default social profiles",
-];
 
 export default async function SocialPilotProductPage() {
   const user = await getSession();
@@ -158,9 +168,10 @@ export default async function SocialPilotProductPage() {
                 <p className="mt-2 text-sm text-muted-foreground">
                   The reusable SocialPilot workspace is live with {projects.length}{" "}
                   project kinds (post, story, carousel, video, short, reel, thread,
-                  campaign, podcast) and a brand kit, media library, project
-                  properties and activity panel. Every future tool plugs straight
-                  into the same shell, sidebar, autosave loop and export pipeline.
+                  campaign, podcast, caption, hashtag, calendar, note) and a brand
+                  kit, media library, project properties and activity panel.
+                  Every future tool plugs straight into the same shell, sidebar,
+                  autosave loop and export pipeline.
                 </p>
               </Card>
             </div>
@@ -187,7 +198,7 @@ export default async function SocialPilotProductPage() {
           <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
             <div className="mb-6 flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <h2 className="text-lg font-semibold">What ships in batch 1</h2>
+              <h2 className="text-lg font-semibold">What ships in batches 1 and 2</h2>
             </div>
             <Card className="p-6">
               <ul className="space-y-3 text-sm">
@@ -207,7 +218,7 @@ export default async function SocialPilotProductPage() {
 
         <section className="border-b border-border/40">
           <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
-            <h2 className="mb-6 text-lg font-semibold">Project kinds included in batch 1</h2>
+            <h2 className="mb-6 text-lg font-semibold">Project kinds included in batches 1 and 2</h2>
             <ul className="grid gap-3 sm:grid-cols-2">
               {projects.map((entry) => (
                 <li key={entry.kind}>

@@ -4,7 +4,11 @@ import { getSession } from "@/lib/auth";
 import { Navbar } from "@/components/navbar";
 import { SocialWorkspace } from "@/components/socialpilot/workspace";
 import { BlankSurface } from "@/components/socialpilot/surfaces/blank";
-import { PostSurface } from "@/components/socialpilot/surfaces/post";
+import { PostCreator } from "@/components/socialpilot/surfaces/post-creator";
+import { CaptionManager } from "@/components/socialpilot/surfaces/caption-manager";
+import { HashtagManager } from "@/components/socialpilot/surfaces/hashtag-manager";
+import { ContentCalendar } from "@/components/socialpilot/surfaces/content-calendar";
+import { Notes } from "@/components/socialpilot/surfaces/notes";
 import { StorySurface } from "@/components/socialpilot/surfaces/story";
 import { CarouselSurface } from "@/components/socialpilot/surfaces/carousel";
 import { VideoSurface } from "@/components/socialpilot/surfaces/video";
@@ -63,7 +67,15 @@ type SurfaceComponent = React.ComponentType<{
 function pickSurface(project: SocialProjectDefinition): SurfaceComponent {
   switch (project.kind) {
     case "post":
-      return PostSurface as unknown as SurfaceComponent;
+      return PostCreator as unknown as SurfaceComponent;
+    case "caption":
+      return CaptionManager as unknown as SurfaceComponent;
+    case "hashtag":
+      return HashtagManager as unknown as SurfaceComponent;
+    case "calendar":
+      return ContentCalendar as unknown as SurfaceComponent;
+    case "note":
+      return Notes as unknown as SurfaceComponent;
     case "story":
       return StorySurface as unknown as SurfaceComponent;
     case "carousel":
