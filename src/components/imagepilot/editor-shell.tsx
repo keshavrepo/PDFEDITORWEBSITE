@@ -7,6 +7,7 @@ import { ExportPresets } from "./export-presets";
 import { ExifViewer } from "./exif-viewer";
 import { FaviconGenerator } from "./favicon-generator";
 import { PrintLayoutStudio } from "./print-layout";
+import { CollageMaker } from "./collage-maker";
 import { Card } from "@/components/ui/card";
 
 export function ImagePilotEditor() {
@@ -45,6 +46,7 @@ export function ImagePilotEditor() {
           <FaviconGenerator />
         </div>
         <PrintLayoutStudio />
+        <CollageMaker images={currentFile ? [URL.createObjectURL(currentFile)] : undefined} />
       </section>
     </main>
   );

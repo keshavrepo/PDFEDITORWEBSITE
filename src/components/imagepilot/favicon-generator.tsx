@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
+import { encodeIco } from "@/lib/imagepilot/ico-encoder";
 import { Button } from "@/components/ui/button";
 
 const sizes = [16, 32, 48, 64, 180, 192, 512];
@@ -46,6 +47,16 @@ export function FaviconGenerator() {
             link.href = canvas?.toDataURL('image/png') || '';
             link.click();
           }}>Download PNG</Button>
+          <Button variant="outline" onClick={() => {
+            const pngBlob = new Blob([new Uint8Array(atob((canvas?.toDataURL('image/png') || '').split(',')[1] || '').split('').map(c => c.charCodeAt(0)))], { type: 'image/png' });
+            const ico = encodeIco([{ size: 16, pngData: new Uint8Array(pngBlob.arrayBuffer()) }, { size: 32, pngData: new Uint8Array(pngBlob.arrayBuffer()) }, { size: 48, pngData: new Uint8Array(pngBlob.arrayBuffer()) }, { size: 64, pngData: new Uint8Array(pngBlob.arrayBuffer()) }, { size: 128, pngData: new Uint8Array(pngBlob.arrayBuffer()) }, { size: 256, pngData: new Uint8Array(pngBlob.arrayBuffer()) }]);
+            const url = URL.createObjectURL(new Blob([ico], { type: 'image/x-icon' }));
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'icon.ico';
+            a.click();
+            URL.revokeObjectURL(url);
+          }}>Download .ico</Button>
         </div>
       )}
     </Card>
