@@ -23,6 +23,11 @@ export type AudioSessionCategory =
   | "trimmer"
   | "converter"
   | "recorder"
+  | "merger"
+  | "splitter"
+  | "metadata"
+  | "batch"
+  | "library"
   | "custom";
 
 /** Audio formats AudioPilot can read and write. */
@@ -305,6 +310,356 @@ export interface AudioRecorderBody {
   recordings: AudioRecording[];
   /** The id of the currently-selected recording, for the details panel. */
   selectedRecordingId: string;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batch 2: merger, splitter, metadata editor, batch processing, library     */
+/* -------------------------------------------------------------------------- */
+
+/** A single track on the Audio Merger timeline. The track holds the
+ * source data URL, the decoded duration, the user-controlled
+ * volume / pan and a derived waveform used by the preview
+ * timeline. The track order on the body is the playback order. */
+export interface AudioMergeTrack {
+  /** Stable id, used as the React key and the audio element id. */
+  id: string;
+  /** Display name shown on the track header. */
+  name: string;
+  /** The track's audio as a data URL, including the MIME type prefix. */
+  dataUrl: string;
+  /** The detected audio format. */
+  format: AudioFormat;
+  /** Approximate size in bytes. */
+  size: number;
+  /** Source duration in seconds. */
+  durationSeconds: number;
+  /** Per-track volume in 0..1. */
+  volume: number;
+  /** Per-track pan in -1..1 (-1 = full left, 1 = full right). */
+  pan: number;
+  /** Whether the track is muted. */
+  muted: boolean;
+  /** Pre-computed waveform peaks, normalised to 0..1. */
+  waveform: AudioWaveformPoint[];
+  /** When the track was added. */
+  addedAt: string;
+}
+
+/** A single point on the merger timeline. The merger stores the
+ * resolved layout (per-track timing + crossfade) so the preview
+ * can render without re-decoding. */
+export interface AudioMergeTimelinePoint {
+  /** Track id. */
+  trackId: string;
+  /** Time in seconds relative to the start of the merged output. */
+  startSeconds: number;
+  /** Time in seconds when the track ends (exclusive). */
+  endSeconds: number;
+  /** Fade-in duration in seconds (0 if the track has no fade-in). */
+  fadeInSeconds: number;
+  /** Fade-out duration in seconds (0 if the track has no fade-out). */
+  fadeOutSeconds: number;
+}
+
+/** The Audio Merger body. The merger holds the user tracks, the
+ * per-track volume / pan, the gap between tracks and the fade
+ * between consecutive tracks. The preview is the resolved
+ * timeline; the export runs an `OfflineAudioContext` mixdown. */
+export interface AudioMergerBody {
+  /** The tracks the user added, in their current order. */
+  tracks: AudioMergeTrack[];
+  /** Gap between tracks in seconds. */
+  gapSeconds: number;
+  /** Fade between consecutive tracks in seconds. */
+  crossfadeSeconds: number;
+  /** Master output format. */
+  outputFormat: AudioFormat;
+  /** Master output sample rate in Hz. 0 means "use the first track's rate". */
+  outputSampleRate: number;
+  /** Master output bitrate in kbps. 0 means "let the encoder choose". */
+  outputBitrateKbps: number;
+  /** The resolved timeline, rebuilt whenever the inputs change. */
+  timeline: AudioMergeTimelinePoint[];
+  /** Total merged duration in seconds, derived from the timeline. */
+  totalDurationSeconds: number;
+  /** Last exported data URL, if any. */
+  lastExportDataUrl: string;
+  /** When the last export happened. */
+  lastExportAt: string;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Audio Splitter body                                                        */
+/* -------------------------------------------------------------------------- */
+
+/** A single marker on the Audio Splitter timeline. Markers are
+ * added by the user at a precise timestamp; the splitter uses them
+ * to cut the source into segments. */
+export interface AudioSplitMarker {
+  id: string;
+  /** Marker time in seconds. */
+  timeSeconds: number;
+  /** Optional label. */
+  label: string;
+}
+
+/** A single segment produced by the Audio Splitter. The segment
+ * stores its own source-data-URL-free record: the source lives on
+ * the body and the segment references it by start / end
+ * timestamps. The segment can be exported independently. */
+export interface AudioSplitSegment {
+  id: string;
+  /** Display name. */
+  name: string;
+  /** Segment start in seconds. */
+  startSeconds: number;
+  /** Segment end in seconds. */
+  endSeconds: number;
+  /** Source format. */
+  format: AudioFormat;
+  /** Detected silence flag (set by the "split by silence" mode). */
+  isSilence: boolean;
+  /** Whether the segment is selected for batch export. */
+  selected: boolean;
+}
+
+/** The Audio Splitter body. The splitter holds the source audio,
+ * the markers the user added, the current splitter mode and the
+ * segments the current run produced. */
+export interface AudioSplitterBody {
+  /** The source audio as a data URL, including the MIME type prefix. */
+  sourceDataUrl: string;
+  /** The detected source format. */
+  sourceFormat: AudioFormat;
+  /** Original file name. */
+  fileName: string;
+  /** Total source duration in seconds. */
+  durationSeconds: number;
+  /** Current splitter mode. */
+  mode: "time" | "markers" | "equal" | "silence";
+  /** "split by time" mode: every N seconds. */
+  everySeconds: number;
+  /** "split into equal parts" mode: how many parts. */
+  equalParts: number;
+  /** "split by silence" mode: silence threshold in dB. */
+  silenceThresholdDb: number;
+  /** "split by silence" mode: minimum silence duration in seconds. */
+  silenceMinDurationSeconds: number;
+  /** User-added markers. */
+  markers: AudioSplitMarker[];
+  /** The segments the current run produced. */
+  segments: AudioSplitSegment[];
+  /** When the last split ran. */
+  lastSplitAt: string;
+  /** Last export format. */
+  lastExportFormat: AudioFormat;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Metadata Editor body                                                       */
+/* -------------------------------------------------------------------------- */
+
+/** Cover art stored on the Metadata Editor body. The image is kept
+ * as a data URL so the editor can preview it without an extra
+ * round trip to disk. The MIME type and the byte size are
+ * captured for the export step. */
+export interface AudioCoverArt {
+  /** The cover art as a data URL, including the MIME type prefix. */
+  dataUrl: string;
+  /** The detected MIME type. */
+  mime: string;
+  /** Approximate size in bytes. */
+  size: number;
+  /** Width in pixels, if known. */
+  width?: number;
+  /** Height in pixels, if known. */
+  height?: number;
+}
+
+/** The Metadata Editor body. The editor covers the standard tag
+ * fields every audio format uses (Title, Artist, Album, Genre,
+ * Year, Track Number, Comments) and adds cover art for the
+ * formats that support it. The user can save the metadata back to
+ * the same source file. */
+export interface AudioMetadataEditorBody {
+  /** The source audio as a data URL, including the MIME type prefix. */
+  sourceDataUrl: string;
+  /** The detected source format. */
+  sourceFormat: AudioFormat;
+  /** Original file name. */
+  fileName: string;
+  /** Title tag. */
+  title: string;
+  /** Artist tag. */
+  artist: string;
+  /** Album tag. */
+  album: string;
+  /** Genre tag. */
+  genre: string;
+  /** Year tag. */
+  year: string;
+  /** Track number tag (string to allow "1/12" style values). */
+  trackNumber: string;
+  /** Comments / description tag. */
+  comments: string;
+  /** Optional cover art. */
+  coverArt: AudioCoverArt | null;
+  /** Last saved timestamp. */
+  lastSavedAt: string;
+  /** Last exported data URL, if any. */
+  lastExportDataUrl: string;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batch Processing body                                                       */
+/* -------------------------------------------------------------------------- */
+
+/** The current batch job mode. */
+export type AudioBatchMode = "convert" | "rename" | "metadata" | "export";
+
+/** A single file in the batch. The file is the source the batch
+ * acts on. */
+export interface AudioBatchFile {
+  id: string;
+  fileName: string;
+  format: AudioFormat;
+  dataUrl: string;
+  size: number;
+  durationSeconds: number;
+}
+
+/** A single batch item, combining a source file, the desired
+ * operation and the resolved output. The `outputDataUrl` is set
+ * when the operation finishes. */
+export interface AudioBatchItem {
+  id: string;
+  file: AudioBatchFile;
+  /** Target format (convert mode). */
+  targetFormat: AudioFormat;
+  /** Target bitrate (convert mode). */
+  targetBitrateKbps: number;
+  /** New file name (rename mode). */
+  renameTo: string;
+  /** Title to apply (metadata mode). */
+  metadataTitle: string;
+  /** Artist to apply (metadata mode). */
+  metadataArtist: string;
+  /** Album to apply (metadata mode). */
+  metadataAlbum: string;
+  /** Year to apply (metadata mode). */
+  metadataYear: string;
+  /** Comments to apply (metadata mode). */
+  metadataComments: string;
+  /** Output file name (export mode). */
+  exportName: string;
+  /** Status of the item. */
+  status: "pending" | "running" | "done" | "error" | "cancelled";
+  /** Progress 0..1. */
+  progress: number;
+  /** Output data URL when done. */
+  outputDataUrl: string;
+  /** Output format when done. */
+  outputFormat: AudioFormat;
+  /** Output size in bytes. */
+  outputSize: number;
+  /** Error message when status is "error". */
+  errorMessage: string;
+  /** When the operation finished. */
+  finishedAt: string;
+}
+
+/** The Batch Processing body. The batch holds the queue, the
+ * resolved per-item results and a cancel flag. The user can
+ * download the results as a ZIP once the queue finishes. */
+export interface AudioBatchBody {
+  /** Current batch mode. */
+  mode: AudioBatchMode;
+  /** Whether the batch is currently running. */
+  running: boolean;
+  /** Whether the batch was cancelled. */
+  cancelled: boolean;
+  /** The current item index (0-based) when running. */
+  currentIndex: number;
+  /** Overall progress 0..1. */
+  progress: number;
+  /** The queue. */
+  items: AudioBatchItem[];
+  /** When the batch started. */
+  startedAt: string;
+  /** When the batch finished. */
+  finishedAt: string;
+  /** Last downloaded ZIP data URL, if any. */
+  lastZipDataUrl: string;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Audio Library body                                                          */
+/* -------------------------------------------------------------------------- */
+
+/** A single entry in the Audio Library. The library is the
+ * "files I have imported across every AudioPilot tool" view; an
+ * entry is the import record plus the per-tool favourites and
+ * recent flags. */
+export interface AudioLibraryEntry {
+  /** Stable id. */
+  id: string;
+  /** Display name. */
+  name: string;
+  /** The audio as a data URL, including the MIME type prefix. */
+  dataUrl: string;
+  /** Detected format. */
+  format: AudioFormat;
+  /** Approximate size in bytes. */
+  size: number;
+  /** Duration in seconds, captured at import time. */
+  durationSeconds: number;
+  /** Optional title tag. */
+  title: string;
+  /** Optional artist tag. */
+  artist: string;
+  /** Optional album tag. */
+  album: string;
+  /** When the entry was added. */
+  addedAt: string;
+  /** When the entry was last opened. */
+  lastOpenedAt: string;
+  /** Number of times the entry has been opened. */
+  openCount: number;
+  /** Whether the entry is favourited. */
+  isFavorite: boolean;
+  /** Free-form tags for filtering. */
+  tags: string[];
+}
+
+/** The Audio Library body. The library holds every imported audio
+ * file, the search / sort / filter state and the favourites
+ * gallery. The library powers the file picker every other
+ * AudioPilot surface uses. */
+export interface AudioLibraryBody {
+  /** Every imported entry, newest first. Capped at 200. */
+  entries: AudioLibraryEntry[];
+  /** Search term. */
+  search: string;
+  /** Sort field. */
+  sortField: "addedAt" | "name" | "size" | "durationSeconds" | "lastOpenedAt";
+  /** Sort direction. */
+  sortDirection: "asc" | "desc";
+  /** Format filter. Empty string means "all formats". */
+  formatFilter: string;
+  /** Favourite-only filter. */
+  favoritesOnly: boolean;
+  /** Currently selected entry id, for the details panel. */
+  selectedEntryId: string;
   /** Favourite flag. */
   isFavorite: boolean;
 }

@@ -221,10 +221,10 @@ export const products: Product[] = [
     name: "AudioPilot",
     tagline: "A professional audio workspace in your browser",
     description:
-      "A single audio workspace inside LaunchStack: an Audio Player with playback controls, waveform preview, seek, volume, mute, playback speed and loop, an Audio Trimmer with precision controls, live preview, undo / redo and export, an Audio Converter for MP3, WAV, OGG, FLAC and AAC with metadata preservation, and a Recorder with microphone capture, pause / resume, playback and save. Everything runs in the browser, reuses the existing LaunchStack storage, autosave loop, dashboard, search, file manager, settings and notifications, and ships as a single workspace where future audio tools will live alongside the foundation.",
+      "A single audio workspace inside LaunchStack: an Audio Player with playback controls, waveform preview, seek, volume, mute, playback speed and loop, an Audio Trimmer with precision controls, live preview, undo / redo and export, an Audio Converter for MP3, WAV, OGG, FLAC and AAC with metadata preservation, a Recorder with microphone capture, pause, resume, playback and save, an Audio Merger with reorder, remove, gap and crossfade, an Audio Splitter with time / markers / equal / silence modes, a Metadata Editor with cover art, a Batch Processing queue with progress and cancel, and a searchable Audio Library. Everything runs in the browser, reuses the existing LaunchStack storage, autosave loop, dashboard, search, file manager, settings and notifications, and ships as a single workspace where future audio tools will live alongside the foundation.",
     status: "active",
     category: "Media",
-    version: "0.1.0",
+    version: "0.2.0",
     href: "/audiopilot",
     accent: "text-primary",
     highlights: [
@@ -232,9 +232,27 @@ export const products: Product[] = [
       "Audio Trimmer — Trim Start, Trim End, Precision Controls, Live Preview, Undo, Redo, Export",
       "Audio Converter — MP3, WAV, OGG, FLAC, AAC import and export with metadata preservation where possible",
       "Recorder — Microphone Recording, Pause, Resume, Stop, Playback, Save Recording",
+      "Audio Merger — merge unlimited audio files, reorder tracks, remove tracks, live preview, gap between tracks, fade between tracks, export merged audio",
+      "Audio Splitter — split by time, split by markers, split into equal parts, split by silence, preview every segment, export selected segments",
+      "Metadata Editor — title, artist, album, genre, year, track number, comments, cover art, save metadata",
+      "Batch Processing — batch convert, batch rename, batch metadata update, batch export, progress tracking, cancel processing",
+      "Audio Library — recent files, favorites, search, sort, filter, duplicate, rename, delete",
       "Reuses the LaunchStack workspace shell, IndexedDB storage, autosave loop, dashboard, search, file manager, settings and notifications — no second workspace was created",
     ],
     releaseNotes: [
+      {
+        version: "0.2.0",
+        date: "2026-08-02",
+        changes: [
+          "Added the Audio Merger surface: merge unlimited MP3, WAV, OGG, FLAC and AAC files, reorder and remove tracks, set the gap between tracks and the crossfade between consecutive tracks, preview the mixdown on a per-track timeline, and export the result through the platform's OfflineAudioContext",
+          "Added the Audio Splitter surface: split by time, split by markers, split into equal parts and split by silence, preview every segment on a waveform, select which segments to export, batch export the selection to the user's downloads",
+          "Added the Metadata Editor surface: edit title, artist, album, genre, year, track number and comments, attach cover art, save the metadata back to the same source file",
+          "Added the Batch Processing surface: batch convert, batch rename, batch metadata update and batch export, per-item progress, overall progress, current-item indicator, cancel between items, result ZIP streamed through the platform's JSZip dependency",
+          "Added the Audio Library surface: every imported file in one place, search by name / artist / album / tags, sort by date / name / size / duration / last opened, filter by format or favourites-only, rename, duplicate, delete and favourite inline",
+          "Reused the existing AudioPilot workspace shell, IndexedDB storage, autosave loop, search index, dashboard and recent-mirror for every new tool — no second workspace was created and no shared infrastructure was duplicated",
+          "Added five new rail entries to the AudioPilot session switcher: merger, splitter, metadata, batch, library",
+        ],
+      },
       {
         version: "0.1.0",
         date: "2026-08-02",

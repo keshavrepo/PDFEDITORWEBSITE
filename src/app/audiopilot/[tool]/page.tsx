@@ -8,6 +8,11 @@ import { AudioPlayerSurface } from "@/components/audiopilot/surfaces/player";
 import { AudioTrimmerSurface } from "@/components/audiopilot/surfaces/trimmer";
 import { AudioConverterSurface } from "@/components/audiopilot/surfaces/converter";
 import { AudioRecorderSurface } from "@/components/audiopilot/surfaces/recorder";
+import { AudioMergerSurface } from "@/components/audiopilot/surfaces/merger";
+import { AudioSplitterSurface } from "@/components/audiopilot/surfaces/splitter";
+import { AudioMetadataEditorSurface } from "@/components/audiopilot/surfaces/metadata";
+import { AudioBatchSurface } from "@/components/audiopilot/surfaces/batch";
+import { AudioLibrarySurface } from "@/components/audiopilot/surfaces/library";
 import {
   focusedSessions,
   getSessionBySlug,
@@ -74,6 +79,26 @@ function pickSessionComponents(kind: AudioSessionKind): {
     case "recorder":
       return {
         Surface: AudioRecorderSurface as unknown as SurfaceComponent,
+      };
+    case "merger":
+      return {
+        Surface: AudioMergerSurface as unknown as SurfaceComponent,
+      };
+    case "splitter":
+      return {
+        Surface: AudioSplitterSurface as unknown as SurfaceComponent,
+      };
+    case "metadata":
+      return {
+        Surface: AudioMetadataEditorSurface as unknown as SurfaceComponent,
+      };
+    case "batch":
+      return {
+        Surface: AudioBatchSurface as unknown as SurfaceComponent,
+      };
+    case "library":
+      return {
+        Surface: AudioLibrarySurface as unknown as SurfaceComponent,
       };
     default:
       return null;

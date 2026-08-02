@@ -23,6 +23,11 @@ export const sessionCategoryOrder: AudioSessionCategory[] = [
   "trimmer",
   "converter",
   "recorder",
+  "merger",
+  "splitter",
+  "metadata",
+  "batch",
+  "library",
   "custom",
 ];
 
@@ -33,6 +38,11 @@ export const sessionCategoryLabels: Record<AudioSessionCategory, string> = {
   trimmer: "Trimmer",
   converter: "Converter",
   recorder: "Recorder",
+  merger: "Merger",
+  splitter: "Splitter",
+  metadata: "Metadata",
+  batch: "Batch",
+  library: "Library",
   custom: "Custom",
 };
 
@@ -50,6 +60,16 @@ export const sessionCategoryDescriptions: Record<
     "Audio Converter — MP3, WAV, OGG, FLAC, AAC import and export with metadata preservation where the format supports it",
   recorder:
     "Recorder — microphone recording with pause, resume, stop, playback and save to the same IndexedDB store",
+  merger:
+    "Audio Merger — merge unlimited audio files, reorder tracks, remove tracks, live preview, gap between tracks, fade between tracks, export merged audio",
+  splitter:
+    "Audio Splitter — split by time, split by markers, split into equal parts, split by silence, preview every segment, export selected segments",
+  metadata:
+    "Metadata Editor — title, artist, album, genre, year, track number, comments, cover art, save metadata",
+  batch:
+    "Batch Processing — batch convert, batch rename, batch metadata update, batch export, progress tracking, cancel processing",
+  library:
+    "Audio Library — recent files, favorites, search, sort, filter, duplicate, rename, delete",
   custom: "Anything else you build",
 };
 
@@ -220,6 +240,163 @@ export const sessions: AudioSessionDefinition[] = [
       "Inline playback with the same transport controls as the Player",
       "Save the capture to the workspace IndexedDB store",
       "Most-recent captures list with rename, delete and favourite",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "audio-merger",
+    kind: "merger",
+    slug: "merger",
+    name: "Audio Merger",
+    tagline:
+      "Merge unlimited audio files, reorder tracks, remove tracks, live preview, gap between tracks, fade between tracks, export merged audio",
+    description:
+      "A professional Audio Merger for AudioPilot. Drop in any number of MP3, WAV, OGG, FLAC or AAC files, reorder and remove tracks, set the gap between tracks, set the crossfade between consecutive tracks, preview the result on a per-track timeline, and export the merged mixdown. The merger runs an `OfflineAudioContext` mixdown so the export is sample-accurate, and the result lands in the user's downloads.",
+    intro:
+      "Open the Audio Merger to combine several audio files into one. Add tracks, reorder them on the timeline, set the gap and the crossfade, preview the result, and export. The merger persists the queue, the per-track volume / pan and the resolved timeline to the same IndexedDB store every other surface uses.",
+    defaultCategory: "merger",
+    keywords: [
+      "audio",
+      "merger",
+      "merge",
+      "combine",
+      "concatenate",
+      "mixdown",
+      "crossfade",
+      "AudioPilot",
+    ],
+    highlights: [
+      "Merge unlimited MP3, WAV, OGG, FLAC and AAC files into one",
+      "Reorder and remove tracks on a per-track timeline",
+      "Gap between tracks, fade-in and fade-out per track",
+      "Live preview plays the resolved mixdown on the timeline",
+      "Sample-accurate export through the platform's OfflineAudioContext",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "audio-splitter",
+    kind: "splitter",
+    slug: "splitter",
+    name: "Audio Splitter",
+    tagline:
+      "Split by time, split by markers, split into equal parts, split by silence, preview every segment, export selected segments",
+    description:
+      "A professional Audio Splitter for AudioPilot. Open any MP3, WAV, OGG, FLAC or AAC file, pick a mode (split by time, split by markers, split into equal parts, split by silence), preview every segment on a waveform, choose which segments to export, and download the selection. The splitter keeps the resolved segments on the session body so the user can re-export without re-running the split.",
+    intro:
+      "Open the Audio Splitter to cut a long audio file into segments. Add markers on the waveform, set the time interval, the equal-part count or the silence threshold, run the split, preview each segment, and export the selection. The splitter re-encodes through the platform's MediaRecorder and writes the files to the user's downloads.",
+    defaultCategory: "splitter",
+    keywords: [
+      "audio",
+      "splitter",
+      "split",
+      "cut",
+      "markers",
+      "silence",
+      "segments",
+      "AudioPilot",
+    ],
+    highlights: [
+      "Split by time, by markers, into equal parts, or by silence detection",
+      "Preview every segment on a waveform with start / end / duration",
+      "Select which segments to export, batch export to the downloads",
+      "Silence detector computes an RMS-based threshold per sample",
+      "Persists the resolved segments on the session body",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "audio-metadata-editor",
+    kind: "metadata",
+    slug: "metadata",
+    name: "Metadata Editor",
+    tagline:
+      "Title, artist, album, genre, year, track number, comments, cover art, save metadata",
+    description:
+      "A professional Metadata Editor for AudioPilot. Open any MP3, WAV, OGG, FLAC or AAC file, edit the standard tag fields (title, artist, album, genre, year, track number, comments), attach cover art, and save the metadata back to the same source. The editor reuses the platform's ID3v2 metadata reader the Converter already uses and persists the changes to the same IndexedDB store.",
+    intro:
+      "Open the Metadata Editor to fix the tags on a file. Edit the title, artist, album, genre, year, track number and comments, attach cover art, and save. The editor re-encodes the source through the platform's MediaRecorder with the new metadata baked in.",
+    defaultCategory: "metadata",
+    keywords: [
+      "audio",
+      "metadata",
+      "tags",
+      "id3",
+      "cover art",
+      "title",
+      "artist",
+      "album",
+      "AudioPilot",
+    ],
+    highlights: [
+      "Standard tag fields: title, artist, album, genre, year, track number, comments",
+      "Cover art: pick a JPG / PNG, the editor stores it as a data URL",
+      "Save metadata: re-encodes the source with the new tags baked in",
+      "Best-effort re-encoding through the platform's MediaRecorder",
+      "Reports the saved timestamp on the surface",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "audio-batch",
+    kind: "batch",
+    slug: "batch",
+    name: "Batch Processing",
+    tagline:
+      "Batch convert, batch rename, batch metadata update, batch export, progress tracking, cancel processing",
+    description:
+      "A professional Batch Processing surface for AudioPilot. Drop in a queue of files, pick a mode (batch convert, batch rename, batch metadata update, batch export), watch the progress bar advance per-item, cancel the batch at any time, and download the results as a ZIP. The batch reuses the same re-encoding pipeline the Converter, Metadata Editor and Trimmer already use.",
+    intro:
+      "Open the Batch Processing surface to apply a single operation to a queue of files. Add files, set the per-item options, hit run, watch the progress bar advance item by item, and download the ZIP when the batch finishes. The cancel button stops the queue between items so a long batch never runs away.",
+    defaultCategory: "batch",
+    keywords: [
+      "audio",
+      "batch",
+      "queue",
+      "convert",
+      "rename",
+      "metadata",
+      "export",
+      "zip",
+      "AudioPilot",
+    ],
+    highlights: [
+      "Batch convert, batch rename, batch metadata update, batch export",
+      "Per-item progress, overall progress, current-item indicator",
+      "Cancel processing between items without losing the queue",
+      "Result ZIP streamed through the platform's JSZip dependency",
+      "Reuses the same IndexedDB store every other surface uses",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "audio-library",
+    kind: "library",
+    slug: "library",
+    name: "Audio Library",
+    tagline:
+      "Recent files, favorites, search, sort, filter, duplicate, rename, delete",
+    description:
+      "A professional Audio Library for AudioPilot. Browse every audio file the user has imported across the workspace, sort by date, name, size or duration, filter by format or by favourites, search the metadata, mark favourites, and rename, duplicate or delete entries. The library is the \"files I have\" view that powers the file picker every other AudioPilot surface uses.",
+    intro:
+      "Open the Audio Library to see every audio file you have imported. Search, sort, filter, pin favourites, and manage the entries with rename, duplicate and delete. The library is the source of truth for \"which file is in my workspace\" and every other surface reads from it.",
+    defaultCategory: "library",
+    keywords: [
+      "audio",
+      "library",
+      "files",
+      "favorites",
+      "search",
+      "sort",
+      "filter",
+      "AudioPilot",
+    ],
+    highlights: [
+      "Recent files and favourites in one place",
+      "Search by name, artist, album and tags",
+      "Sort by date, name, size, duration or last opened",
+      "Filter by format or favourites-only",
+      "Rename, duplicate and delete entries inline",
     ],
     toolCount: 1,
   },

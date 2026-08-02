@@ -18,7 +18,11 @@ import {
   FileText,
   History as HistoryIcon,
   Layers,
+  Library,
+  ListChecks,
   Mic,
+  Save,
+  Scissors,
   Settings2,
   Sparkles,
   Star,
@@ -134,7 +138,17 @@ export function WorkspaceDashboard({ session }: WorkspaceDashboardProps) {
   }, [toast]);
 
   const sessionDef = getSession("dashboard");
-  const toolKinds = new Set<string>(["player", "trimmer", "converter", "recorder"]);
+  const toolKinds = new Set<string>([
+    "player",
+    "trimmer",
+    "converter",
+    "recorder",
+    "merger",
+    "splitter",
+    "metadata",
+    "batch",
+    "library",
+  ]);
   const favouriteTools = recent.filter(
     (entry) => toolKinds.has(entry.kind) && entry.isFavorite
   );
@@ -193,6 +207,16 @@ function ToolIcon({ kind }: { kind: string }) {
       return <FileText className={className} aria-hidden="true" />;
     case "recorder":
       return <Mic className={className} aria-hidden="true" />;
+    case "merger":
+      return <ListChecks className={className} aria-hidden="true" />;
+    case "splitter":
+      return <Scissors className={className} aria-hidden="true" />;
+    case "metadata":
+      return <Save className={className} aria-hidden="true" />;
+    case "batch":
+      return <Layers className={className} aria-hidden="true" />;
+    case "library":
+      return <Library className={className} aria-hidden="true" />;
     case "blank":
       return <FileText className={className} aria-hidden="true" />;
     case "history":

@@ -6,3 +6,4 @@
  */
 
 export * from "./audio";
+export * from "./audio-batch2";

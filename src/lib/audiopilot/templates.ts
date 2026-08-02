@@ -13,24 +13,44 @@
 
 import { sessionCategoryOrder } from "./sessions";
 import {
+  DEFAULT_BATCH_BODY,
   DEFAULT_CONVERTER_BODY,
+  DEFAULT_LIBRARY_BODY,
+  DEFAULT_MERGER_BODY,
+  DEFAULT_METADATA_EDITOR_BODY,
   DEFAULT_PLAYER_BODY,
   DEFAULT_RECORDER_BODY,
+  DEFAULT_SPLITTER_BODY,
   DEFAULT_TRIMMER_BODY,
+  asBatchBody,
   asConverterBody,
+  asLibraryBody,
+  asMergerBody,
+  asMetadataEditorBody,
   asPlayerBody,
   asRecorderBody,
+  asSplitterBody,
   asTrimmerBody,
+  cloneBatchBody,
   cloneConverterBody,
+  cloneLibraryBody,
+  cloneMergerBody,
+  cloneMetadataEditorBody,
   clonePlayerBody,
   cloneRecorderBody,
+  cloneSplitterBody,
   cloneTrimmerBody,
 } from "./bodies";
 import type {
+  AudioBatchBody,
+  AudioLibraryBody,
+  AudioMergerBody,
+  AudioMetadataEditorBody,
   AudioPlayerBody,
   AudioRecorderBody,
   AudioSessionCategory,
   AudioSessionKind,
+  AudioSplitterBody,
   AudioTemplate,
   AudioTrimmerBody,
   AudioConverterBody,
@@ -52,6 +72,16 @@ export function createBlankBody(kind: AudioSessionKind): unknown {
       return cloneConverterBody(DEFAULT_CONVERTER_BODY);
     case "recorder":
       return cloneRecorderBody(DEFAULT_RECORDER_BODY);
+    case "merger":
+      return cloneMergerBody(DEFAULT_MERGER_BODY);
+    case "splitter":
+      return cloneSplitterBody(DEFAULT_SPLITTER_BODY);
+    case "metadata":
+      return cloneMetadataEditorBody(DEFAULT_METADATA_EDITOR_BODY);
+    case "batch":
+      return cloneBatchBody(DEFAULT_BATCH_BODY);
+    case "library":
+      return cloneLibraryBody(DEFAULT_LIBRARY_BODY);
     case "blank":
     case "custom":
     default:
@@ -103,14 +133,29 @@ export {
   asTrimmerBody,
   asConverterBody,
   asRecorderBody,
+  asMergerBody,
+  asSplitterBody,
+  asMetadataEditorBody,
+  asBatchBody,
+  asLibraryBody,
   clonePlayerBody,
   cloneTrimmerBody,
   cloneConverterBody,
   cloneRecorderBody,
+  cloneMergerBody,
+  cloneSplitterBody,
+  cloneMetadataEditorBody,
+  cloneBatchBody,
+  cloneLibraryBody,
   DEFAULT_PLAYER_BODY,
   DEFAULT_TRIMMER_BODY,
   DEFAULT_CONVERTER_BODY,
   DEFAULT_RECORDER_BODY,
+  DEFAULT_MERGER_BODY,
+  DEFAULT_SPLITTER_BODY,
+  DEFAULT_METADATA_EDITOR_BODY,
+  DEFAULT_BATCH_BODY,
+  DEFAULT_LIBRARY_BODY,
 };
 
 export type {
@@ -118,4 +163,9 @@ export type {
   AudioTrimmerBody,
   AudioConverterBody,
   AudioRecorderBody,
+  AudioMergerBody,
+  AudioSplitterBody,
+  AudioMetadataEditorBody,
+  AudioBatchBody,
+  AudioLibraryBody,
 };

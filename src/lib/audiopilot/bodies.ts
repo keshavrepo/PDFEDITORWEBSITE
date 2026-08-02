@@ -11,13 +11,27 @@
  */
 
 import type {
+  AudioBatchBody,
+  AudioBatchFile,
+  AudioBatchItem,
+  AudioBatchMode,
   AudioConverterBody,
+  AudioCoverArt,
   AudioFormat,
+  AudioLibraryBody,
+  AudioLibraryEntry,
+  AudioMergeTimelinePoint,
+  AudioMergeTrack,
+  AudioMergerBody,
+  AudioMetadataEditorBody,
   AudioMetadataTag,
   AudioPlayerBody,
   AudioRecording,
   AudioSessionCategory,
   AudioSessionKind,
+  AudioSplitMarker,
+  AudioSplitSegment,
+  AudioSplitterBody,
   AudioTrimOp,
   AudioTrimmerBody,
   AudioWaveformPoint,
@@ -25,8 +39,19 @@ import type {
 } from "./types";
 
 export type {
+  AudioBatchBody,
+  AudioBatchFile,
+  AudioBatchItem,
+  AudioBatchMode,
   AudioConverterBody,
+  AudioCoverArt,
   AudioFormat,
+  AudioLibraryBody,
+  AudioLibraryEntry,
+  AudioMergeTimelinePoint,
+  AudioMergeTrack,
+  AudioMergerBody,
+  AudioMetadataEditorBody,
   AudioMetadataTag,
   AudioPlayerBody,
   AudioRecording,
@@ -35,6 +60,9 @@ export type {
   AudioSessionKind,
   AudioSessionMeta,
   AudioSessionSummary,
+  AudioSplitMarker,
+  AudioSplitSegment,
+  AudioSplitterBody,
   AudioTemplate,
   AudioTrimOp,
   AudioTrimmerBody,
@@ -70,6 +98,11 @@ function asAudioSessionCategory(
     case "trimmer":
     case "converter":
     case "recorder":
+    case "merger":
+    case "splitter":
+    case "metadata":
+    case "batch":
+    case "library":
     case "custom":
       return value;
     case "blank":
@@ -438,6 +471,593 @@ export function cloneRecorderBody(body: AudioRecorderBody): AudioRecorderBody {
     sampleRate: body.sampleRate,
     recordings: body.recordings.map((recording) => ({ ...recording })),
     selectedRecordingId: body.selectedRecordingId,
+    isFavorite: body.isFavorite,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batch 2: merger, splitter, metadata editor, batch processing, library     */
+/* -------------------------------------------------------------------------- */
+
+function asMergeTrack(value: unknown): AudioMergeTrack | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== "string" ||
+    typeof record.name !== "string" ||
+    typeof record.dataUrl !== "string"
+  ) {
+    return null;
+  }
+  const waveform = Array.isArray(record.waveform)
+    ? (record.waveform as unknown[])
+        .map((entry) => asWaveformPoint(entry))
+        .filter((entry): entry is AudioWaveformPoint => Boolean(entry))
+    : [];
+  return {
+    id: record.id,
+    name: record.name,
+    dataUrl: record.dataUrl,
+    format: asAudioFormat(record.format),
+    size: clampNumber(record.size, 0, 1_000_000_000, 0),
+    durationSeconds: clampNumber(
+      record.durationSeconds,
+      0,
+      24 * 60 * 60,
+      0
+    ),
+    volume: clampNumber(record.volume, 0, 1, 1),
+    pan: clampNumber(record.pan, -1, 1, 0),
+    muted: record.muted === true,
+    waveform,
+    addedAt:
+      typeof record.addedAt === "string"
+        ? record.addedAt
+        : new Date().toISOString(),
+  };
+}
+
+function asMergeTimelinePoint(value: unknown): AudioMergeTimelinePoint | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.trackId !== "string") return null;
+  return {
+    trackId: record.trackId,
+    startSeconds: clampNumber(record.startSeconds, 0, 24 * 60 * 60, 0),
+    endSeconds: clampNumber(record.endSeconds, 0, 24 * 60 * 60, 0),
+    fadeInSeconds: clampNumber(record.fadeInSeconds, 0, 60, 0),
+    fadeOutSeconds: clampNumber(record.fadeOutSeconds, 0, 60, 0),
+  };
+}
+
+export const DEFAULT_MERGER_BODY: AudioMergerBody = {
+  tracks: [],
+  gapSeconds: 0,
+  crossfadeSeconds: 0,
+  outputFormat: "wav",
+  outputSampleRate: 0,
+  outputBitrateKbps: 192,
+  timeline: [],
+  totalDurationSeconds: 0,
+  lastExportDataUrl: "",
+  lastExportAt: "",
+  isFavorite: false,
+};
+
+export function asMergerBody(value: unknown): AudioMergerBody {
+  if (!value || typeof value !== "object") return { ...DEFAULT_MERGER_BODY };
+  const record = value as Record<string, unknown>;
+  const tracks = Array.isArray(record.tracks)
+    ? (record.tracks as unknown[])
+        .map((entry) => asMergeTrack(entry))
+        .filter((entry): entry is AudioMergeTrack => Boolean(entry))
+        .slice(0, 50)
+    : [];
+  const timeline = Array.isArray(record.timeline)
+    ? (record.timeline as unknown[])
+        .map((entry) => asMergeTimelinePoint(entry))
+        .filter((entry): entry is AudioMergeTimelinePoint => Boolean(entry))
+    : [];
+  return {
+    tracks,
+    gapSeconds: clampNumber(record.gapSeconds, 0, 60, 0),
+    crossfadeSeconds: clampNumber(record.crossfadeSeconds, 0, 30, 0),
+    outputFormat: asAudioFormat(record.outputFormat),
+    outputSampleRate: clampNumber(record.outputSampleRate, 0, 384_000, 0),
+    outputBitrateKbps: clampNumber(
+      record.outputBitrateKbps,
+      32,
+      320,
+      192
+    ),
+    timeline,
+    totalDurationSeconds: clampNumber(
+      record.totalDurationSeconds,
+      0,
+      24 * 60 * 60,
+      0
+    ),
+    lastExportDataUrl:
+      typeof record.lastExportDataUrl === "string"
+        ? record.lastExportDataUrl
+        : "",
+    lastExportAt:
+      typeof record.lastExportAt === "string" ? record.lastExportAt : "",
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export function cloneMergerBody(body: AudioMergerBody): AudioMergerBody {
+  return {
+    tracks: body.tracks.map((track) => ({
+      ...track,
+      waveform: track.waveform.map((point) => ({ ...point })),
+    })),
+    gapSeconds: body.gapSeconds,
+    crossfadeSeconds: body.crossfadeSeconds,
+    outputFormat: body.outputFormat,
+    outputSampleRate: body.outputSampleRate,
+    outputBitrateKbps: body.outputBitrateKbps,
+    timeline: body.timeline.map((entry) => ({ ...entry })),
+    totalDurationSeconds: body.totalDurationSeconds,
+    lastExportDataUrl: body.lastExportDataUrl,
+    lastExportAt: body.lastExportAt,
+    isFavorite: body.isFavorite,
+  };
+}
+
+function asSplitMarker(value: unknown): AudioSplitMarker | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.id !== "string") return null;
+  return {
+    id: record.id,
+    timeSeconds: clampNumber(record.timeSeconds, 0, 24 * 60 * 60, 0),
+    label: typeof record.label === "string" ? record.label : "",
+  };
+}
+
+function asSplitSegment(value: unknown): AudioSplitSegment | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.id !== "string" || typeof record.name !== "string") {
+    return null;
+  }
+  return {
+    id: record.id,
+    name: record.name,
+    startSeconds: clampNumber(record.startSeconds, 0, 24 * 60 * 60, 0),
+    endSeconds: clampNumber(record.endSeconds, 0, 24 * 60 * 60, 0),
+    format: asAudioFormat(record.format),
+    isSilence: record.isSilence === true,
+    selected: record.selected !== false,
+  };
+}
+
+export const DEFAULT_SPLITTER_BODY: AudioSplitterBody = {
+  sourceDataUrl: "",
+  sourceFormat: "wav",
+  fileName: "",
+  durationSeconds: 0,
+  mode: "time",
+  everySeconds: 30,
+  equalParts: 4,
+  silenceThresholdDb: -40,
+  silenceMinDurationSeconds: 0.5,
+  markers: [],
+  segments: [],
+  lastSplitAt: "",
+  lastExportFormat: "wav",
+  isFavorite: false,
+};
+
+export function asSplitterBody(value: unknown): AudioSplitterBody {
+  if (!value || typeof value !== "object") return { ...DEFAULT_SPLITTER_BODY };
+  const record = value as Record<string, unknown>;
+  const markers = Array.isArray(record.markers)
+    ? (record.markers as unknown[])
+        .map((entry) => asSplitMarker(entry))
+        .filter((entry): entry is AudioSplitMarker => Boolean(entry))
+        .slice(0, 200)
+    : [];
+  const segments = Array.isArray(record.segments)
+    ? (record.segments as unknown[])
+        .map((entry) => asSplitSegment(entry))
+        .filter((entry): entry is AudioSplitSegment => Boolean(entry))
+        .slice(0, 200)
+    : [];
+  const mode =
+    record.mode === "markers" ||
+    record.mode === "equal" ||
+    record.mode === "silence"
+      ? record.mode
+      : "time";
+  return {
+    sourceDataUrl:
+      typeof record.sourceDataUrl === "string" ? record.sourceDataUrl : "",
+    sourceFormat: asAudioFormat(record.sourceFormat),
+    fileName: typeof record.fileName === "string" ? record.fileName : "",
+    durationSeconds: clampNumber(
+      record.durationSeconds,
+      0,
+      24 * 60 * 60,
+      0
+    ),
+    mode,
+    everySeconds: clampNumber(record.everySeconds, 1, 3600, 30),
+    equalParts: clampNumber(record.equalParts, 2, 100, 4),
+    silenceThresholdDb: clampNumber(
+      record.silenceThresholdDb,
+      -120,
+      0,
+      -40
+    ),
+    silenceMinDurationSeconds: clampNumber(
+      record.silenceMinDurationSeconds,
+      0.05,
+      30,
+      0.5
+    ),
+    markers,
+    segments,
+    lastSplitAt:
+      typeof record.lastSplitAt === "string" ? record.lastSplitAt : "",
+    lastExportFormat: asAudioFormat(record.lastExportFormat),
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export function cloneSplitterBody(body: AudioSplitterBody): AudioSplitterBody {
+  return {
+    sourceDataUrl: body.sourceDataUrl,
+    sourceFormat: body.sourceFormat,
+    fileName: body.fileName,
+    durationSeconds: body.durationSeconds,
+    mode: body.mode,
+    everySeconds: body.everySeconds,
+    equalParts: body.equalParts,
+    silenceThresholdDb: body.silenceThresholdDb,
+    silenceMinDurationSeconds: body.silenceMinDurationSeconds,
+    markers: body.markers.map((entry) => ({ ...entry })),
+    segments: body.segments.map((entry) => ({ ...entry })),
+    lastSplitAt: body.lastSplitAt,
+    lastExportFormat: body.lastExportFormat,
+    isFavorite: body.isFavorite,
+  };
+}
+
+function asCoverArt(value: unknown): AudioCoverArt | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.dataUrl !== "string" ||
+    typeof record.mime !== "string"
+  ) {
+    return null;
+  }
+  return {
+    dataUrl: record.dataUrl,
+    mime: record.mime,
+    size: clampNumber(record.size, 0, 1_000_000_000, 0),
+    width:
+      typeof record.width === "number" && Number.isFinite(record.width)
+        ? record.width
+        : undefined,
+    height:
+      typeof record.height === "number" && Number.isFinite(record.height)
+        ? record.height
+        : undefined,
+  };
+}
+
+export const DEFAULT_METADATA_EDITOR_BODY: AudioMetadataEditorBody = {
+  sourceDataUrl: "",
+  sourceFormat: "wav",
+  fileName: "",
+  title: "",
+  artist: "",
+  album: "",
+  genre: "",
+  year: "",
+  trackNumber: "",
+  comments: "",
+  coverArt: null,
+  lastSavedAt: "",
+  lastExportDataUrl: "",
+  isFavorite: false,
+};
+
+export function asMetadataEditorBody(
+  value: unknown
+): AudioMetadataEditorBody {
+  if (!value || typeof value !== "object")
+    return { ...DEFAULT_METADATA_EDITOR_BODY };
+  const record = value as Record<string, unknown>;
+  return {
+    sourceDataUrl:
+      typeof record.sourceDataUrl === "string" ? record.sourceDataUrl : "",
+    sourceFormat: asAudioFormat(record.sourceFormat),
+    fileName: typeof record.fileName === "string" ? record.fileName : "",
+    title: typeof record.title === "string" ? record.title : "",
+    artist: typeof record.artist === "string" ? record.artist : "",
+    album: typeof record.album === "string" ? record.album : "",
+    genre: typeof record.genre === "string" ? record.genre : "",
+    year: typeof record.year === "string" ? record.year : "",
+    trackNumber:
+      typeof record.trackNumber === "string" ? record.trackNumber : "",
+    comments: typeof record.comments === "string" ? record.comments : "",
+    coverArt: asCoverArt(record.coverArt),
+    lastSavedAt:
+      typeof record.lastSavedAt === "string" ? record.lastSavedAt : "",
+    lastExportDataUrl:
+      typeof record.lastExportDataUrl === "string"
+        ? record.lastExportDataUrl
+        : "",
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export function cloneMetadataEditorBody(
+  body: AudioMetadataEditorBody
+): AudioMetadataEditorBody {
+  return {
+    sourceDataUrl: body.sourceDataUrl,
+    sourceFormat: body.sourceFormat,
+    fileName: body.fileName,
+    title: body.title,
+    artist: body.artist,
+    album: body.album,
+    genre: body.genre,
+    year: body.year,
+    trackNumber: body.trackNumber,
+    comments: body.comments,
+    coverArt: body.coverArt ? { ...body.coverArt } : null,
+    lastSavedAt: body.lastSavedAt,
+    lastExportDataUrl: body.lastExportDataUrl,
+    isFavorite: body.isFavorite,
+  };
+}
+
+function asBatchFile(value: unknown): AudioBatchFile | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== "string" ||
+    typeof record.fileName !== "string" ||
+    typeof record.dataUrl !== "string"
+  ) {
+    return null;
+  }
+  return {
+    id: record.id,
+    fileName: record.fileName,
+    format: asAudioFormat(record.format),
+    dataUrl: record.dataUrl,
+    size: clampNumber(record.size, 0, 1_000_000_000, 0),
+    durationSeconds: clampNumber(
+      record.durationSeconds,
+      0,
+      24 * 60 * 60,
+      0
+    ),
+  };
+}
+
+function asBatchItem(value: unknown): AudioBatchItem | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const file = asBatchFile(record.file);
+  if (!file) return null;
+  if (typeof record.id !== "string") return null;
+  return {
+    id: record.id,
+    file,
+    targetFormat: asAudioFormat(record.targetFormat),
+    targetBitrateKbps: clampNumber(
+      record.targetBitrateKbps,
+      32,
+      320,
+      192
+    ),
+    renameTo: typeof record.renameTo === "string" ? record.renameTo : file.fileName,
+    metadataTitle:
+      typeof record.metadataTitle === "string" ? record.metadataTitle : "",
+    metadataArtist:
+      typeof record.metadataArtist === "string" ? record.metadataArtist : "",
+    metadataAlbum:
+      typeof record.metadataAlbum === "string" ? record.metadataAlbum : "",
+    metadataYear:
+      typeof record.metadataYear === "string" ? record.metadataYear : "",
+    metadataComments:
+      typeof record.metadataComments === "string"
+        ? record.metadataComments
+        : "",
+    exportName:
+      typeof record.exportName === "string"
+        ? record.exportName
+        : file.fileName,
+    status:
+      record.status === "running" ||
+      record.status === "done" ||
+      record.status === "error" ||
+      record.status === "cancelled"
+        ? record.status
+        : "pending",
+    progress: clampNumber(record.progress, 0, 1, 0),
+    outputDataUrl:
+      typeof record.outputDataUrl === "string" ? record.outputDataUrl : "",
+    outputFormat: asAudioFormat(record.outputFormat),
+    outputSize: clampNumber(record.outputSize, 0, 1_000_000_000, 0),
+    errorMessage:
+      typeof record.errorMessage === "string" ? record.errorMessage : "",
+    finishedAt:
+      typeof record.finishedAt === "string" ? record.finishedAt : "",
+  };
+}
+
+export const DEFAULT_BATCH_BODY: AudioBatchBody = {
+  mode: "convert",
+  running: false,
+  cancelled: false,
+  currentIndex: 0,
+  progress: 0,
+  items: [],
+  startedAt: "",
+  finishedAt: "",
+  lastZipDataUrl: "",
+  isFavorite: false,
+};
+
+export function asBatchBody(value: unknown): AudioBatchBody {
+  if (!value || typeof value !== "object") return { ...DEFAULT_BATCH_BODY };
+  const record = value as Record<string, unknown>;
+  const items = Array.isArray(record.items)
+    ? (record.items as unknown[])
+        .map((entry) => asBatchItem(entry))
+        .filter((entry): entry is AudioBatchItem => Boolean(entry))
+        .slice(0, 100)
+    : [];
+  const mode =
+    record.mode === "rename" ||
+    record.mode === "metadata" ||
+    record.mode === "export"
+      ? record.mode
+      : "convert";
+  return {
+    mode,
+    running: record.running === true,
+    cancelled: record.cancelled === true,
+    currentIndex: clampNumber(record.currentIndex, 0, items.length, 0),
+    progress: clampNumber(record.progress, 0, 1, 0),
+    items,
+    startedAt: typeof record.startedAt === "string" ? record.startedAt : "",
+    finishedAt:
+      typeof record.finishedAt === "string" ? record.finishedAt : "",
+    lastZipDataUrl:
+      typeof record.lastZipDataUrl === "string" ? record.lastZipDataUrl : "",
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export function cloneBatchBody(body: AudioBatchBody): AudioBatchBody {
+  return {
+    mode: body.mode,
+    running: body.running,
+    cancelled: body.cancelled,
+    currentIndex: body.currentIndex,
+    progress: body.progress,
+    items: body.items.map((entry) => ({
+      ...entry,
+      file: { ...entry.file },
+    })),
+    startedAt: body.startedAt,
+    finishedAt: body.finishedAt,
+    lastZipDataUrl: body.lastZipDataUrl,
+    isFavorite: body.isFavorite,
+  };
+}
+
+function asLibraryEntry(value: unknown): AudioLibraryEntry | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== "string" ||
+    typeof record.name !== "string" ||
+    typeof record.dataUrl !== "string"
+  ) {
+    return null;
+  }
+  const tags = Array.isArray(record.tags)
+    ? (record.tags as unknown[]).filter(
+        (entry): entry is string => typeof entry === "string"
+      )
+    : [];
+  return {
+    id: record.id,
+    name: record.name,
+    dataUrl: record.dataUrl,
+    format: asAudioFormat(record.format),
+    size: clampNumber(record.size, 0, 1_000_000_000, 0),
+    durationSeconds: clampNumber(
+      record.durationSeconds,
+      0,
+      24 * 60 * 60,
+      0
+    ),
+    title: typeof record.title === "string" ? record.title : "",
+    artist: typeof record.artist === "string" ? record.artist : "",
+    album: typeof record.album === "string" ? record.album : "",
+    addedAt:
+      typeof record.addedAt === "string"
+        ? record.addedAt
+        : new Date().toISOString(),
+    lastOpenedAt:
+      typeof record.lastOpenedAt === "string"
+        ? record.lastOpenedAt
+        : new Date(0).toISOString(),
+    openCount: clampNumber(record.openCount, 0, 1_000_000, 0),
+    isFavorite: record.isFavorite === true,
+    tags,
+  };
+}
+
+const LIBRARY_SORT_FIELDS = new Set([
+  "addedAt",
+  "name",
+  "size",
+  "durationSeconds",
+  "lastOpenedAt",
+] as const);
+
+export const DEFAULT_LIBRARY_BODY: AudioLibraryBody = {
+  entries: [],
+  search: "",
+  sortField: "addedAt",
+  sortDirection: "desc",
+  formatFilter: "",
+  favoritesOnly: false,
+  selectedEntryId: "",
+  isFavorite: false,
+};
+
+export function asLibraryBody(value: unknown): AudioLibraryBody {
+  if (!value || typeof value !== "object") return { ...DEFAULT_LIBRARY_BODY };
+  const record = value as Record<string, unknown>;
+  const entries = Array.isArray(record.entries)
+    ? (record.entries as unknown[])
+        .map((entry) => asLibraryEntry(entry))
+        .filter((entry): entry is AudioLibraryEntry => Boolean(entry))
+        .slice(0, 200)
+    : [];
+  const sortFieldRaw = record.sortField;
+  const sortField = (
+    LIBRARY_SORT_FIELDS as Set<AudioLibraryBody["sortField"]>
+  ).has(sortFieldRaw as AudioLibraryBody["sortField"])
+    ? (sortFieldRaw as AudioLibraryBody["sortField"])
+    : "addedAt";
+  return {
+    entries,
+    search: typeof record.search === "string" ? record.search : "",
+    sortField,
+    sortDirection: record.sortDirection === "asc" ? "asc" : "desc",
+    formatFilter:
+      typeof record.formatFilter === "string" ? record.formatFilter : "",
+    favoritesOnly: record.favoritesOnly === true,
+    selectedEntryId:
+      typeof record.selectedEntryId === "string" ? record.selectedEntryId : "",
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export function cloneLibraryBody(body: AudioLibraryBody): AudioLibraryBody {
+  return {
+    entries: body.entries.map((entry) => ({ ...entry, tags: [...entry.tags] })),
+    search: body.search,
+    sortField: body.sortField,
+    sortDirection: body.sortDirection,
+    formatFilter: body.formatFilter,
+    favoritesOnly: body.favoritesOnly,
+    selectedEntryId: body.selectedEntryId,
     isFavorite: body.isFavorite,
   };
 }

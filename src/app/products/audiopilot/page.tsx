@@ -14,7 +14,7 @@ const product = getProduct("audiopilot");
 const url = `${getAppUrl()}/products/audiopilot`;
 const description =
   product?.description ??
-  "AudioPilot is LaunchStack's audio workspace. Batch 1 ships a reusable audio workspace with an Audio Player, an Audio Trimmer, an Audio Converter and a Recorder. Everything runs in your browser and reuses the same LaunchStack authentication, dashboard, storage, search, file manager, settings and notifications every other product ships.";
+  "AudioPilot is LaunchStack's audio workspace. Batch 1 ships a reusable audio workspace with an Audio Player, an Audio Trimmer, an Audio Converter and a Recorder. Batch 2 adds the professional audio workflow: Audio Merger, Audio Splitter, Metadata Editor, Batch Processing and Audio Library. Everything runs in your browser and reuses the same LaunchStack authentication, dashboard, storage, search, file manager, settings and notifications every other product ships.";
 
 export const metadata: Metadata = {
   title: `AudioPilot — A professional audio workspace | ${platform.name}`,
@@ -26,6 +26,11 @@ export const metadata: Metadata = {
     "audio player",
     "audio trimmer",
     "audio converter",
+    "audio merger",
+    "audio splitter",
+    "metadata editor",
+    "batch processing",
+    "audio library",
     "recorder",
     "MP3",
     "WAV",
@@ -77,18 +82,25 @@ const FEATURE_HIGHLIGHTS = [
   "Audio Trimmer — Trim Start, Trim End, Precision Controls (0.01s, 0.05s, 0.1s), Live Preview, Undo, Redo, Export",
   "Audio Converter — MP3, WAV, OGG, FLAC, AAC import and export with metadata preservation where the format supports it",
   "Recorder — Microphone Recording, Pause, Resume, Stop, Playback, Save Recording",
+  "Audio Merger — merge unlimited audio files, reorder tracks, remove tracks, live preview, gap between tracks, fade between tracks, export merged audio",
+  "Audio Splitter — split by time, split by markers, split into equal parts, split by silence, preview every segment, export selected segments",
+  "Metadata Editor — title, artist, album, genre, year, track number, comments, cover art, save metadata",
+  "Batch Processing — batch convert, batch rename, batch metadata update, batch export, progress tracking, cancel processing",
+  "Audio Library — recent files, favorites, search, sort, filter, duplicate, rename, delete",
   "Reuses the LaunchStack workspace shell, IndexedDB storage, autosave loop, dashboard, search, file manager, settings and notifications — no second workspace was created",
-  "Two new database tables: audio_sessions and audio_history, both keyed per user, mirroring the WebPilot / DevPilot recent-mirror pattern",
-  "Two new API endpoints: /api/audiopilot/sessions and /api/audiopilot/sessions/[id], both rate-limited and origin-checked",
-  "The default /audiopilot landing opens the Workspace Dashboard; the rail and the new-session menu link to every other surface",
 ];
 
-/** What ships across Batch 1. */
+/** What ships across Batch 1 + Batch 2. */
 const LAUNCHED_CHECKLIST = [
-  "Audio Player — Play, Pause, Stop, Seek, Volume, Mute, Playback Speed, Loop, Current Time, Duration, Waveform Preview",
-  "Audio Trimmer — Trim Start, Trim End, Precision Controls, Live Preview, Undo, Redo, Export",
-  "Audio Converter — MP3, WAV, OGG, FLAC, AAC import and export with metadata preservation where possible",
-  "Recorder — Microphone Recording, Pause, Resume, Stop, Playback, Save Recording",
+  "Batch 2 — Audio Merger: merge unlimited audio files, reorder and remove tracks, gap and crossfade between tracks, live preview, sample-accurate export through the platform's OfflineAudioContext",
+  "Batch 2 — Audio Splitter: split by time, split by markers, split into equal parts, split by silence, preview every segment, export selected segments as a ZIP",
+  "Batch 2 — Metadata Editor: standard tag fields (title, artist, album, genre, year, track number, comments), cover art, save metadata",
+  "Batch 2 — Batch Processing: batch convert, batch rename, batch metadata update, batch export, per-item progress, cancel between items, result ZIP",
+  "Batch 2 — Audio Library: every imported file in one place, search, sort, format filter, favourites-only filter, rename, duplicate, delete, tags",
+  "Batch 1 — Audio Player: play, pause, stop, seek, volume, mute, playback speed, loop, current time, duration, waveform preview",
+  "Batch 1 — Audio Trimmer: trim start, trim end, precision controls, live preview, undo, redo, export",
+  "Batch 1 — Audio Converter: MP3, WAV, OGG, FLAC, AAC import and export with metadata preservation",
+  "Batch 1 — Recorder: microphone recording with pause, resume, stop, playback, save recording",
   "AudioPilot workspace shell with left navigation, tool switcher, workspace header, recent sessions, favourites, autosave, keyboard shortcuts and shortcuts dialog",
   "Two new database tables: audio_sessions and audio_history, both keyed per user, mirroring the WebPilot / DevPilot recent-mirror pattern",
   "Two new API endpoints: /api/audiopilot/{sessions, sessions/[id], history}, all rate-limited and origin-checked",
@@ -101,7 +113,6 @@ const ROADMAP = [
   "Audio Effects rack with EQ, compressor, reverb, delay, limiter, gate, de-esser, sidechain",
   "Noise Reduction and Audio Restoration tools (spectral denoise, de-clip, de-hum, de-reverb)",
   "Voice & Music AI tools: transcription, alignment, stem separation, mastering presets, AI mix assist",
-  "Batch Audio Processing: apply a chain of operations to a queue of files, log every step, export as a ZIP",
   "Audio Search: search the metadata of every project file, jump to a timecode, export a cue sheet",
 ];
 
@@ -117,7 +128,7 @@ export default async function AudioPilotProductPage() {
           <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-20">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs">
               <Sparkles className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
-              Batch 1 · Foundation + four core audio tools
+              Batch 2 · Professional audio workflow
             </div>
             <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
               {product?.name ?? "AudioPilot"}
@@ -138,8 +149,8 @@ export default async function AudioPilotProductPage() {
               </Button>
               {productStatus === "active" && (
                 <Button asChild variant="ghost" className="gap-1.5">
-                  <Link href="/audiopilot/player">
-                    Open the Audio Player
+                  <Link href="/audiopilot/merger">
+                    Open the Audio Merger
                     <ArrowRight className="h-4 w-4" aria-hidden="true" />
                   </Link>
                 </Button>
@@ -150,7 +161,7 @@ export default async function AudioPilotProductPage() {
 
         <section className="border-b border-border/40">
           <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
-            <h2 className="mb-6 text-lg font-semibold">What ships in Batch 1</h2>
+            <h2 className="mb-6 text-lg font-semibold">What ships across Batch 1 and Batch 2</h2>
             <Card className="p-6">
               <ul className="space-y-2 text-sm">
                 {LAUNCHED_CHECKLIST.map((item) => (
@@ -188,7 +199,7 @@ export default async function AudioPilotProductPage() {
 
         <section className="border-b border-border/40">
           <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
-            <h2 className="mb-6 text-lg font-semibold">Tools in Batch 1</h2>
+            <h2 className="mb-6 text-lg font-semibold">All tools</h2>
             <ul className="grid gap-3 sm:grid-cols-2">
               {sessions
                 .filter((entry) => entry.slug && entry.slug !== "dashboard")
