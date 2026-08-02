@@ -491,3 +491,57 @@ export const socialUserState = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   }
 );
+
+/**
+ * DevPilot recent-sessions mirror.
+ *
+ * The full session body lives in the browser (IndexedDB) so it is
+ * always available offline. This row is a small index the server uses
+ * to list the user's recent sessions on the dashboard, the file
+ * manager and the search results without round-tripping the local
+ * store.
+ */
+export const devSessions = pgTable(
+  "dev_sessions",
+  {
+    id: varchar("id", { length: 80 }).primaryKey(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    kind: varchar("kind", { length: 30 }).notNull(),
+    title: varchar("title", { length: 200 }).notNull(),
+    category: varchar("category", { length: 30 }).default("blank").notNull(),
+    version: integer("version").default(1).notNull(),
+    size: integer("size").default(0).notNull(),
+    isFavorite: boolean("is_favorite").default(false).notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("dev_sessions_user_updated_idx").on(table.userId, table.updatedAt),
+    index("dev_sessions_user_kind_idx").on(table.userId, table.kind),
+  ]
+);
+
+/**
+ * DevPilot developer history.
+ *
+ * One row per history entry, holding the small per-tool history
+ * (recent and favourites) so the dashboard, the file manager and
+ * the search can list what the developer has been working on
+ * without round-tripping the local store.
+ */
+export const devHistory = pgTable(
+  "dev_history",
+  {
+    id: varchar("id", { length: 80 }).primaryKey(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+    toolName: varchar("tool_name", { length: 100 }).notNull(),
+    kind: varchar("kind", { length: 20 }).default("tool").notNull(),
+    isFavorite: boolean("is_favorite").default(false).notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("dev_history_user_updated_idx").on(table.userId, table.updatedAt),
+    index("dev_history_user_tool_idx").on(table.userId, table.toolName),
+  ]
+);

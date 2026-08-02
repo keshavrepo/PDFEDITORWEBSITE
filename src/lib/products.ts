@@ -157,15 +157,35 @@ export const products: Product[] = [
   {
     id: "devpilot",
     name: "DevPilot",
-    tagline: "Everyday developer utilities",
+    tagline: "A professional developer workspace in your browser",
     description:
-      "Formatters, validators, encoders and generators for the tasks developers reach for a dozen times a day.",
-    status: "coming-soon",
+      "A developer workspace for every future DevPilot tool. Batch 1 ships the foundation: a reusable workspace shell with sessions, snippets and history that future developer tools (formatters, validators, encoders, generators) will plug into. Reuses the same LaunchStack platform that hosts OfficePilot, SocialPilot and FinancePilot: authentication, dashboard, storage, search, activity, settings, notifications and the shared file manager.",
+    status: "active",
     category: "Developer",
-    version: "0.0.0",
-    accent: "text-muted-foreground",
-    highlights: ["JSON and YAML tools", "Encoding helpers", "Diff and validate"],
-    releaseNotes: [],
+    version: "0.1.0",
+    href: "/devpilot",
+    accent: "text-primary",
+    highlights: [
+      "Reusable developer workspace: left rail, tool switcher, header, properties, activity, autosave, keyboard shortcuts",
+      "Workspace sessions: create, rename, duplicate, delete, favourite, recent and dashboard integration",
+      "Developer snippets: categories, languages, search, favourite, duplicate and delete",
+      "Developer history: per-tool recent and favourites, search and restore",
+    ],
+    releaseNotes: [
+      {
+        version: "0.1.0",
+        date: "2026-08-02",
+        changes: [
+          "Added the DevPilot workspace shell: left navigation, tool switcher, workspace header, activity panel, properties panel, search, recent sessions, favourites, autosave and keyboard shortcuts — consistent with OfficePilot and SocialPilot",
+          "Added workspace sessions as first-class projects: create, rename, duplicate, delete, favourite, recent mirror and dashboard integration",
+          "Added developer snippets: save snippets with categories, languages, search, favourite, duplicate and delete",
+          "Added developer history: per-tool recent and favourites with search and restore, mirroring the same pattern the rest of LaunchStack uses",
+          "Added two new database tables: devSessions and devHistory, both keyed per user, mirroring the FinancePilot / SocialPilot recent-mirror pattern",
+          "Added two new API endpoints: /api/devpilot/{sessions, history}, both rate-limited and origin-checked",
+          "The default /devpilot landing opens the Workspace Dashboard; the rail and the new-session menu link to every other surface",
+        ],
+      },
+    ],
   },
   {
     id: "officepilot",

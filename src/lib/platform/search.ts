@@ -14,6 +14,7 @@ import { imageTools } from "@/lib/imagepilot/tools";
 import { editors, templates } from "@/lib/officepilot";
 import { calculators as financeCalculators, templates as financeTemplates } from "@/lib/financepilot";
 import { projects as socialProjects, templates as socialTemplates } from "@/lib/socialpilot";
+import { sessions as devSessions, templates as devTemplates } from "@/lib/devpilot";
 import { documentationSections } from "@/lib/platform/documentation";
 
 export type SearchResultType =
@@ -180,6 +181,32 @@ function buildStaticIndex(): IndexEntry[] {
       description: template.description,
       href: "/socialpilot",
       context: "SocialPilot template",
+      haystack: `${template.name} ${template.description} ${template.category} ${template.highlights.join(" ")}`.toLowerCase(),
+      weight: 2,
+    });
+  }
+
+  for (const session of devSessions) {
+    entries.push({
+      id: `tool-devpilot-${session.kind}`,
+      type: "tool",
+      title: session.name,
+      description: session.description,
+      href: session.slug ? `/devpilot/${session.slug}` : "/devpilot",
+      context: "DevPilot",
+      haystack: `${session.name} ${session.description} ${session.keywords.join(" ")}`.toLowerCase(),
+      weight: 2,
+    });
+  }
+
+  for (const template of devTemplates) {
+    entries.push({
+      id: `template-dev-${template.id}`,
+      type: "template",
+      title: template.name,
+      description: template.description,
+      href: "/devpilot",
+      context: "DevPilot template",
       haystack: `${template.name} ${template.description} ${template.category} ${template.highlights.join(" ")}`.toLowerCase(),
       weight: 2,
     });
