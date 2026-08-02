@@ -221,38 +221,33 @@ export function ColorSurface({ session, onChange }: ColorSurfaceProps) {
           </div>
           <div className="grid grid-cols-5 gap-2">
             {palette.map((swatch) => (
-              <button
+              <div
                 key={swatch.hex}
-                type="button"
-                onClick={() => applySwatch(swatch.hex)}
                 className="group flex flex-col items-stretch gap-1 rounded-md border border-border p-2 text-left text-[10px] hover:border-primary"
               >
-                <div
-                  className="h-12 w-full rounded-sm border border-border"
-                  style={{ backgroundColor: swatch.hex }}
-                />
-                <span className="font-medium text-foreground">{swatch.name}</span>
-                <span className="font-mono text-muted-foreground">{swatch.hex}</span>
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    void copyHex(swatch.hex);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      void copyHex(swatch.hex);
-                    }
-                  }}
+                <button
+                  type="button"
+                  onClick={() => applySwatch(swatch.hex)}
+                  className="flex flex-col items-stretch gap-1 text-left"
+                  aria-label={`Apply ${swatch.name} (${swatch.hex})`}
+                >
+                  <div
+                    className="h-12 w-full rounded-sm border border-border"
+                    style={{ backgroundColor: swatch.hex }}
+                  />
+                  <span className="font-medium text-foreground">{swatch.name}</span>
+                  <span className="font-mono text-muted-foreground">{swatch.hex}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void copyHex(swatch.hex)}
                   className="inline-flex cursor-pointer items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+                  aria-label={`Copy ${swatch.hex}`}
                 >
                   <Copy className="h-2.5 w-2.5" aria-hidden="true" />
                   copy
-                </span>
-              </button>
+                </button>
+              </div>
             ))}
           </div>
 

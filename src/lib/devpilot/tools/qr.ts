@@ -23,6 +23,12 @@ export type QrEcLevel = "L" | "M" | "Q" | "H";
 
 export type QrMatrix = boolean[][];
 
+/** Internal matrix used while placing function patterns. `null` means
+ * "not yet placed" so the data-bit pass can skip it. The public
+ * `QrMatrix` only ever exposes booleans (nulls are coerced to false
+ * before returning). */
+type InternalMatrix = (boolean | null)[][];
+
 export interface QrError {
   ok: false;
   message: string;
@@ -67,11 +73,6 @@ const EC_LEVEL_BITS: Record<QrEcLevel, number> = {
   H: 0b10,
 };
 
-const G15 = 0x537;
-const G18 = 0x1f25;
-const G15_MASK = (1 << 14) - 1;
-const G18_MASK = (1 << 17) - 1;
-
 function gfMul(a: number, b: number): number {
   let result = 0;
   for (let i = 0; i < 8; i += 1) {
@@ -109,10 +110,6 @@ function reedSolomonRemainder(data: number[], ecLength: number): number[] {
   return buffer.slice(data.length);
 }
 
-function maskBit(condition: number, format: number): number {
-  return condition === 0 ? 0 : (format >> condition) & 1;
-}
-
 function pickVersion(text: string, ec: QrEcLevel): QrError | VersionInfo {
   for (const version of VERSION_TABLE) {
     if (capacityFor(version, ec) >= text.length) return version;
@@ -130,16 +127,10 @@ function capacityFor(version: VersionInfo, ec: QrEcLevel): number {
 }
 
 function ecOverhead(version: VersionInfo, ec: QrEcLevel): number {
-  if (ec === "L") {
-    return version.groups.reduce((sum, g) => sum + g.blocks * ecForGroup(ec, version), 0);
-  }
-  if (ec === "M") {
-    return version.groups.reduce((sum, g) => sum + g.blocks * ecForGroup(ec, version), 0);
-  }
-  if (ec === "Q") {
-    return version.groups.reduce((sum, g) => sum + g.blocks * ecForGroup(ec, version), 0);
-  }
-  return version.groups.reduce((sum, g) => sum + g.blocks * ecForGroup(ec, version), 0);
+  return version.groups.reduce(
+    (sum, group) => sum + group.blocks * ecForGroup(ec, version),
+    0
+  );
 }
 
 function ecForGroup(ec: QrEcLevel, version: VersionInfo): number {
@@ -227,7 +218,7 @@ function pushBits(bits: number[], value: number, length: number): void {
   }
 }
 
-function placeFunctionPatterns(matrix: QrMatrix, version: VersionInfo): void {
+function placeFunctionPatterns(matrix: InternalMatrix, version: VersionInfo): void {
   // Finder + separator around the three corners.
   drawFinder(matrix, 0, 0);
   drawFinder(matrix, version.size - 7, 0);
@@ -249,7 +240,7 @@ function placeFunctionPatterns(matrix: QrMatrix, version: VersionInfo): void {
   matrix[(version.size - 8)]![8] = true;
 }
 
-function drawFinder(matrix: QrMatrix, x: number, y: number): void {
+function drawFinder(matrix: InternalMatrix, x: number, y: number): void {
   for (let dy = 0; dy < 7; dy += 1) {
     for (let dx = 0; dx < 7; dx += 1) {
       const onEdge = dx === 0 || dx === 6 || dy === 0 || dy === 6;
@@ -270,7 +261,7 @@ function drawFinder(matrix: QrMatrix, x: number, y: number): void {
   }
 }
 
-function drawAlignment(matrix: QrMatrix, cx: number, cy: number): void {
+function drawAlignment(matrix: InternalMatrix, cx: number, cy: number): void {
   for (let dy = -2; dy <= 2; dy += 1) {
     for (let dx = -2; dx <= 2; dx += 1) {
       const isEdge = Math.max(Math.abs(dx), Math.abs(dy)) === 2;
@@ -280,7 +271,7 @@ function drawAlignment(matrix: QrMatrix, cx: number, cy: number): void {
   }
 }
 
-function placeDataBits(matrix: QrMatrix, version: VersionInfo, data: number[]): void {
+function placeDataBits(matrix: InternalMatrix, version: VersionInfo, data: number[]): void {
   const size = version.size;
   let bitIndex = 0;
   let upward = true;
@@ -301,7 +292,7 @@ function placeDataBits(matrix: QrMatrix, version: VersionInfo, data: number[]): 
   }
 }
 
-function placeFormatInfo(matrix: QrMatrix, version: VersionInfo, ec: QrEcLevel): void {
+function placeFormatInfo(matrix: InternalMatrix, version: VersionInfo, ec: QrEcLevel): void {
   const size = version.size;
   const data = (EC_LEVEL_BITS[ec] << 3) | bestMask(matrix, version, ec);
   let rem = data;
@@ -327,7 +318,7 @@ function placeFormatInfo(matrix: QrMatrix, version: VersionInfo, ec: QrEcLevel):
   matrix[size - 8]![8] = true;
 }
 
-function bestMask(matrix: QrMatrix, version: VersionInfo, ec: QrEcLevel): number {
+function bestMask(matrix: InternalMatrix, version: VersionInfo, ec: QrEcLevel): number {
   let best = 0;
   let bestScore = Infinity;
   for (let mask = 0; mask < 8; mask += 1) {
@@ -342,7 +333,7 @@ function bestMask(matrix: QrMatrix, version: VersionInfo, ec: QrEcLevel): number
   return best;
 }
 
-function applyMask(matrix: QrMatrix, version: VersionInfo, mask: number): void {
+function applyMask(matrix: InternalMatrix, version: VersionInfo, mask: number): void {
   const size = version.size;
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
@@ -375,13 +366,12 @@ function maskFunction(mask: number, x: number, y: number): boolean {
   return false;
 }
 
-function evaluateMask(matrix: QrMatrix, version: VersionInfo): number {
+function evaluateMask(matrix: InternalMatrix, version: VersionInfo): number {
   // Simplified mask penalty: count adjacent modules of the same
   // colour in rows and columns. Lower is better.
   let score = 0;
   const size = version.size;
   for (let y = 0; y < size; y += 1) {
-    let runColor = false;
     let runLength = 1;
     for (let x = 1; x < size; x += 1) {
       if (matrix[y]![x] === matrix[y]![x - 1]) {
@@ -391,9 +381,7 @@ function evaluateMask(matrix: QrMatrix, version: VersionInfo): number {
       } else {
         runLength = 1;
       }
-      runColor = matrix[y]![x] ?? false;
     }
-    void runColor;
   }
   for (let x = 0; x < size; x += 1) {
     let runLength = 1;
@@ -410,15 +398,15 @@ function evaluateMask(matrix: QrMatrix, version: VersionInfo): number {
   return score;
 }
 
-function cloneMatrix(matrix: QrMatrix): QrMatrix {
+function cloneMatrix(matrix: InternalMatrix): InternalMatrix {
   return matrix.map((row) => row.slice());
 }
 
-function emptyMatrix(size: number): QrMatrix {
-  const matrix: QrMatrix = [];
+function emptyMatrix(size: number): InternalMatrix {
+  const matrix: InternalMatrix = [];
   for (let i = 0; i < size; i += 1) {
-    const row: boolean[] = [];
-    for (let j = 0; j < size; j += 1) row.push(false);
+    const row: (boolean | null)[] = [];
+    for (let j = 0; j < size; j += 1) row.push(null);
     matrix.push(row);
   }
   return matrix;
@@ -432,16 +420,10 @@ export function generateQr(text: string, ec: QrEcLevel = "M"): QrResult {
   const v = version as VersionInfo;
   const data = encodeText(text, v, ec);
   const matrix = emptyMatrix(v.size);
-  // Reserve function pattern cells.
-  for (let i = 0; i < v.size; i += 1) {
-    for (let j = 0; j < v.size; j += 1) {
-      matrix[i]![j] = null as unknown as boolean;
-    }
-  }
-  placeFunctionPatterns(matrix as unknown as QrMatrix, v);
-  placeDataBits(matrix as unknown as QrMatrix, v, data);
-  placeFormatInfo(matrix as unknown as QrMatrix, v, ec);
-  // Coerce nulls to false (shouldn't be any left after placement).
+  placeFunctionPatterns(matrix, v);
+  placeDataBits(matrix, v, data);
+  placeFormatInfo(matrix, v, ec);
+  // Coerce remaining nulls to false (shouldn't be any after placement).
   for (let i = 0; i < v.size; i += 1) {
     for (let j = 0; j < v.size; j += 1) {
       if (matrix[i]![j] === null) matrix[i]![j] = false;

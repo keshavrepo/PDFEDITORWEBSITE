@@ -200,7 +200,7 @@ export function WorkspaceDashboard({ session }: WorkspaceDashboardProps) {
         </p>
       </Card>
 
-      <StatsRow loading={loading} stats={stats} />
+      <StatsRow loading={loading} stats={stats} historyCount={recentHistory.length} />
 
       <div className="grid gap-4 md:grid-cols-2">
         <RecentSessionsCard loading={loading} recent={recent} />
@@ -260,6 +260,7 @@ function ToolIcon({ kind }: { kind: string }) {
 function StatsRow({
   loading,
   stats,
+  historyCount,
 }: {
   loading: boolean;
   stats: {
@@ -268,6 +269,7 @@ function StatsRow({
     totalSnippets: number;
     perKind: PerKindCount[];
   };
+  historyCount: number;
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -295,7 +297,7 @@ function StatsRow({
       <StatCard
         loading={loading}
         label="History entries"
-        value={stats.perKind.reduce((sum, row) => sum + row.count, 0)}
+        value={historyCount}
         sub="from the recent mirror"
         icon={<HistoryIcon className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />}
       />

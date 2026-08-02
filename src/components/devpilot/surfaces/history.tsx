@@ -30,7 +30,32 @@ interface HistorySurfaceProps {
   onChange: (next: DevSession) => void;
 }
 
-const TOOLS = ["all", "snippet", "history", "blank", "custom"];
+const TOOLS = [
+  "all",
+  "snippet",
+  "history",
+  "blank",
+  "json",
+  "jwt",
+  "base64",
+  "uuid",
+  "hash",
+  "url",
+  "api",
+  "regex",
+  "diff",
+  "sql",
+  "html",
+  "css",
+  "javascript",
+  "cron",
+  "timestamp",
+  "xml",
+  "yaml",
+  "qr",
+  "color",
+  "custom",
+];
 
 function uniqueId(): string {
   return `devhist-${Math.random().toString(36).slice(2, 10)}`;
