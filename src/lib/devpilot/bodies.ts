@@ -16,6 +16,9 @@ import type {
   DevApiQueryParam,
   DevApiRequest,
   DevBase64Body,
+  DevColorBody,
+  DevColorHistoryEntry,
+  DevColorSwatch,
   DevCronBody,
   DevDiffBody,
   DevHashBody,
@@ -26,12 +29,15 @@ import type {
   DevJsBody,
   DevJsonBody,
   DevJwtBody,
+  DevQrBody,
   DevRegexBody,
   DevSnippetBody,
   DevSqlBody,
   DevTimestampBody,
   DevUrlBody,
   DevUuidBody,
+  DevXmlBody,
+  DevYamlBody,
 } from "./types";
 
 export type {
@@ -41,6 +47,9 @@ export type {
   DevApiQueryParam,
   DevApiRequest,
   DevBase64Body,
+  DevColorBody,
+  DevColorHistoryEntry,
+  DevColorSwatch,
   DevCronBody,
   DevDiffBody,
   DevHashBody,
@@ -51,12 +60,15 @@ export type {
   DevJsBody,
   DevJsonBody,
   DevJwtBody,
+  DevQrBody,
   DevRegexBody,
   DevSnippetBody,
   DevSqlBody,
   DevTimestampBody,
   DevUrlBody,
   DevUuidBody,
+  DevXmlBody,
+  DevYamlBody,
 } from "./types";
 
 /* -------------------------------------------------------------------------- */
@@ -210,7 +222,7 @@ export function asBase64Body(value: unknown): DevBase64Body {
   if (!value || typeof value !== "object") return { ...DEFAULT_BASE64_BODY };
   const record = value as Record<string, unknown>;
   const mode: DevBase64Body["mode"] =
-    record.mode === "file" ? "file" : "text";
+    record.mode === "file" || record.mode === "image" ? record.mode : "text";
   return {
     mode,
     text: typeof record.text === "string" ? record.text : "",
@@ -612,6 +624,140 @@ export function asTimestampBody(value: unknown): DevTimestampBody {
     )
       ? (record.direction as DevTimestampBody["direction"])
       : "fromUnix",
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batch 4: tool body normalisers                                             */
+/* -------------------------------------------------------------------------- */
+
+export const DEFAULT_XML_BODY: DevXmlBody = {
+  input: "",
+  indent: 2,
+  isFavorite: false,
+};
+
+export function asXmlBody(value: unknown): DevXmlBody {
+  if (!value || typeof value !== "object") return { ...DEFAULT_XML_BODY };
+  const record = value as Record<string, unknown>;
+  const indent =
+    typeof record.indent === "number" && Number.isFinite(record.indent)
+      ? Math.max(0, Math.min(8, Math.floor(record.indent)))
+      : 2;
+  return {
+    input: typeof record.input === "string" ? record.input : "",
+    indent,
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export const DEFAULT_YAML_BODY: DevYamlBody = {
+  input: "",
+  indent: 2,
+  isFavorite: false,
+};
+
+export function asYamlBody(value: unknown): DevYamlBody {
+  if (!value || typeof value !== "object") return { ...DEFAULT_YAML_BODY };
+  const record = value as Record<string, unknown>;
+  const indent =
+    typeof record.indent === "number" && Number.isFinite(record.indent)
+      ? Math.max(0, Math.min(8, Math.floor(record.indent)))
+      : 2;
+  return {
+    input: typeof record.input === "string" ? record.input : "",
+    indent,
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+const EC_LEVELS: DevQrBody["ecLevel"][] = ["L", "M", "Q", "H"];
+
+export const DEFAULT_QR_BODY: DevQrBody = {
+  text: "",
+  moduleSize: 6,
+  margin: 2,
+  ecLevel: "M",
+  isFavorite: false,
+};
+
+export function asQrBody(value: unknown): DevQrBody {
+  if (!value || typeof value !== "object") return { ...DEFAULT_QR_BODY };
+  const record = value as Record<string, unknown>;
+  const moduleSize =
+    typeof record.moduleSize === "number" && Number.isFinite(record.moduleSize)
+      ? Math.max(1, Math.min(20, Math.floor(record.moduleSize)))
+      : 6;
+  const margin =
+    typeof record.margin === "number" && Number.isFinite(record.margin)
+      ? Math.max(0, Math.min(10, Math.floor(record.margin)))
+      : 2;
+  return {
+    text: typeof record.text === "string" ? record.text : "",
+    moduleSize,
+    margin,
+    ecLevel: EC_LEVELS.includes(record.ecLevel as DevQrBody["ecLevel"])
+      ? (record.ecLevel as DevQrBody["ecLevel"])
+      : "M",
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export const DEFAULT_COLOR_BODY: DevColorBody = {
+  hex: "#0EA5E9",
+  name: "",
+  compareHex: "#F43F5E",
+  history: [],
+  palette: [],
+  isFavorite: false,
+};
+
+function asColorSwatch(value: unknown): DevColorSwatch | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.hex !== "string") return null;
+  return {
+    hex: record.hex,
+    name: typeof record.name === "string" ? record.name : "",
+  };
+}
+
+function asColorHistoryEntry(value: unknown): DevColorHistoryEntry | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.hex !== "string" || typeof record.id !== "string") return null;
+  return {
+    id: record.id,
+    hex: record.hex,
+    name: typeof record.name === "string" ? record.name : "",
+    createdAt:
+      typeof record.createdAt === "string"
+        ? record.createdAt
+        : new Date().toISOString(),
+  };
+}
+
+export function asColorBody(value: unknown): DevColorBody {
+  if (!value || typeof value !== "object") return { ...DEFAULT_COLOR_BODY };
+  const record = value as Record<string, unknown>;
+  return {
+    hex: typeof record.hex === "string" ? record.hex : "#0EA5E9",
+    name: typeof record.name === "string" ? record.name : "",
+    compareHex:
+      typeof record.compareHex === "string" ? record.compareHex : "#F43F5E",
+    history: Array.isArray(record.history)
+      ? (record.history as unknown[])
+          .map((entry) => asColorHistoryEntry(entry))
+          .filter((entry): entry is DevColorHistoryEntry => Boolean(entry))
+          .slice(0, 50)
+      : [],
+    palette: Array.isArray(record.palette)
+      ? (record.palette as unknown[])
+          .map((entry) => asColorSwatch(entry))
+          .filter((entry): entry is DevColorSwatch => Boolean(entry))
+          .slice(0, 24)
+      : [],
     isFavorite: record.isFavorite === true,
   };
 }

@@ -12,7 +12,7 @@
  */
 
 import { useMemo, useRef, useState } from "react";
-import { FileUp, FileDown, Type } from "lucide-react";
+import { FileUp, FileDown, Image as ImageIcon, Type } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -43,7 +43,7 @@ export function Base64Surface({ session, onChange }: Base64SurfaceProps) {
   const [error, setError] = useState<string | null>(null);
   const [decodedKind, setDecodedKind] = useState<"text" | "file" | null>(null);
   const [decodedName, setDecodedName] = useState<string>("decoded.bin");
-  const [decodedMime] = useState<string>("application/octet-stream");
+  const [decodedMime, setDecodedMime] = useState<string>("application/octet-stream");
 
   const inputSize = useMemo(() => {
     if (body.mode === "text") return new Blob([body.text]).size;
@@ -104,6 +104,19 @@ export function Base64Surface({ session, onChange }: Base64SurfaceProps) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to decode");
     }
+  }
+
+  function decodeAsImage() {
+    setError(null);
+    if (!body.text.trim()) {
+      setError("Paste a base64 string to decode");
+      return;
+    }
+    const cleaned = body.text.trim().replace(/^data:[^;]+;base64,/, "");
+    setOutput(cleaned);
+    setDecodedKind("file");
+    setDecodedMime("image/png");
+    setDecodedName("decoded.png");
   }
 
   async function copyOutput() {
@@ -198,6 +211,18 @@ export function Base64Surface({ session, onChange }: Base64SurfaceProps) {
               <FileUp className="h-3 w-3" aria-hidden="true" />
               File
             </button>
+            <button
+              type="button"
+              onClick={() => commit({ mode: "image" })}
+              className={
+                body.mode === "image"
+                  ? "inline-flex items-center gap-1 bg-accent px-2 py-1 font-medium"
+                  : "inline-flex items-center gap-1 px-2 py-1 text-muted-foreground hover:bg-accent"
+              }
+            >
+              <ImageIcon className="h-3 w-3" aria-hidden="true" />
+              Image
+            </button>
           </div>
         }
         status={
@@ -241,6 +266,14 @@ export function Base64Surface({ session, onChange }: Base64SurfaceProps) {
               >
                 Decode as file
               </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 text-xs"
+                onClick={decodeAsImage}
+              >
+                Decode as image
+              </Button>
             </div>
           </Card>
         ) : (
@@ -248,6 +281,7 @@ export function Base64Surface({ session, onChange }: Base64SurfaceProps) {
             <input
               ref={fileInputRef}
               type="file"
+              accept={body.mode === "image" ? "image/*" : undefined}
               hidden
               onChange={(event) => {
                 const file = event.target.files?.[0];
@@ -262,16 +296,26 @@ export function Base64Surface({ session, onChange }: Base64SurfaceProps) {
                 onClick={() => fileInputRef.current?.click()}
               >
                 <FileUp className="mr-1.5 h-3 w-3" aria-hidden="true" />
-                Choose file
+                {body.mode === "image" ? "Choose image" : "Choose file"}
               </Button>
               {body.filename && (
                 <p className="text-muted-foreground">
                   Loaded: <span className="font-medium text-foreground">{body.filename}</span>
                 </p>
               )}
+              {body.mode === "image" && body.fileBase64 && (
+                <div className="rounded-md border border-border bg-white p-2">
+                  <img
+                    src={`data:image/*;base64,${body.fileBase64}`}
+                    alt="Loaded image preview"
+                    className="max-h-40 max-w-full"
+                  />
+                </div>
+              )}
               <p className="text-[10px] text-muted-foreground">
-                The browser converts the file to base64 locally. Nothing is
-                uploaded.
+                {body.mode === "image"
+                  ? "Pick an image to encode as a base64 data URL or decode a base64 string back to an image."
+                  : "The browser converts the file to base64 locally. Nothing is uploaded."}
               </p>
             </div>
             <div className="mt-3 flex items-center gap-2">
@@ -291,10 +335,47 @@ export function Base64Surface({ session, onChange }: Base64SurfaceProps) {
         {output !== null && (
           <Card className="p-3">
             <p className="mb-1 text-xs font-semibold">Output</p>
-            <pre className="max-h-[260px] overflow-auto rounded-md border border-border bg-background p-2 font-mono text-[11px] leading-relaxed">
-              {output}
-            </pre>
-            {body.mode === "text" && decodedKind && (
+            {decodedMime.startsWith("image/") && body.mode === "text" ? (
+              <div className="rounded-md border border-border bg-white p-2">
+                <img
+                  src={`data:${decodedMime};base64,${output}`}
+                  alt="Decoded image preview"
+                  className="max-h-[260px] max-w-full"
+                />
+              </div>
+            ) : body.mode === "image" ? (
+              <div className="rounded-md border border-border bg-white p-2">
+                <img
+                  src={`data:image/*;base64,${output}`}
+                  alt="Encoded image preview"
+                  className="max-h-[260px] max-w-full"
+                />
+              </div>
+            ) : (
+              <pre className="max-h-[260px] overflow-auto rounded-md border border-border bg-background p-2 font-mono text-[11px] leading-relaxed">
+                {output}
+              </pre>
+            )}
+            {body.mode === "text" && decodedKind && !decodedMime.startsWith("image/") && (
+              <div className="mt-2 flex items-center gap-2">
+                <Input
+                  value={decodedName}
+                  onChange={(event) => setDecodedName(event.target.value)}
+                  placeholder="filename for download"
+                  className="h-7 text-xs"
+                />
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 gap-1.5 px-2 text-xs"
+                  onClick={downloadDecoded}
+                >
+                  <FileDown className="h-3 w-3" aria-hidden="true" />
+                  Download
+                </Button>
+              </div>
+            )}
+            {body.mode === "text" && decodedMime.startsWith("image/") && (
               <div className="mt-2 flex items-center gap-2">
                 <Input
                   value={decodedName}

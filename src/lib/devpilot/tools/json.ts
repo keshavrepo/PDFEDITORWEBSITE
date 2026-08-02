@@ -184,3 +184,180 @@ export function toTree(value: unknown, key = "$", path = ""): JsonTreeNode {
   }
   return { key, path: path || key, kind: "null", size: 0, preview: String(value), children: [] };
 }
+
+export interface JsonRepairResult {
+  ok: boolean;
+  repaired: string;
+  /** Repairs applied during the pass, in order. */
+  repairs: string[];
+  error: string | null;
+}
+
+/**
+ * Best-effort repair of common JSON errors:
+ * - trailing commas in objects and arrays
+ * - single-quoted strings
+ * - unquoted object keys
+ * - leading / trailing junk
+ * - JS-style comments
+ * - NaN / Infinity → null
+ */
+export function repairJson(input: string): JsonRepairResult {
+  const repairs: string[] = [];
+  let text = (input ?? "").replace(/\r\n?/g, "\n");
+
+  if (!text.trim()) {
+    return { ok: false, repaired: "", repairs, error: "Input is empty" };
+  }
+
+  // Strip JS-style comments.
+  const beforeComments = text;
+  text = stripComments(text);
+  if (text !== beforeComments) repairs.push("Stripped comments");
+
+  // Replace NaN and Infinity with null.
+  const beforeNan = text;
+  text = text.replace(/\bNaN\b/g, "null").replace(/\bInfinity\b/g, "null");
+  if (text !== beforeNan) repairs.push("Replaced NaN / Infinity with null");
+
+  // Trim leading / trailing junk.
+  const beforeTrim = text;
+  text = text.trim();
+  if (text !== beforeTrim) repairs.push("Trimmed leading / trailing junk");
+
+  // Replace single-quoted strings with double-quoted.
+  const beforeQuotes = text;
+  text = replaceSingleQuoted(text);
+  if (text !== beforeQuotes) repairs.push("Replaced single-quoted strings");
+
+  // Add quotes around unquoted object keys.
+  const beforeKeys = text;
+  text = quoteUnquotedKeys(text);
+  if (text !== beforeKeys) repairs.push("Quoted unquoted object keys");
+
+  // Remove trailing commas.
+  const beforeTrailing = text;
+  text = text.replace(/,(\s*[}\]])/g, "$1");
+  if (text !== beforeTrailing) repairs.push("Removed trailing commas");
+
+  const parsed = parseJson(text);
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      repaired: text,
+      repairs,
+      error: parsed.message,
+    };
+  }
+  const formatted = formatJson(text, { indent: 2 });
+  return {
+    ok: true,
+    repaired: formatted.ok ? formatted.formatted : text,
+    repairs,
+    error: null,
+  };
+}
+
+function stripComments(input: string): string {
+  let out = "";
+  let i = 0;
+  let inString: '"' | "'" | null = null;
+  let escaped = false;
+  while (i < input.length) {
+    const ch = input[i]!;
+    const next = input[i + 1];
+    if (inString) {
+      out += ch;
+      if (escaped) {
+        escaped = false;
+      } else if (ch === "\\") {
+        escaped = true;
+      } else if (ch === inString) {
+        inString = null;
+      }
+      i += 1;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      inString = ch as '"' | "'";
+      out += ch;
+      i += 1;
+      continue;
+    }
+    if (ch === "/" && next === "/") {
+      while (i < input.length && input[i] !== "\n") i += 1;
+      continue;
+    }
+    if (ch === "/" && next === "*") {
+      i += 2;
+      while (i < input.length && !(input[i] === "*" && input[i + 1] === "/")) i += 1;
+      i += 2;
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
+function replaceSingleQuoted(input: string): string {
+  // Find every single-quoted run and rewrite it as a double-quoted
+  // string, escaping embedded double quotes and backslashes.
+  let out = "";
+  let i = 0;
+  while (i < input.length) {
+    const ch = input[i]!;
+    if (ch === "'") {
+      let j = i + 1;
+      let value = "";
+      while (j < input.length && input[j] !== "'") {
+        if (input[j] === "\\" && j + 1 < input.length) {
+          value += input[j]! + input[j + 1]!;
+          j += 2;
+        } else {
+          value += input[j]!;
+          j += 1;
+        }
+      }
+      // Escape any unescaped double quotes / backslashes.
+      let escaped = "";
+      for (let k = 0; k < value.length; k += 1) {
+        const c = value[k]!;
+        if (c === "\\") escaped += "\\\\";
+        else if (c === '"') escaped += '\\"';
+        else escaped += c;
+      }
+      out += '"' + escaped + '"';
+      i = j + 1;
+      continue;
+    }
+    if (ch === '"') {
+      let j = i + 1;
+      out += ch;
+      while (j < input.length && input[j] !== '"') {
+        if (input[j] === "\\" && j + 1 < input.length) {
+          out += input[j]! + input[j + 1]!;
+          j += 2;
+        } else {
+          out += input[j]!;
+          j += 1;
+        }
+      }
+      out += '"';
+      i = j + 1;
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
+function quoteUnquotedKeys(input: string): string {
+  // Match `key:` where the key is unquoted (an identifier), but
+  // only when it appears as an object key (preceded by `{` or `,`).
+  return input.replace(
+    /([{,]\s*)([A-Za-z_$][A-Za-z0-9_$]*)(\s*:)/g,
+    (_match, prefix: string, key: string, tail: string) => `${prefix}"${key}"${tail}`
+  );
+}

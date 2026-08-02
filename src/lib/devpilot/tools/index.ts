@@ -18,3 +18,7 @@ export * from "./sql";
 export * from "./format";
 export * from "./cron";
 export * from "./timestamp";
+export * from "./xml";
+export * from "./yaml";
+export * from "./qr";
+export * from "./color";

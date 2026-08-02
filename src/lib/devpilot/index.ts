@@ -31,6 +31,10 @@ export {
   DEFAULT_JS_BODY,
   DEFAULT_CRON_BODY,
   DEFAULT_TIMESTAMP_BODY,
+  DEFAULT_XML_BODY,
+  DEFAULT_YAML_BODY,
+  DEFAULT_QR_BODY,
+  DEFAULT_COLOR_BODY,
   asSnippetBody,
   asHistoryBody,
   asJsonBody,
@@ -48,6 +52,10 @@ export {
   asJsBody,
   asCronBody,
   asTimestampBody,
+  asXmlBody,
+  asYamlBody,
+  asQrBody,
+  asColorBody,
 } from "./bodies";
 export {
   STORAGE_DATABASE,

@@ -21,6 +21,10 @@ import { CssSurface } from "@/components/devpilot/surfaces/css";
 import { JsSurface } from "@/components/devpilot/surfaces/js";
 import { CronSurface } from "@/components/devpilot/surfaces/cron";
 import { TimestampSurface } from "@/components/devpilot/surfaces/timestamp";
+import { XmlSurface } from "@/components/devpilot/surfaces/xml";
+import { YamlSurface } from "@/components/devpilot/surfaces/yaml";
+import { QrSurface } from "@/components/devpilot/surfaces/qr";
+import { ColorSurface } from "@/components/devpilot/surfaces/color";
 import { WorkspaceDashboard } from "@/components/devpilot/surfaces/workspace-dashboard";
 import {
   focusedSessions,
@@ -107,6 +111,14 @@ function pickSurface(session: DevSessionDefinition): SurfaceComponent {
       return CronSurface as unknown as SurfaceComponent;
     case "timestamp":
       return TimestampSurface as unknown as SurfaceComponent;
+    case "xml":
+      return XmlSurface as unknown as SurfaceComponent;
+    case "yaml":
+      return YamlSurface as unknown as SurfaceComponent;
+    case "qr":
+      return QrSurface as unknown as SurfaceComponent;
+    case "color":
+      return ColorSurface as unknown as SurfaceComponent;
     case "blank":
     default:
       return WorkspaceDashboard as unknown as SurfaceComponent;

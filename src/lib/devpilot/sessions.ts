@@ -36,6 +36,10 @@ export const sessionCategoryOrder: DevSessionCategory[] = [
   "javascript",
   "cron",
   "timestamp",
+  "xml",
+  "yaml",
+  "qr",
+  "color",
   "custom",
 ];
 
@@ -59,6 +63,10 @@ export const sessionCategoryLabels: Record<DevSessionCategory, string> = {
   javascript: "JavaScript",
   cron: "Cron",
   timestamp: "Timestamp",
+  xml: "XML",
+  yaml: "YAML",
+  qr: "QR",
+  color: "Color",
   custom: "Custom",
 };
 
@@ -82,6 +90,10 @@ export const sessionCategoryDescriptions: Record<DevSessionCategory, string> = {
   javascript: "JavaScript formatter, beautifier and minifier",
   cron: "Visual cron expression builder with human-readable output",
   timestamp: "Convert between Unix timestamps, ISO 8601 and local time",
+  xml: "XML beautifier, minifier and validator",
+  yaml: "YAML beautifier, minifier and validator",
+  qr: "QR code generator with PNG and SVG export",
+  color: "HEX, RGB, HSL and HSV converter with a generated palette",
   custom: "Anything else you build",
 };
 
@@ -473,6 +485,85 @@ export const sessions: DevSessionDefinition[] = [
       "Unix timestamp ↔ ISO 8601",
       "UTC and local time",
       "Relative time",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-xml",
+    kind: "xml",
+    slug: "xml",
+    name: "XML workspace",
+    tagline: "Beautify, minify and validate an XML document",
+    description:
+      "Format an XML document with a configurable indent, minify, and validate against the standard parser. The format pass uses fast-xml-parser to round-trip the document safely; the minify pass strips whitespace between tags.",
+    intro:
+      "Open the XML workspace to beautify, minify or validate an XML document. The minifier drops whitespace between tags; the validator catches the first parser error.",
+    defaultCategory: "xml",
+    keywords: ["xml", "format", "beautify", "minify", "validate", "DevPilot"],
+    highlights: [
+      "Beautify with configurable indent",
+      "Minify",
+      "Validate with parser errors",
+      "Copy and download",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-yaml",
+    kind: "yaml",
+    slug: "yaml",
+    name: "YAML workspace",
+    tagline: "Beautify, minify and validate a YAML document",
+    description:
+      "Format a YAML document with a configurable indent, minify, and validate. The parser handles scalars, quoted strings, key/value pairs, lists, nested maps, comments, multi-line scalars and flow-style arrays and objects.",
+    intro:
+      "Open the YAML workspace to beautify, minify or validate a YAML document. The minifier collapses whitespace; the validator catches indentation mismatches and other errors with line numbers.",
+    defaultCategory: "yaml",
+    keywords: ["yaml", "format", "beautify", "minify", "validate", "DevPilot"],
+    highlights: [
+      "Beautify with configurable indent",
+      "Minify",
+      "Validate with line-aware errors",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-qr",
+    kind: "qr",
+    slug: "qr",
+    name: "QR workspace",
+    tagline: "Generate a QR code and download it as PNG or SVG",
+    description:
+      "Type any text — a URL, a UUID, a JSON payload — and the workspace generates a Model 2 QR code with the four standard error-correction levels. Adjust the module size and the quiet zone, then download the matrix as PNG or SVG.",
+    intro:
+      "Open the QR workspace to generate a QR code for any text. Pick the error-correction level, set the module size, and download the matrix as PNG or SVG.",
+    defaultCategory: "qr",
+    keywords: ["qr", "qrcode", "barcode", "generate", "png", "svg", "DevPilot"],
+    highlights: [
+      "RFC-compliant QR code generation",
+      "Four error-correction levels",
+      "Download as PNG or SVG",
+      "Configurable module size and quiet zone",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-color",
+    kind: "color",
+    slug: "color",
+    name: "Color workspace",
+    tagline: "Convert HEX, RGB, HSL and HSV; generate a palette",
+    description:
+      "Type a HEX code and the tool renders the colour in RGB, HSL and HSV. The palette generator produces a five-colour monochromatic-plus-complementary palette; the contrast-ratio helper answers the WCAG question for any second colour. Recent colours and the generated palette are kept on the session body.",
+    intro:
+      "Open the Color workspace to convert between HEX, RGB, HSL and HSV. Pick a base colour, generate a palette, and check the contrast ratio against any other colour.",
+    defaultCategory: "color",
+    keywords: ["color", "hex", "rgb", "hsl", "hsv", "palette", "contrast", "DevPilot"],
+    highlights: [
+      "HEX, RGB, HSL and HSV converter",
+      "Five-colour palette generator",
+      "WCAG contrast ratio",
+      "Recent colours history",
     ],
     toolCount: 1,
   },

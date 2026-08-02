@@ -249,3 +249,20 @@ function legacyHash(bytes: Uint8Array, algorithm: HashAlgorithm): string {
   if (algorithm === "sha1") return sha1(bytes);
   throw new Error(`Unsupported algorithm: ${algorithm}`);
 }
+
+/**
+ * Compare two hex digests in constant time. Returns `true` when the
+ * digests match. The function is exposed so the Hash workspace can
+ * surface a side-by-side comparison without re-hashing the same
+ * bytes.
+ */
+export function compareHashes(expected: string, actual: string): boolean {
+  const a = expected.trim().toLowerCase();
+  const b = actual.trim().toLowerCase();
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}

@@ -35,6 +35,10 @@ export type DevSessionCategory =
   | "javascript"
   | "cron"
   | "timestamp"
+  | "xml"
+  | "yaml"
+  | "qr"
+  | "color"
   | "custom";
 
 /** Persistent metadata stored alongside the session body. */
@@ -212,13 +216,13 @@ export interface DevJwtBody {
 
 /** Base64 workspace body. */
 export interface DevBase64Body {
-  /** Input mode: text or file. */
-  mode: "text" | "file";
+  /** Input mode: text, file, or image. */
+  mode: "text" | "file" | "image";
   /** Text input (used when mode === "text"). */
   text: string;
-  /** Original filename (used when mode === "file"). */
+  /** Original filename (used when mode === "file" or "image"). */
   filename: string;
-  /** Base64 representation of the file binary (used when mode === "file"). */
+  /** Base64 representation of the file binary (used when mode === "file" or "image"). */
   fileBase64: string;
   /** Free-form note. */
   note: string;
@@ -437,6 +441,74 @@ export interface DevTimestampBody {
   input: string;
   /** Selected conversion direction. */
   direction: "fromUnix" | "toUnix" | "fromIso" | "toIso";
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batch 4: tool bodies                                                       */
+/* -------------------------------------------------------------------------- */
+
+/** XML workspace body. */
+export interface DevXmlBody {
+  input: string;
+  /** Indent width when formatting. */
+  indent: number;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** YAML workspace body. */
+export interface DevYamlBody {
+  input: string;
+  /** Indent width when formatting. */
+  indent: number;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** QR workspace body. */
+export interface DevQrBody {
+  /** Text to encode. */
+  text: string;
+  /** Module size in pixels (each QR cell). */
+  moduleSize: number;
+  /** Quiet-zone (border) in modules. */
+  margin: number;
+  /** Error-correction level. */
+  ecLevel: "L" | "M" | "Q" | "H";
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** A single colour in the palette. */
+export interface DevColorSwatch {
+  /** Hex string, e.g. "#0EA5E9". */
+  hex: string;
+  /** Friendly name (palette generators may fill this in). */
+  name: string;
+}
+
+/** A single history entry for the colour workspace. */
+export interface DevColorHistoryEntry {
+  id: string;
+  hex: string;
+  name: string;
+  createdAt: string;
+}
+
+/** Color workspace body. */
+export interface DevColorBody {
+  /** Current colour under inspection, in hex form. */
+  hex: string;
+  /** Optional friendly name. */
+  name: string;
+  /** Optional comparison hex (e.g. for the palette). */
+  compareHex: string;
+  /** History of recent colours. */
+  history: DevColorHistoryEntry[];
+  /** Generated palette. */
+  palette: DevColorSwatch[];
   /** Favourite flag. */
   isFavorite: boolean;
 }

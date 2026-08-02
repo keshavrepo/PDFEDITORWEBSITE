@@ -11,13 +11,15 @@
  */
 
 import { useRef, useState } from "react";
-import { FileUp, Type } from "lucide-react";
+import { CheckCircle2, FileUp, Type, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "../toast";
 import { ToolChrome } from "./shared/tool-chrome";
 import {
   asHashBody,
+  compareHashes,
   copyToClipboard,
   deleteDevSession,
   downloadTextFile,
@@ -59,6 +61,8 @@ export function HashSurface({ session, onChange }: HashSurfaceProps) {
   const [result, setResult] = useState<DigestResult | null>(null);
   const [computing, setComputing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expectedHash, setExpectedHash] = useState("");
+  const [compareAlgorithm, setCompareAlgorithm] = useState<HashAlgorithm>("sha256");
 
   function commit(patch: Partial<typeof body>) {
     onChange({ ...session, body: { ...body, ...patch } });
@@ -296,6 +300,67 @@ export function HashSurface({ session, onChange }: HashSurfaceProps) {
               </li>
             ))}
           </ul>
+        </Card>
+
+        <Card className="p-3">
+          <p className="mb-2 text-xs font-semibold">Compare hashes</p>
+          <div className="grid gap-2 sm:grid-cols-[1fr,auto,1fr,auto] sm:items-center">
+            <select
+              value={compareAlgorithm}
+              onChange={(event) =>
+                setCompareAlgorithm(event.target.value as HashAlgorithm)
+              }
+              className="h-7 rounded-md border border-border bg-background px-2 text-xs"
+              aria-label="Algorithm to compare"
+            >
+              {rows.map((algorithm) => (
+                <option key={algorithm} value={algorithm}>
+                  {hashLabel(algorithm)}
+                </option>
+              ))}
+            </select>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              =
+            </span>
+            <Input
+              value={expectedHash}
+              onChange={(event) => setExpectedHash(event.target.value)}
+              placeholder="Expected hash"
+              className="h-7 font-mono text-xs"
+              spellCheck={false}
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 gap-1 px-2 text-xs"
+              onClick={() => setExpectedHash("")}
+              disabled={!expectedHash}
+            >
+              <X className="h-3 w-3" aria-hidden="true" />
+              Clear
+            </Button>
+          </div>
+          {expectedHash && (
+            <div className="mt-2 flex items-center gap-2 text-[11px]">
+              {digests[compareAlgorithm] ? (
+                compareHashes(expectedHash, digests[compareAlgorithm]) ? (
+                  <span className="inline-flex items-center gap-1 text-primary">
+                    <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                    Match — {hashLabel(compareAlgorithm)} digests are equal.
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-destructive">
+                    <X className="h-3 w-3" aria-hidden="true" />
+                    Mismatch — the expected hash does not match {hashLabel(compareAlgorithm)}.
+                  </span>
+                )
+              ) : (
+                <span className="text-muted-foreground">
+                  Compute {hashLabel(compareAlgorithm)} first to compare.
+                </span>
+              )}
+            </div>
+          )}
         </Card>
       </div>
     </div>

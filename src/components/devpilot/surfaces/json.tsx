@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Code2,
   Eraser,
   FileUp,
   ListTree,
@@ -23,6 +24,7 @@ import {
   Sparkles,
   TriangleAlert,
   Wand2,
+  Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -36,6 +38,7 @@ import {
   downloadTextFile,
   formatJson,
   readFileAsText,
+  repairJson,
   searchJson,
   toTree,
   type JsonTreeNode,
@@ -119,6 +122,24 @@ export function JsonSurface({ session, onChange }: JsonSurfaceProps) {
       return;
     }
     toast({ message: "Valid JSON", tone: "success" });
+  }
+
+  function repairNow() {
+    const result = repairJson(body.input);
+    if (!result.ok) {
+      toast({
+        message: result.error
+          ? `Could not repair: ${result.error}`
+          : "Could not repair the input",
+        tone: "error",
+      });
+      return;
+    }
+    commit({ input: result.repaired });
+    const repairs = result.repairs.length > 0
+      ? ` (${result.repairs.join(", ")})`
+      : "";
+    toast({ message: `Repaired JSON${repairs}`, tone: "success" });
   }
 
   async function copyResult() {
@@ -225,8 +246,8 @@ export function JsonSurface({ session, onChange }: JsonSurfaceProps) {
               className="h-7 gap-1.5 px-2 text-xs"
               onClick={() => setView("input")}
             >
-              <Wand2 className="h-3 w-3" aria-hidden="true" />
-              Edit
+              <Code2 className="h-3 w-3" aria-hidden="true" />
+              Code
             </Button>
             <Button
               size="sm"
@@ -301,6 +322,15 @@ export function JsonSurface({ session, onChange }: JsonSurfaceProps) {
               >
                 <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
                 Validate
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 gap-1.5 px-2 text-xs"
+                onClick={repairNow}
+              >
+                <Wrench className="h-3 w-3" aria-hidden="true" />
+                Repair
               </Button>
             </div>
           </div>
