@@ -1947,3 +1947,434 @@ export function cloneProductivityBody(
     isFavorite: body.isFavorite,
   };
 }
+
+/* --------------------------- Settings ----------------------------------- */
+
+import type {
+  WebDashboardActivityRow,
+  WebDashboardBody,
+  WebDashboardNotification,
+  WebDashboardStorage,
+  WebProjectHistoryBody,
+  WebProjectHistoryBodyEntry,
+  WebProjectHistoryEntry,
+  WebProjectHistoryTombstone,
+  WebSettingsBody,
+  WebSettingsMetadata,
+} from "./types";
+
+export type {
+  WebDashboardActivityRow,
+  WebDashboardBody,
+  WebDashboardNotification,
+  WebDashboardStorage,
+  WebProjectHistoryBody,
+  WebProjectHistoryBodyEntry,
+  WebProjectHistoryEntry,
+  WebProjectHistoryTombstone,
+  WebSettingsBody,
+  WebSettingsMetadata,
+} from "./types";
+
+const SETTING_THEMES = new Set([
+  "default",
+  "light",
+  "dark",
+  "high-contrast",
+] as const);
+const TWITTER_CARDS = new Set([
+  "summary",
+  "summary_large_image",
+  "app",
+  "player",
+] as const);
+
+function asSettingsTheme(value: unknown): WebSettingsBody["theme"] {
+  return SETTING_THEMES.has(value as never)
+    ? (value as WebSettingsBody["theme"])
+    : "default";
+}
+
+function asTwitterCard(value: unknown): WebSettingsMetadata["twitterCard"] {
+  return TWITTER_CARDS.has(value as never)
+    ? (value as WebSettingsMetadata["twitterCard"])
+    : "summary";
+}
+
+function asSettingsMetadata(value: unknown): WebSettingsMetadata {
+  if (!value || typeof value !== "object") return {};
+  const record = value as Record<string, unknown>;
+  return {
+    favicon:
+      typeof record.favicon === "string" ? record.favicon : undefined,
+    ogTitle: typeof record.ogTitle === "string" ? record.ogTitle : undefined,
+    ogDescription:
+      typeof record.ogDescription === "string"
+        ? record.ogDescription
+        : undefined,
+    ogImage: typeof record.ogImage === "string" ? record.ogImage : undefined,
+    ogType: typeof record.ogType === "string" ? record.ogType : undefined,
+    ogUrl: typeof record.ogUrl === "string" ? record.ogUrl : undefined,
+    twitterCard:
+      typeof record.twitterCard === "string"
+        ? asTwitterCard(record.twitterCard)
+        : undefined,
+    twitterSite:
+      typeof record.twitterSite === "string" ? record.twitterSite : undefined,
+    twitterCreator:
+      typeof record.twitterCreator === "string"
+        ? record.twitterCreator
+        : undefined,
+    canonicalUrl:
+      typeof record.canonicalUrl === "string"
+        ? record.canonicalUrl
+        : undefined,
+    author: typeof record.author === "string" ? record.author : undefined,
+    themeColor:
+      typeof record.themeColor === "string" ? record.themeColor : undefined,
+    locale: typeof record.locale === "string" ? record.locale : undefined,
+    keywords:
+      typeof record.keywords === "string" ? record.keywords : undefined,
+  };
+}
+
+export const DEFAULT_SETTINGS_BODY: WebSettingsBody = {
+  projectId: "",
+  projectName: "Untitled project",
+  description: "",
+  version: "0.1.0",
+  author: "",
+  theme: "default",
+  customCss: "",
+  customJavaScript: "",
+  metadata: {
+    ogType: "website",
+    locale: "en_US",
+    twitterCard: "summary",
+  },
+  updatedAt: "",
+  isFavorite: false,
+};
+
+export function asSettingsBody(value: unknown): WebSettingsBody {
+  if (!value || typeof value !== "object")
+    return { ...DEFAULT_SETTINGS_BODY };
+  const record = value as Record<string, unknown>;
+  return {
+    projectId:
+      typeof record.projectId === "string" ? record.projectId : "",
+    projectName:
+      typeof record.projectName === "string" && record.projectName.trim()
+        ? record.projectName.trim()
+        : DEFAULT_SETTINGS_BODY.projectName,
+    description:
+      typeof record.description === "string" ? record.description : "",
+    version:
+      typeof record.version === "string" && record.version.trim()
+        ? record.version.trim()
+        : DEFAULT_SETTINGS_BODY.version,
+    author: typeof record.author === "string" ? record.author : "",
+    theme: asSettingsTheme(record.theme),
+    customCss: typeof record.customCss === "string" ? record.customCss : "",
+    customJavaScript:
+      typeof record.customJavaScript === "string"
+        ? record.customJavaScript
+        : "",
+    metadata: asSettingsMetadata(record.metadata),
+    updatedAt:
+      typeof record.updatedAt === "string" ? record.updatedAt : "",
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export function cloneSettingsBody(body: WebSettingsBody): WebSettingsBody {
+  return {
+    projectId: body.projectId,
+    projectName: body.projectName,
+    description: body.description,
+    version: body.version,
+    author: body.author,
+    theme: body.theme,
+    customCss: body.customCss,
+    customJavaScript: body.customJavaScript,
+    metadata: { ...body.metadata },
+    updatedAt: body.updatedAt,
+    isFavorite: body.isFavorite,
+  };
+}
+
+/* ----------------------- Project History --------------------------------- */
+
+function asProjectHistoryBodyEntry(
+  value: unknown
+): WebProjectHistoryBodyEntry | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== "string" ||
+    typeof record.title !== "string" ||
+    typeof record.kind !== "string"
+  ) {
+    return null;
+  }
+  return {
+    id: record.id,
+    title: record.title,
+    kind: record.kind,
+    category:
+      typeof record.category === "string" ? record.category : "blank",
+    updatedAt:
+      typeof record.updatedAt === "string"
+        ? record.updatedAt
+        : new Date().toISOString(),
+    version: clampNumber(record.version, 0, 1_000_000, 1),
+    size: clampNumber(record.size, 0, 1_000_000_000, 0),
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+function asProjectHistoryTombstone(
+  value: unknown
+): WebProjectHistoryTombstone | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== "string" ||
+    typeof record.sessionId !== "string" ||
+    typeof record.projectName !== "string"
+  ) {
+    return null;
+  }
+  return {
+    id: record.id,
+    sessionId: record.sessionId,
+    projectName: record.projectName,
+    deletedAt:
+      typeof record.deletedAt === "string"
+        ? record.deletedAt
+        : new Date().toISOString(),
+    body: record.body,
+  };
+}
+
+export const DEFAULT_PROJECT_HISTORY_BODY: WebProjectHistoryBody = {
+  recent: [],
+  favorites: [],
+  tombstones: [],
+  lastDeletedSessionId: "",
+  lastDeletedAt: "",
+  lastRestoredSessionId: "",
+  lastRestoredAt: "",
+  search: "",
+  isFavorite: false,
+};
+
+export function asProjectHistoryBody(value: unknown): WebProjectHistoryBody {
+  if (!value || typeof value !== "object")
+    return { ...DEFAULT_PROJECT_HISTORY_BODY };
+  const record = value as Record<string, unknown>;
+  const recent = Array.isArray(record.recent)
+    ? (record.recent as unknown[])
+        .map((entry) => asProjectHistoryBodyEntry(entry))
+        .filter(
+          (entry): entry is WebProjectHistoryBodyEntry => Boolean(entry)
+        )
+        .slice(0, 50)
+    : [];
+  const favorites = Array.isArray(record.favorites)
+    ? (record.favorites as unknown[]).filter(
+        (entry): entry is string => typeof entry === "string"
+      )
+    : [];
+  const tombstones = Array.isArray(record.tombstones)
+    ? (record.tombstones as unknown[])
+        .map((entry) => asProjectHistoryTombstone(entry))
+        .filter(
+          (entry): entry is WebProjectHistoryTombstone => Boolean(entry)
+        )
+        .slice(0, 50)
+    : [];
+  return {
+    recent,
+    favorites,
+    tombstones,
+    lastDeletedSessionId:
+      typeof record.lastDeletedSessionId === "string"
+        ? record.lastDeletedSessionId
+        : "",
+    lastDeletedAt:
+      typeof record.lastDeletedAt === "string"
+        ? record.lastDeletedAt
+        : "",
+    lastRestoredSessionId:
+      typeof record.lastRestoredSessionId === "string"
+        ? record.lastRestoredSessionId
+        : "",
+    lastRestoredAt:
+      typeof record.lastRestoredAt === "string"
+        ? record.lastRestoredAt
+        : "",
+    search: typeof record.search === "string" ? record.search : "",
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export function cloneProjectHistoryBody(
+  body: WebProjectHistoryBody
+): WebProjectHistoryBody {
+  return {
+    recent: body.recent.map((entry) => ({ ...entry })),
+    favorites: [...body.favorites],
+    tombstones: body.tombstones.map((entry) => ({
+      ...entry,
+    })),
+    lastDeletedSessionId: body.lastDeletedSessionId,
+    lastDeletedAt: body.lastDeletedAt,
+    lastRestoredSessionId: body.lastRestoredSessionId,
+    lastRestoredAt: body.lastRestoredAt,
+    search: body.search,
+    isFavorite: body.isFavorite,
+  };
+}
+
+/* ----------------------- Dashboard Integration -------------------------- */
+
+function asDashboardNotification(
+  value: unknown
+): WebDashboardNotification | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== "string" ||
+    typeof record.title !== "string" ||
+    typeof record.body !== "string"
+  ) {
+    return null;
+  }
+  return {
+    id: record.id,
+    kind:
+      record.kind === "success" ||
+      record.kind === "warning" ||
+      record.kind === "error"
+        ? record.kind
+        : "info",
+    title: record.title,
+    body: record.body,
+    surface: typeof record.surface === "string" ? record.surface : "",
+    createdAt:
+      typeof record.createdAt === "string"
+        ? record.createdAt
+        : new Date().toISOString(),
+    read: record.read === true,
+  };
+}
+
+function asDashboardActivityRow(
+  value: unknown
+): WebDashboardActivityRow | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.kind !== "string") return null;
+  return {
+    kind: record.kind,
+    events: clampNumber(record.events, 0, 1_000_000, 0),
+    lastEventAt:
+      typeof record.lastEventAt === "string"
+        ? record.lastEventAt
+        : "",
+    sessionCount: clampNumber(record.sessionCount, 0, 1_000_000, 0),
+  };
+}
+
+function asDashboardStorage(value: unknown): WebDashboardStorage {
+  if (!value || typeof value !== "object")
+    return {
+      sessions: 0,
+      bytes: 0,
+      historyEntries: 0,
+      assets: 0,
+      assetBytes: 0,
+      computedAt: "",
+    };
+  const record = value as Record<string, unknown>;
+  return {
+    sessions: clampNumber(record.sessions, 0, 1_000_000, 0),
+    bytes: clampNumber(record.bytes, 0, 1_000_000_000_000, 0),
+    historyEntries: clampNumber(record.historyEntries, 0, 1_000_000, 0),
+    assets: clampNumber(record.assets, 0, 1_000_000, 0),
+    assetBytes: clampNumber(record.assetBytes, 0, 1_000_000_000_000, 0),
+    computedAt:
+      typeof record.computedAt === "string" ? record.computedAt : "",
+  };
+}
+
+export const DEFAULT_DASHBOARD_BODY: WebDashboardBody = {
+  storage: {
+    sessions: 0,
+    bytes: 0,
+    historyEntries: 0,
+    assets: 0,
+    assetBytes: 0,
+    computedAt: "",
+  },
+  notifications: [],
+  recentSearches: [],
+  favouriteSurfaces: [],
+  activity: [],
+  refreshedAt: "",
+  isFavorite: false,
+};
+
+export function asDashboardBody(value: unknown): WebDashboardBody {
+  if (!value || typeof value !== "object")
+    return cloneDashboardBody(DEFAULT_DASHBOARD_BODY);
+  const record = value as Record<string, unknown>;
+  const notifications = Array.isArray(record.notifications)
+    ? (record.notifications as unknown[])
+        .map((entry) => asDashboardNotification(entry))
+        .filter(
+          (entry): entry is WebDashboardNotification => Boolean(entry)
+        )
+        .slice(0, 50)
+    : [];
+  const recentSearches = Array.isArray(record.recentSearches)
+    ? (record.recentSearches as unknown[]).filter(
+        (entry): entry is string => typeof entry === "string"
+      )
+    : [];
+  const favouriteSurfaces = Array.isArray(record.favouriteSurfaces)
+    ? (record.favouriteSurfaces as unknown[]).filter(
+        (entry): entry is string => typeof entry === "string"
+      )
+    : [];
+  const activity = Array.isArray(record.activity)
+    ? (record.activity as unknown[])
+        .map((entry) => asDashboardActivityRow(entry))
+        .filter(
+          (entry): entry is WebDashboardActivityRow => Boolean(entry)
+        )
+    : [];
+  return {
+    storage: asDashboardStorage(record.storage),
+    notifications,
+    recentSearches,
+    favouriteSurfaces,
+    activity,
+    refreshedAt:
+      typeof record.refreshedAt === "string" ? record.refreshedAt : "",
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export function cloneDashboardBody(body: WebDashboardBody): WebDashboardBody {
+  return {
+    storage: { ...body.storage },
+    notifications: body.notifications.map((entry) => ({ ...entry })),
+    recentSearches: [...body.recentSearches],
+    favouriteSurfaces: [...body.favouriteSurfaces],
+    activity: body.activity.map((entry) => ({ ...entry })),
+    refreshedAt: body.refreshedAt,
+    isFavorite: body.isFavorite,
+  };
+}

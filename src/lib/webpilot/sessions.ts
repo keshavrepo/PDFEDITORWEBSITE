@@ -34,6 +34,10 @@ export const sessionCategoryOrder: WebSessionCategory[] = [
   "export",
   "import",
   "productivity",
+  "settings",
+  "templates",
+  "project-history",
+  "dashboard-integration",
   "history",
   "custom",
 ];
@@ -56,6 +60,10 @@ export const sessionCategoryLabels: Record<WebSessionCategory, string> = {
   export: "Export",
   import: "Import",
   productivity: "Productivity",
+  settings: "Settings",
+  templates: "Templates",
+  "project-history": "Project History",
+  "dashboard-integration": "Dashboard",
   history: "History",
   custom: "Custom",
 };
@@ -90,6 +98,14 @@ export const sessionCategoryDescriptions: Record<WebSessionCategory, string> = {
     "Project Import — import a ZIP, restore folders, assets and metadata, conflict handling, validation before import",
   productivity:
     "Workspace Productivity — Command Palette, keyboard shortcut reference, recent projects, quick actions, workspace settings, autosave controls",
+  settings:
+    "Project Settings — name, description, version, author, theme, custom CSS, custom JavaScript, metadata, favicon, Open Graph fields",
+  templates:
+    "Professional Project Templates — Landing Page, Portfolio, Business Website, SaaS Landing Page, Dashboard, Blog, Documentation, Login Page, Pricing Page, Contact Page",
+  "project-history":
+    "Project History — recent projects, duplicate, rename, delete, restore last session",
+  "dashboard-integration":
+    "Dashboard Integration — recent projects, storage summary, notifications, search, favourites and analytics in one place",
   history: "Per-tool history with recent and favourites",
   custom: "Anything else you build",
 };
@@ -483,6 +499,147 @@ export const BATCH3_SESSIONS: WebSessionDefinition[] = [
   PRODUCTIVITY_SESSION,
 ];
 
+/* -------------------------------------------------------------------------- */
+/* Batch 4: project settings, project history, dashboard integration          */
+/* -------------------------------------------------------------------------- */
+
+const SETTINGS_SESSION: WebSessionDefinition = {
+  id: "web-settings",
+  kind: "settings",
+  slug: "settings",
+  name: "Project Settings",
+  tagline:
+    "Project name, description, version, author, theme, custom CSS, custom JavaScript, metadata, favicon and Open Graph fields",
+  description:
+    "A professional Project Settings surface. The user edits the project name, description, version, author, theme, custom CSS, custom JavaScript, and the Open Graph / favicon metadata. The settings surface is the single place every other WebPilot surface reads its defaults from: the multi-file editor reads the custom CSS and JavaScript, the Project Export surface reads the metadata, and the Workspace Productivity surface reads the theme.",
+  intro:
+    "Open the Project Settings to tune the project. The custom CSS and JavaScript are appended to every HTML file the Project Export surface produces, the metadata block lands in the project.json manifest and in the Open Graph tags of every HTML file, and the theme is the default the rest of the workspace reads on its first render.",
+  defaultCategory: "settings",
+  keywords: [
+    "settings",
+    "config",
+    "configuration",
+    "metadata",
+    "open graph",
+    "favicon",
+    "WebPilot",
+  ],
+  highlights: [
+    "Project name, description, version, author and theme in one place",
+    "Custom CSS and custom JavaScript appended to every HTML file the export produces",
+    "Open Graph fields: title, description, image, type, URL, locale, theme color",
+    "Twitter card: summary, summary_large_image, app, player",
+    "Favicon URL or data URL, canonical URL, keywords",
+    "Settings are the single source of truth for the rest of the workspace",
+  ],
+  toolCount: 1,
+};
+
+const TEMPLATES_SESSION: WebSessionDefinition = {
+  id: "web-templates",
+  kind: "templates",
+  slug: "templates",
+  name: "Professional Project Templates",
+  tagline:
+    "Landing Page, Portfolio, Business Website, SaaS Landing Page, Dashboard, Blog, Documentation, Login Page, Pricing Page, Contact Page",
+  description:
+    "A professional Project Templates surface. The user picks one of the ten starter templates (Landing Page, Portfolio, Business Website, SaaS Landing Page, Dashboard, Blog, Documentation, Login Page, Pricing Page, Contact Page), the surface builds a complete project tree (HTML, CSS, JavaScript, configuration), the templates surface persists the project into the workspace, and the multi-file editor opens with the new project already loaded. Every template integrates with the existing workspace: the Project Explorer, the Asset Manager, the Multi-file Workspace, the Project Export, and the rest of the tools.",
+  intro:
+    "Open the Professional Project Templates to scaffold a complete project in one click. Each template is a curated, opinionated starting point: a Landing Page is hero / features / footer, a SaaS Landing Page is hero / pricing / FAQ, a Documentation site is sidebar / article / table of contents, and so on. Pick one, the project tree appears in the Multi-file Workspace, the Live Preview opens, and the user is ready to ship.",
+  defaultCategory: "templates",
+  keywords: [
+    "template",
+    "starter",
+    "scaffold",
+    "landing",
+    "portfolio",
+    "saas",
+    "blog",
+    "docs",
+    "WebPilot",
+  ],
+  highlights: [
+    "Ten professional starter templates: Landing Page, Portfolio, Business, SaaS, Dashboard, Blog, Documentation, Login, Pricing, Contact",
+    "Each template ships a complete project tree (HTML, CSS, JavaScript, configuration) the user can edit immediately",
+    "One-click open in the Multi-file Workspace and the Live Preview",
+    "Templates integrate with the existing Project Explorer, Asset Manager and Project Export surfaces",
+    "Saved as a regular WebPilot session, so the autosave loop and the dashboard mirror keep working",
+  ],
+  toolCount: 1,
+};
+
+const PROJECT_HISTORY_SESSION: WebSessionDefinition = {
+  id: "web-project-history",
+  kind: "project-history",
+  slug: "project-history",
+  name: "Project History",
+  tagline:
+    "Recent projects, duplicate, rename, delete, restore last session",
+  description:
+    "A professional Project History surface. The user sees the most recent projects in one place, can duplicate, rename, or delete a project, and can restore the last session from a soft-deletion tombstone. The surface reads the existing session lifecycle (create, open, save, duplicate, rename, delete) and reuses it without duplicating any code.",
+  intro:
+    "Open the Project History to manage the lifecycle of every WebPilot project. The recent list is the most recent edit per project, the favourite list pins the projects the user keeps coming back to, the soft-deletion tombstones keep a one-click restore available for the most recent accidental delete, and the actions row exposes duplicate / rename / delete without leaving the surface.",
+  defaultCategory: "history",
+  keywords: [
+    "history",
+    "recent",
+    "duplicate",
+    "rename",
+    "delete",
+    "restore",
+    "WebPilot",
+  ],
+  highlights: [
+    "Recent projects list with the most recent edit per project",
+    "Duplicate a project with one click — the copy opens in a new tab",
+    "Rename and delete in place, with a soft-deletion tombstone for restore",
+    "Restore the last session with one click",
+    "Search across the recent and favourite lists",
+    "Reuses the existing session engine, no new lifecycle code",
+  ],
+  toolCount: 1,
+};
+
+const DASHBOARD_INTEGRATION_SESSION: WebSessionDefinition = {
+  id: "web-dashboard-integration",
+  kind: "dashboard-integration",
+  slug: "dashboard-integration",
+  name: "Dashboard Integration",
+  tagline:
+    "Recent projects, storage summary, notifications, search, favourites and analytics in one place",
+  description:
+    "A professional Dashboard Integration surface. The user sees every important piece of WebPilot state in one place: the recent projects list, the storage summary (sessions, history, assets, bytes), the notifications queue, the search history, the favourites gallery, and the activity analytics broken down by surface. The surface reuses the same IndexedDB-backed store, the same autosave loop, and the same platform-wide search index every other tool already uses.",
+  intro:
+    "Open the Dashboard Integration to see every important WebPilot state in one place. The recent projects, the storage summary, the notifications queue, the search history, the favourites gallery, and the activity analytics all live in this surface. The dashboard is the LaunchStack-wide aggregation point the user can visit from the /webpilot route.",
+  defaultCategory: "blank",
+  keywords: [
+    "dashboard",
+    "recent",
+    "storage",
+    "notifications",
+    "search",
+    "favourites",
+    "analytics",
+    "WebPilot",
+  ],
+  highlights: [
+    "Recent projects list with one-click reopen",
+    "Storage summary: sessions, history, assets, total bytes",
+    "Notifications queue: info, success, warning, error",
+    "Search history: the most recent 12 search terms",
+    "Favourites gallery: pinned surfaces and pinned sessions",
+    "Activity analytics: events per surface, sorted by recency",
+  ],
+  toolCount: 1,
+};
+
+export const BATCH4_SESSIONS: WebSessionDefinition[] = [
+  SETTINGS_SESSION,
+  TEMPLATES_SESSION,
+  PROJECT_HISTORY_SESSION,
+  DASHBOARD_INTEGRATION_SESSION,
+];
+
 export const sessions: WebSessionDefinition[] = [
   {
     id: "web-dashboard",
@@ -672,6 +829,7 @@ export const sessions: WebSessionDefinition[] = [
   },
   ...BATCH2_SESSIONS,
   ...BATCH3_SESSIONS,
+  ...BATCH4_SESSIONS,
 ]
 
 export function getSession(

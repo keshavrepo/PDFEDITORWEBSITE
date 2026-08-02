@@ -11,6 +11,12 @@
 export * from "./types";
 export * from "./sessions";
 export * from "./templates";
+export {
+  PROFESSIONAL_PROJECT_TEMPLATES,
+  PROFESSIONAL_TEMPLATE_DESCRIPTORS,
+  buildProjectTemplateBody,
+  type ProfessionalProjectTemplate,
+} from "./templates";
 export * from "./engine";
 export {
   DEFAULT_HISTORY_BODY,
@@ -29,6 +35,9 @@ export {
   DEFAULT_EXPORT_BODY,
   DEFAULT_IMPORT_BODY,
   DEFAULT_PRODUCTIVITY_BODY,
+  DEFAULT_SETTINGS_BODY,
+  DEFAULT_PROJECT_HISTORY_BODY,
+  DEFAULT_DASHBOARD_BODY,
   asHistoryBody,
   asHtmlBody,
   asCssBody,
@@ -45,11 +54,17 @@ export {
   asExportBody,
   asImportBody,
   asProductivityBody,
+  asSettingsBody,
+  asProjectHistoryBody,
+  asDashboardBody,
   cloneProjectsBody,
   cloneUtilitiesBody,
   cloneTerminalBody,
   cloneIntelligenceBody,
   cloneProductivityBody,
+  cloneSettingsBody,
+  cloneProjectHistoryBody,
+  cloneDashboardBody,
 } from "./bodies";
 export {
   STORAGE_DATABASE,

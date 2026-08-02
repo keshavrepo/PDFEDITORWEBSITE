@@ -36,6 +36,10 @@ export type WebSessionCategory =
   | "export"
   | "import"
   | "productivity"
+  | "settings"
+  | "templates"
+  | "project-history"
+  | "dashboard-integration"
   | "custom";
 
 /** Persistent metadata stored alongside the session body. */
@@ -853,4 +857,202 @@ export interface WebProductivityBody {
   findShortcut: boolean;
   /** Favourite flag. */
   isFavorite: boolean;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batch 4: project settings + project history + dashboard integration        */
+/* -------------------------------------------------------------------------- */
+
+/** A single open-graph / metadata field on the Project Settings surface. */
+export interface WebSettingsMetadata {
+  /** Optional favicon URL or data URL. */
+  favicon?: string;
+  /** Open Graph title. */
+  ogTitle?: string;
+  /** Open Graph description. */
+  ogDescription?: string;
+  /** Open Graph image (URL or data URL). */
+  ogImage?: string;
+  /** Open Graph type (e.g. "website", "article"). */
+  ogType?: string;
+  /** Open Graph URL. */
+  ogUrl?: string;
+  /** Twitter card. */
+  twitterCard?: "summary" | "summary_large_image" | "app" | "player";
+  /** Twitter site. */
+  twitterSite?: string;
+  /** Twitter creator. */
+  twitterCreator?: string;
+  /** Canonical URL. */
+  canonicalUrl?: string;
+  /** Author name. */
+  author?: string;
+  /** Theme color used by mobile browsers. */
+  themeColor?: string;
+  /** Locale (e.g. "en_US"). */
+  locale?: string;
+  /** Keywords (comma-separated). */
+  keywords?: string;
+}
+
+/** The Project Settings body. The settings surface is the single
+ * place every other WebPilot surface reads its defaults from:
+ * the multi-file editor reads the custom CSS / custom JavaScript,
+ * the Project Export surface reads the metadata, and the
+ * Workspace Productivity surface reads the theme. */
+export interface WebSettingsBody {
+  projectId: string;
+  projectName: string;
+  description: string;
+  version: string;
+  author: string;
+  theme: "default" | "light" | "dark" | "high-contrast";
+  customCss: string;
+  customJavaScript: string;
+  metadata: WebSettingsMetadata;
+  /** When the settings were last updated. */
+  updatedAt: string;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** A single record in the Project History surface. The record
+ * captures the state of a project at the moment the user hit Save
+ * (or the autosave loop persisted it), so the user can step
+ * through previous states the same way they would through a
+ * history in any other tool. */
+export interface WebProjectHistoryEntry {
+  id: string;
+  /** The session id the entry belongs to. */
+  sessionId: string;
+  /** The project name at the time of the entry. */
+  projectName: string;
+  /** ISO timestamp the entry was recorded. */
+  savedAt: string;
+  /** The version the entry was recorded at. */
+  version: number;
+  /** Free-form note the user can attach. */
+  note: string;
+  /** The body shape is intentionally `unknown` so each session
+   * can ship its own snapshot. The history surface never has to
+   * touch the body — it is stored verbatim. */
+  body: unknown;
+}
+
+/** A single soft-deletion tombstone the user can restore. */
+export interface WebProjectHistoryTombstone {
+  id: string;
+  sessionId: string;
+  projectName: string;
+  deletedAt: string;
+  /** The body at the moment of deletion. */
+  body: unknown;
+}
+
+/** The Project History body. Stores the most recent saves and the
+ * most recent deletions so the surface can offer "Restore last
+ * session" with a single click. */
+export interface WebProjectHistoryBody {
+  /** All known session ids. The user sees them in a single list
+   * with the most recent edit at the top. */
+  recent: WebProjectHistoryBodyEntry[];
+  /** Favourited projects, persisted between sessions. */
+  favorites: string[];
+  /** Soft-deletion tombstones. The most recent is offered as
+   * "Restore last session". */
+  tombstones: WebProjectHistoryTombstone[];
+  /** The id of the most recently deleted session. */
+  lastDeletedSessionId: string;
+  /** When the last deletion happened. */
+  lastDeletedAt: string;
+  /** The id of the most recently restored session, if any. */
+  lastRestoredSessionId: string;
+  /** When the last restore happened. */
+  lastRestoredAt: string;
+  /** Search term. */
+  search: string;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** A single entry in the Project History recent list. The shape
+ * is intentionally small: the body is referenced by id, not
+ * embedded, so the list stays under a kilobyte even for hundreds
+ * of sessions. */
+export interface WebProjectHistoryBodyEntry {
+  id: string;
+  title: string;
+  kind: string;
+  category: string;
+  updatedAt: string;
+  version: number;
+  size: number;
+  isFavorite: boolean;
+}
+
+/** The Dashboard Integration body. Aggregates the storage
+ * summary, the notifications queue, the search index, the
+ * favourites gallery and the activity analytics. */
+export interface WebDashboardBody {
+  /** Storage summary written by the workspace shell. */
+  storage: WebDashboardStorage;
+  /** Notifications queue, newest first. Capped at 50. */
+  notifications: WebDashboardNotification[];
+  /** Recent search terms, newest first. Capped at 12. */
+  recentSearches: string[];
+  /** Favourites gallery: pinned surface ids. */
+  favouriteSurfaces: string[];
+  /** Activity analytics per surface, sorted by event count
+   * descending. The most active surface is rendered first. */
+  activity: WebDashboardActivityRow[];
+  /** Last dashboard refresh timestamp. */
+  refreshedAt: string;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** A storage summary row. */
+export interface WebDashboardStorage {
+  /** Total sessions, across every kind. */
+  sessions: number;
+  /** Total bytes used by every session. */
+  bytes: number;
+  /** History entries, across every kind. */
+  historyEntries: number;
+  /** Asset count, across every folder. */
+  assets: number;
+  /** Total bytes used by every asset. */
+  assetBytes: number;
+  /** When the summary was computed. */
+  computedAt: string;
+}
+
+/** A single dashboard notification. */
+export interface WebDashboardNotification {
+  id: string;
+  /** The notification kind. */
+  kind: "info" | "success" | "warning" | "error";
+  /** The notification title. */
+  title: string;
+  /** The notification body. */
+  body: string;
+  /** The surface the notification belongs to. */
+  surface: string;
+  /** The notification timestamp. */
+  createdAt: string;
+  /** Whether the user has read the notification. */
+  read: boolean;
+}
+
+/** A single activity analytics row. */
+export interface WebDashboardActivityRow {
+  /** The surface kind, e.g. "html", "css", "projects". */
+  kind: string;
+  /** Number of events recorded for this surface. */
+  events: number;
+  /** The most recent event timestamp. */
+  lastEventAt: string;
+  /** Number of distinct sessions the user has opened for this
+   * surface. */
+  sessionCount: number;
 }
