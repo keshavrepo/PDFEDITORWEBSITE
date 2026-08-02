@@ -43,3 +43,53 @@ export function readFileAsText(file: File): Promise<string> {
     reader.readAsText(file);
   });
 }
+
+/** Read a File as a data URL. Browser-only. */
+export function readFileAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+/** Read a File as a raw byte array. Browser-only. */
+export function readFileAsBytes(file: File): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (result instanceof ArrayBuffer) {
+        resolve(new Uint8Array(result));
+      } else {
+        reject(new Error("Unexpected reader result"));
+      }
+    };
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("Failed to read file"));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+/**
+ * Best-effort detection of an image's intrinsic dimensions. Returns
+ * `null` outside the browser or when the asset is not a decodable
+ * image (SVG, font, video, etc.).
+ */
+export function readImageDimensions(
+  dataUrl: string
+): Promise<{ width: number; height: number } | null> {
+  if (typeof window === "undefined" || typeof Image === "undefined") {
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      resolve({ width: image.naturalWidth, height: image.naturalHeight });
+    };
+    image.onerror = () => resolve(null);
+    image.src = dataUrl;
+  });
+}

@@ -17,11 +17,17 @@
 
 import { sessionCategoryOrder } from "./sessions";
 import {
+  DEFAULT_ASSETS_BODY,
   DEFAULT_CSS_BODY,
   DEFAULT_HISTORY_BODY,
   DEFAULT_HTML_BODY,
   DEFAULT_JS_BODY,
   DEFAULT_PREVIEW_BODY,
+  DEFAULT_PROJECTS_BODY,
+  DEFAULT_SEARCH_BODY,
+  DEFAULT_UTILITIES_BODY,
+  DEFAULT_WORKSPACE_BODY,
+  cloneProjectsBody,
 } from "./bodies";
 import type {
   WebSessionCategory,
@@ -47,6 +53,16 @@ export function createBlankBody(kind: WebSessionKind): unknown {
       return { ...DEFAULT_PREVIEW_BODY };
     case "history":
       return { ...DEFAULT_HISTORY_BODY };
+    case "projects":
+      return cloneProjectsBody(DEFAULT_PROJECTS_BODY);
+    case "assets":
+      return { ...DEFAULT_ASSETS_BODY };
+    case "workspace":
+      return { ...DEFAULT_WORKSPACE_BODY };
+    case "search":
+      return { ...DEFAULT_SEARCH_BODY };
+    case "utilities":
+      return { ...DEFAULT_UTILITIES_BODY };
     case "blank":
     case "custom":
     default:

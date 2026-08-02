@@ -9,6 +9,11 @@ import { HtmlSurface } from "@/components/webpilot/surfaces/html";
 import { CssSurface } from "@/components/webpilot/surfaces/css";
 import { JsSurface } from "@/components/webpilot/surfaces/javascript";
 import { PreviewSurface } from "@/components/webpilot/surfaces/preview";
+import { ProjectsSurface } from "@/components/webpilot/surfaces/projects";
+import { AssetsSurface } from "@/components/webpilot/surfaces/assets";
+import { WorkspaceSurface } from "@/components/webpilot/surfaces/workspace";
+import { SearchSurface } from "@/components/webpilot/surfaces/search";
+import { UtilitiesSurface } from "@/components/webpilot/surfaces/utilities";
 import { WorkspaceDashboard } from "@/components/webpilot/surfaces/workspace-dashboard";
 import {
   focusedSessions,
@@ -71,6 +76,16 @@ function pickSurface(session: WebSessionDefinition): SurfaceComponent {
       return JsSurface as unknown as SurfaceComponent;
     case "preview":
       return PreviewSurface as unknown as SurfaceComponent;
+    case "projects":
+      return ProjectsSurface as unknown as SurfaceComponent;
+    case "assets":
+      return AssetsSurface as unknown as SurfaceComponent;
+    case "workspace":
+      return WorkspaceSurface as unknown as SurfaceComponent;
+    case "search":
+      return SearchSurface as unknown as SurfaceComponent;
+    case "utilities":
+      return UtilitiesSurface as unknown as SurfaceComponent;
     case "blank":
     default:
       return WorkspaceDashboard as unknown as SurfaceComponent;
