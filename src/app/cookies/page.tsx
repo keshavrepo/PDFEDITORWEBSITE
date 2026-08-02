@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import { ContentList, ContentPage } from "@/components/content-page";
 import { getSession } from "@/lib/auth";
 import { siteConfig } from "@/lib/site";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Cookie Policy | PDFPilot",
-  description: "Cookies and browser storage used by PDFPilot.",
-};
+export const metadata: Metadata = buildPageMetadata({
+  path: "/cookies",
+  title: "Cookie Policy",
+  description: "Cookies and browser storage used by LaunchStack.",
+});
 
 export default async function CookiesPage() {
   const user = await getSession();

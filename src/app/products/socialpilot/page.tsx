@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getProduct, platform } from "@/lib/products";
 import { getAppUrl } from "@/lib/env";
+import { buildPageMetadata } from "@/lib/seo";
 import { projects } from "@/lib/socialpilot";
 
 const product = getProduct("socialpilot");
@@ -54,8 +55,9 @@ const LAUNCHED_CHECKLIST = [
   "Batch 3 — Workspace Dashboard surfacing recent projects, recent and favourite assets, favourite captions and hashtag groups, active brand, active profile and the publishing-queue summary",
 ];
 
-export const metadata: Metadata = {
-  title: `SocialPilot — Creator workspace | ${platform.name}`,
+export const metadata: Metadata = buildPageMetadata({
+  path: "/products/socialpilot",
+  title: "SocialPilot — Creator workspace",
   description,
   keywords: [
     "SocialPilot",
@@ -66,15 +68,7 @@ export const metadata: Metadata = {
     "scheduler",
     "LaunchStack",
   ],
-  alternates: { canonical: url },
-  openGraph: {
-    title: `SocialPilot — Creator workspace | ${platform.name}`,
-    description,
-    url,
-    type: "website",
-    siteName: platform.name,
-  },
-};
+});
 
 export const dynamic = "force-dynamic";
 

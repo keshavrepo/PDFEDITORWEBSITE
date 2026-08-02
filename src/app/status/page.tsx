@@ -3,11 +3,13 @@ import { sql } from "drizzle-orm";
 import { ContentPage } from "@/components/content-page";
 import { db } from "@/db";
 import { getSession } from "@/lib/auth";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Service Status | PDFPilot",
-  description: "Current PDFPilot service and database availability.",
-};
+export const metadata: Metadata = buildPageMetadata({
+  path: "/status",
+  title: "Service Status",
+  description: "Current LaunchStack service and database availability.",
+});
 
 export const dynamic = "force-dynamic";
 

@@ -8,12 +8,15 @@ import { FileManager } from "@/components/platform/file-manager";
 import { getStorageSummary, listFiles } from "@/lib/platform/files";
 import { listRecentDocuments } from "@/lib/officepilot/recent";
 import { platform } from "@/lib/products";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: `Files | ${platform.name}`,
+export const metadata: Metadata = buildPageMetadata({
+  path: "/files",
+  title: "Files",
   description:
     "One file history shared across every LaunchStack product. Search, rename, favourite and manage everything you have processed.",
-};
+  indexable: false,
+});
 
 export const dynamic = "force-dynamic";
 

@@ -8,6 +8,15 @@ import { Footer } from "@/components/footer";
 import { SettingsForms } from "@/components/settings-forms";
 import { PreferencesForm } from "@/components/platform/preferences-form";
 import { parsePreferences } from "@/lib/platform/preferences";
+import type { Metadata } from "next";
+import { buildPageMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = buildPageMetadata({
+  path: "/settings",
+  title: "Settings",
+  description: "Account, billing, preferences and security settings for LaunchStack.",
+  indexable: false,
+});
 
 export const dynamic = "force-dynamic";
 

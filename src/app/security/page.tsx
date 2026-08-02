@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { ContentList, ContentPage } from "@/components/content-page";
 import { getSession } from "@/lib/auth";
+import { buildPageMetadata } from "@/lib/seo";
 import { siteConfig } from "@/lib/site";
 
-export const metadata: Metadata = {
-  title: "Security | PDFPilot",
-  description: "PDFPilot security architecture and vulnerability reporting.",
-};
+export const metadata: Metadata = buildPageMetadata({
+  path: "/security",
+  title: "Security",
+  description: "LaunchStack security architecture and vulnerability reporting.",
+});
 
 export default async function SecurityPage() {
   const user = await getSession();

@@ -9,24 +9,28 @@ import { Card } from "@/components/ui/card";
 import { ArrowRight, Check, Layers, Lock, Shield, Users, Zap } from "lucide-react";
 import { activeProducts, platform, products, upcomingProducts } from "@/lib/products";
 import { tools } from "@/lib/tools";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: `${platform.name} — ${platform.tagline}`,
+export const metadata: Metadata = buildPageMetadata({
+  path: "/",
+  title: platform.tagline,
   description: platform.description,
   keywords: [
     "LaunchStack",
     "productivity platform",
     "PDF tools",
+    "ImagePilot",
+    "AudioPilot",
+    "OfficePilot",
+    "DevPilot",
+    "SocialPilot",
+    "FinancePilot",
+    "WebPilot",
     "PDFPilot",
     "browser tools",
     "privacy-first tools",
   ],
-  openGraph: {
-    title: `${platform.name} — ${platform.tagline}`,
-    description: platform.description,
-    type: "website",
-  },
-};
+});
 
 export const dynamic = "force-dynamic";
 

@@ -29,11 +29,15 @@ import { FileText as GenericFileText } from "lucide-react";
 import { platform } from "@/lib/products";
 import { tools } from "@/lib/tools";
 import { formatBytes } from "@/lib/format";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: `Dashboard | ${platform.name}`,
-  description: "Your storage, files, activity and usage across every LaunchStack product.",
-};
+export const metadata: Metadata = buildPageMetadata({
+  path: "/dashboard",
+  title: "Dashboard",
+  description:
+    "Your storage, files, activity and usage across every LaunchStack product.",
+  indexable: false,
+});
 
 export const dynamic = "force-dynamic";
 

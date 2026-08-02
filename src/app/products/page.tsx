@@ -16,12 +16,14 @@ import {
 } from "@/lib/products";
 import { getAppUrl } from "@/lib/env";
 import { tools } from "@/lib/tools";
+import { buildPageMetadata } from "@/lib/seo";
 
 const description = `Every product in the ${platform.name} suite. PDFPilot offers ${tools.length} browser-based PDF tools and ImagePilot is a full image editor; DevPilot, OfficePilot, WebPilot, FinancePilot and AIPilot are in development.`;
 const url = `${getAppUrl()}/products`;
 
-export const metadata: Metadata = {
-  title: `Products | ${platform.name}`,
+export const metadata: Metadata = buildPageMetadata({
+  path: "/products",
+  title: "Products",
   description,
   keywords: [
     "LaunchStack products",
@@ -33,15 +35,7 @@ export const metadata: Metadata = {
     "FinancePilot",
     "AIPilot",
   ],
-  alternates: { canonical: url },
-  openGraph: {
-    title: `Products | ${platform.name}`,
-    description,
-    url,
-    type: "website",
-    siteName: platform.name,
-  },
-};
+});
 
 export const dynamic = "force-dynamic";
 

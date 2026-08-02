@@ -3,11 +3,13 @@ import Link from "next/link";
 import { ContentList, ContentPage } from "@/components/content-page";
 import { getSession } from "@/lib/auth";
 import { siteConfig } from "@/lib/site";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Community | PDFPilot",
-  description: "Connect with PDFPilot and Keshav Labs.",
-};
+export const metadata: Metadata = buildPageMetadata({
+  path: "/community",
+  title: "Community",
+  description: "Connect with LaunchStack and Keshav Labs.",
+});
 
 export default async function CommunityPage() {
   const user = await getSession();

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getSession } from "@/lib/auth";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
@@ -6,6 +7,14 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { BillingButton } from "@/components/billing-button";
+import { buildPageMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = buildPageMetadata({
+  path: "/pricing",
+  title: "Pricing",
+  description:
+    "LaunchStack pricing — every product is free today. Optional Pro and Business plans add storage, higher limits and priority support.",
+});
 
 export const dynamic = "force-dynamic";
 

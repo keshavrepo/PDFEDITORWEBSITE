@@ -5,11 +5,13 @@ import { Footer } from "@/components/footer";
 import { Card } from "@/components/ui/card";
 import { ContactForm } from "@/components/contact-form";
 import { siteConfig } from "@/lib/site";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Contact | PDFPilot",
-  description: "Contact PDFPilot and Keshav Labs in Delhi, India.",
-};
+export const metadata: Metadata = buildPageMetadata({
+  path: "/contact",
+  title: "Contact",
+  description: "Contact LaunchStack and Keshav Labs in Delhi, India.",
+});
 
 export const dynamic = "force-dynamic";
 

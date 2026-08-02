@@ -8,6 +8,7 @@ import { blogCategories, blogPosts } from "@/db/schema";
 import { Navbar } from "@/components/navbar";
 import { Footer } from "@/components/footer";
 import { Card } from "@/components/ui/card";
+import { buildPageMetadata } from "@/lib/seo";
 import { getAppUrl } from "@/lib/env";
 import { platform } from "@/lib/products";
 import {
@@ -18,19 +19,12 @@ import {
 const description = `Documentation for ${platform.name}: getting started, using PDFPilot, managing files, privacy, account settings and troubleshooting.`;
 const url = `${getAppUrl()}/docs`;
 
-export const metadata: Metadata = {
-  title: `Documentation | ${platform.name}`,
+export const metadata: Metadata = buildPageMetadata({
+  path: "/docs",
+  title: "Documentation",
   description,
   keywords: ["LaunchStack documentation", "PDFPilot help", "guides", "how to"],
-  alternates: { canonical: url },
-  openGraph: {
-    title: `Documentation | ${platform.name}`,
-    description,
-    url,
-    type: "website",
-    siteName: platform.name,
-  },
-};
+});
 
 export const dynamic = "force-dynamic";
 

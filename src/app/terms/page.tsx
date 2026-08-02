@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import { ContentList, ContentPage } from "@/components/content-page";
 import { getSession } from "@/lib/auth";
 import { siteConfig } from "@/lib/site";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Terms of Service | PDFPilot",
-  description: "Terms governing use of PDFPilot by Keshav Labs.",
-};
+export const metadata: Metadata = buildPageMetadata({
+  path: "/terms",
+  title: "Terms of Service",
+  description: "Terms governing use of LaunchStack by Keshav Labs.",
+});
 
 export default async function TermsPage() {
   const user = await getSession();

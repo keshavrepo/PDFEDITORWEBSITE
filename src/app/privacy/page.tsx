@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { ContentList, ContentPage } from "@/components/content-page";
 import { getSession } from "@/lib/auth";
+import { buildPageMetadata } from "@/lib/seo";
 import { siteConfig } from "@/lib/site";
 
-export const metadata: Metadata = {
-  title: "Privacy Policy | PDFPilot",
-  description: "How Keshav Labs collects, uses, and protects PDFPilot data.",
-};
+export const metadata: Metadata = buildPageMetadata({
+  path: "/privacy",
+  title: "Privacy Policy",
+  description: "How Keshav Labs collects, uses, and protects LaunchStack data.",
+});
 
 export default async function PrivacyPage() {
   const user = await getSession();

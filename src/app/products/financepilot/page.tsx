@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getProduct, platform } from "@/lib/products";
 import { getAppUrl } from "@/lib/env";
+import { buildPageMetadata } from "@/lib/seo";
 import { calculators } from "@/lib/financepilot";
 
 const product = getProduct("financepilot");
@@ -16,8 +17,9 @@ const description =
   product?.description ??
   "FinancePilot is LaunchStack's workspace for the financial calculators you reach for every day. The EMI, SIP, compound interest and loan calculators are live, with autosave, recent calculations and PDF export.";
 
-export const metadata: Metadata = {
-  title: `FinancePilot — Financial calculators | ${platform.name}`,
+export const metadata: Metadata = buildPageMetadata({
+  path: "/products/financepilot",
+  title: "FinancePilot — Financial calculators",
   description,
   keywords: [
     "FinancePilot",
@@ -28,15 +30,7 @@ export const metadata: Metadata = {
     "browser calculator",
     "LaunchStack",
   ],
-  alternates: { canonical: url },
-  openGraph: {
-    title: `FinancePilot — Financial calculators | ${platform.name}`,
-    description,
-    url,
-    type: "website",
-    siteName: platform.name,
-  },
-};
+});
 
 export const dynamic = "force-dynamic";
 

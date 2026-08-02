@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getProduct, platform } from "@/lib/products";
 import { getAppUrl } from "@/lib/env";
+import { buildPageMetadata } from "@/lib/seo";
 import { sessions } from "@/lib/webpilot";
 
 const product = getProduct("webpilot");
@@ -66,18 +67,11 @@ const ROADMAP = [
   "Future — Snippet library for HTML, CSS and JavaScript components, reuses the DevPilot snippet model",
 ];
 
-export const metadata: Metadata = {
-  title: `${product?.name ?? "WebPilot"} | ${platform.name}`,
+export const metadata: Metadata = buildPageMetadata({
+  path: "/products/webpilot",
+  title: product?.name ?? "WebPilot",
   description,
-  alternates: { canonical: url },
-  openGraph: {
-    title: `${product?.name ?? "WebPilot"} | ${platform.name}`,
-    description,
-    url,
-    type: "website",
-    siteName: platform.name,
-  },
-};
+});
 
 export const dynamic = "force-dynamic";
 

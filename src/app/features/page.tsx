@@ -3,11 +3,13 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ContentList, ContentPage } from "@/components/content-page";
 import { getSession } from "@/lib/auth";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Features | PDFPilot",
-  description: "Private, browser-first PDF tools from PDFPilot by Keshav Labs.",
-};
+export const metadata: Metadata = buildPageMetadata({
+  path: "/features",
+  title: "Features",
+  description: "Private, browser-first productivity tools from LaunchStack by Keshav Labs.",
+});
 
 export default async function FeaturesPage() {
   const user = await getSession();

@@ -10,11 +10,14 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FeaturedImage } from "@/components/featured-image";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Blog | PDFPilot",
-  description: "PDF guides, privacy practices, and document productivity insights from Keshav Labs.",
-};
+export const metadata: Metadata = buildPageMetadata({
+  path: "/blog",
+  title: "Blog",
+  description:
+    "Productivity guides, privacy practices, and product insights from Keshav Labs and the LaunchStack team.",
+});
 export const dynamic = "force-dynamic";
 const PAGE_SIZE = 7;
 

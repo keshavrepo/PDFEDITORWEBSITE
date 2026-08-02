@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import { ContentList, ContentPage } from "@/components/content-page";
 import { getSession } from "@/lib/auth";
 import { siteConfig } from "@/lib/site";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "API Docs | PDFPilot",
-  description: "PDFPilot HTTP endpoint documentation and integration availability.",
-};
+export const metadata: Metadata = buildPageMetadata({
+  path: "/api-docs",
+  title: "API Docs",
+  description: "LaunchStack HTTP endpoint documentation and integration availability.",
+});
 
 function Code({ children }: { children: string }) {
   return <code className="block overflow-x-auto rounded-lg bg-muted p-4 text-xs sm:text-sm text-foreground whitespace-pre">{children}</code>;

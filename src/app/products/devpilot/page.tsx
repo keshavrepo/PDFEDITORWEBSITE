@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getProduct, platform } from "@/lib/products";
 import { getAppUrl } from "@/lib/env";
+import { buildPageMetadata } from "@/lib/seo";
 import { sessions } from "@/lib/devpilot";
 
 const product = getProduct("devpilot");
@@ -46,18 +47,11 @@ const ROADMAP = [
   "Batch 3 — Snippet library enhancements: GitHub Gist import / export, language detection, syntax highlighting",
 ];
 
-export const metadata: Metadata = {
-  title: `${product?.name ?? "DevPilot"} | ${platform.name}`,
+export const metadata: Metadata = buildPageMetadata({
+  path: "/products/devpilot",
+  title: product?.name ?? "DevPilot",
   description,
-  alternates: { canonical: url },
-  openGraph: {
-    title: `${product?.name ?? "DevPilot"} | ${platform.name}`,
-    description,
-    url,
-    type: "website",
-    siteName: platform.name,
-  },
-};
+});
 
 export const dynamic = "force-dynamic";
 

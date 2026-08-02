@@ -26,13 +26,15 @@ import {
 } from "@/lib/imagepilot/core";
 import { getProduct, platform } from "@/lib/products";
 import { getAppUrl } from "@/lib/env";
+import { buildPageMetadata } from "@/lib/seo";
 
 const product = getProduct("imagepilot");
 const url = `${getAppUrl()}/products/imagepilot`;
 const description = `ImagePilot is a professional image editor that runs entirely in your browser: layers, undo history, ${ADJUSTMENTS.length} non-destructive image operations, editable text and shapes, plus focused studios for screenshots, watermarks, passport photos and compression.`;
 
-export const metadata: Metadata = {
-  title: `ImagePilot — Browser Image Editor | ${platform.name}`,
+export const metadata: Metadata = buildPageMetadata({
+  path: "/products/imagepilot",
+  title: "ImagePilot — Browser Image Editor",
   description,
   keywords: [
     "ImagePilot",
@@ -42,15 +44,7 @@ export const metadata: Metadata = {
     "free Photoshop alternative",
     "LaunchStack",
   ],
-  alternates: { canonical: url },
-  openGraph: {
-    title: `ImagePilot — Browser Image Editor | ${platform.name}`,
-    description,
-    url,
-    type: "website",
-    siteName: platform.name,
-  },
-};
+});
 
 export const dynamic = "force-dynamic";
 

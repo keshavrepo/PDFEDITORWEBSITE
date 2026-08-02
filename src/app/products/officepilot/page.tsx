@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getProduct, platform } from "@/lib/products";
 import { getAppUrl } from "@/lib/env";
+import { buildPageMetadata } from "@/lib/seo";
 import { editors } from "@/lib/officepilot";
 
 const product = getProduct("officepilot");
@@ -16,8 +17,9 @@ const description =
   product?.description ??
   "One Office workspace inside LaunchStack: write documents, build spreadsheets and assemble slide decks.";
 
-export const metadata: Metadata = {
-  title: `OfficePilot — Word, Excel and PowerPoint | ${platform.name}`,
+export const metadata: Metadata = buildPageMetadata({
+  path: "/products/officepilot",
+  title: "OfficePilot — Word, Excel and PowerPoint",
   description,
   keywords: [
     "OfficePilot",
@@ -29,15 +31,7 @@ export const metadata: Metadata = {
     "PPTX editor",
     "LaunchStack",
   ],
-  alternates: { canonical: url },
-  openGraph: {
-    title: `OfficePilot — Word, Excel and PowerPoint | ${platform.name}`,
-    description,
-    url,
-    type: "website",
-    siteName: platform.name,
-  },
-};
+});
 
 export const dynamic = "force-dynamic";
 

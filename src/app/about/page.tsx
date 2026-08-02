@@ -3,11 +3,14 @@ import Link from "next/link";
 import { ContentPage } from "@/components/content-page";
 import { getSession } from "@/lib/auth";
 import { siteConfig } from "@/lib/site";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "About | PDFPilot",
-  description: "About PDFPilot, Keshav Labs, and founder Keshav in Delhi, India.",
-};
+export const metadata: Metadata = buildPageMetadata({
+  path: "/about",
+  title: "About",
+  description:
+    "About LaunchStack, Keshav Labs, and founder Keshav in Delhi, India.",
+});
 
 export default async function AboutPage() {
   const user = await getSession();

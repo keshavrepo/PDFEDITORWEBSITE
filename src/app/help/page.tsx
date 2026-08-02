@@ -3,11 +3,13 @@ import Link from "next/link";
 import { ContentPage } from "@/components/content-page";
 import { getSession } from "@/lib/auth";
 import { siteConfig } from "@/lib/site";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Help Center | PDFPilot",
-  description: "Answers and support options for PDFPilot customers.",
-};
+export const metadata: Metadata = buildPageMetadata({
+  path: "/help",
+  title: "Help Center",
+  description: "Answers and support options for LaunchStack customers.",
+});
 
 export default async function HelpPage() {
   const user = await getSession();

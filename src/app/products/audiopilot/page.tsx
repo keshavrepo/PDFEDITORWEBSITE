@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { getProduct, platform } from "@/lib/products";
 import { getAppUrl } from "@/lib/env";
 import { sessions } from "@/lib/audiopilot";
+import { buildPageMetadata } from "@/lib/seo";
 
 const product = getProduct("audiopilot");
 const url = `${getAppUrl()}/products/audiopilot`;
@@ -16,8 +17,9 @@ const description =
   product?.description ??
   "AudioPilot is LaunchStack's audio workspace. Batch 1 ships a reusable audio workspace with an Audio Player, an Audio Trimmer, an Audio Converter and a Recorder. Batch 2 adds the professional audio workflow: Audio Merger, Audio Splitter, Metadata Editor, Batch Processing and Audio Library. Everything runs in your browser and reuses the same LaunchStack authentication, dashboard, storage, search, file manager, settings and notifications every other product ships.";
 
-export const metadata: Metadata = {
-  title: `AudioPilot — A professional audio workspace | ${platform.name}`,
+export const metadata: Metadata = buildPageMetadata({
+  path: "/products/audiopilot",
+  title: "AudioPilot — A professional audio workspace",
   description,
   keywords: [
     "AudioPilot",
@@ -39,15 +41,7 @@ export const metadata: Metadata = {
     "AAC",
     "LaunchStack",
   ],
-  alternates: { canonical: url },
-  openGraph: {
-    title: `AudioPilot — A professional audio workspace | ${platform.name}`,
-    description,
-    url,
-    type: "website",
-    siteName: platform.name,
-  },
-};
+});
 
 export const dynamic = "force-dynamic";
 

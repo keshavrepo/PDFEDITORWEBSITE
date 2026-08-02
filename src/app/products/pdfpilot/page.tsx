@@ -8,25 +8,19 @@ import { Card } from "@/components/ui/card";
 import { ArrowRight, Check, Lock, Zap } from "lucide-react";
 import { getProduct, platform } from "@/lib/products";
 import { getAppUrl } from "@/lib/env";
+import { buildPageMetadata } from "@/lib/seo";
 import { tools, type ToolCategory } from "@/lib/tools";
 
 const product = getProduct("pdfpilot");
 const url = `${getAppUrl()}/products/pdfpilot`;
 const description = `PDFPilot is the first product on ${platform.name}: ${tools.length} browser-based tools to convert, organise, optimise, edit and secure PDFs without uploading them.`;
 
-export const metadata: Metadata = {
-  title: `PDFPilot — PDF Tools | ${platform.name}`,
+export const metadata: Metadata = buildPageMetadata({
+  path: "/products/pdfpilot",
+  title: "PDFPilot — PDF Tools",
   description,
   keywords: ["PDFPilot", "PDF tools", "PDF converter", "PDF editor", "LaunchStack"],
-  alternates: { canonical: url },
-  openGraph: {
-    title: `PDFPilot — PDF Tools | ${platform.name}`,
-    description,
-    url,
-    type: "website",
-    siteName: platform.name,
-  },
-};
+});
 
 export const dynamic = "force-dynamic";
 

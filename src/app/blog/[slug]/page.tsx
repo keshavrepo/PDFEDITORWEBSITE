@@ -11,6 +11,7 @@ import { FeaturedImage } from "@/components/featured-image";
 import { RichPostContent } from "@/components/rich-post-content";
 import { getAppUrl } from "@/lib/env";
 import { siteConfig } from "@/lib/site";
+import { appUrl, articleGraph } from "@/lib/seo";
 
 interface BlogPostPageProps { params: Promise<{ slug: string }> }
 
@@ -42,20 +43,39 @@ async function findPost(slug: string) {
 
 export async function generateMetadata({ params }: BlogPostPageProps): Promise<Metadata> {
   const post = await findPost((await params).slug);
-  if (!post) return { title: "Article not found | PDFPilot" };
+  if (!post) {
+    return {
+      title: "Article not found",
+      robots: { index: false, follow: false },
+    };
+  }
+  const path = `/blog/${post.slug}`;
+  const description = post.seoDescription || post.excerpt;
+  const image = post.featuredImage
+    ? new URL(post.featuredImage, getAppUrl()).toString()
+    : undefined;
   return {
-    title: post.seoTitle || `${post.title} | PDFPilot`,
-    description: post.seoDescription || post.excerpt,
+    title: post.seoTitle || post.title,
+    description,
     keywords: post.seoKeywords?.split(",").map((keyword) => keyword.trim()).filter(Boolean),
+    authors: post.author ? [{ name: post.author }] : undefined,
+    alternates: { canonical: appUrl(path) },
     openGraph: {
       title: post.seoTitle || post.title,
-      description: post.seoDescription || post.excerpt,
+      description,
+      url: appUrl(path),
       type: "article",
+      siteName: "LaunchStack",
       publishedTime: post.publishedAt?.toISOString(),
       modifiedTime: post.updatedAt.toISOString(),
-      images: post.featuredImage
-        ? [new URL(post.featuredImage, getAppUrl()).toString()]
-        : undefined,
+      authors: post.author ? [post.author] : undefined,
+      images: image ? [image] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: post.seoTitle || post.title,
+      description,
+      images: image ? [image] : undefined,
     },
   };
 }
@@ -72,8 +92,24 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     .innerJoin(blogTags, eq(blogPostTags.tagId, blogTags.id))
     .where(eq(blogPostTags.postId, post.id));
 
+  const articleJsonLd = articleGraph({
+    path: `/blog/${slug}`,
+    headline: post.title,
+    description: post.seoDescription || post.excerpt,
+    datePublished:
+      post.publishedAt?.toISOString() ?? new Date().toISOString(),
+    dateModified: post.updatedAt.toISOString(),
+    author: post.author ?? undefined,
+  });
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(articleJsonLd),
+        }}
+      />
       <Navbar user={user} />
       <main className="animate-page-in">
         <article>

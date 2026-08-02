@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import { ContentList, ContentPage } from "@/components/content-page";
 import { getSession } from "@/lib/auth";
 import { siteConfig } from "@/lib/site";
+import { buildPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Careers | Keshav Labs",
-  description: "Career information for Keshav Labs, the company behind PDFPilot.",
-};
+export const metadata: Metadata = buildPageMetadata({
+  path: "/careers",
+  title: "Careers",
+  description: "Career information for Keshav Labs, the company behind LaunchStack.",
+});
 
 export default async function CareersPage() {
   const user = await getSession();
