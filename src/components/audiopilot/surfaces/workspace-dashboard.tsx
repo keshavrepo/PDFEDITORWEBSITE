@@ -14,6 +14,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  Command,
+  Crosshair,
+  Eraser,
   FileAudio,
   FileText,
   History as HistoryIcon,
@@ -148,6 +151,11 @@ export function WorkspaceDashboard({ session }: WorkspaceDashboardProps) {
     "metadata",
     "batch",
     "library",
+    "waveform-editor",
+    "effects",
+    "silence",
+    "export-center",
+    "productivity",
   ]);
   const favouriteTools = recent.filter(
     (entry) => toolKinds.has(entry.kind) && entry.isFavorite
@@ -217,6 +225,16 @@ function ToolIcon({ kind }: { kind: string }) {
       return <Layers className={className} aria-hidden="true" />;
     case "library":
       return <Library className={className} aria-hidden="true" />;
+    case "waveform-editor":
+      return <Crosshair className={className} aria-hidden="true" />;
+    case "effects":
+      return <Sparkles className={className} aria-hidden="true" />;
+    case "silence":
+      return <Eraser className={className} aria-hidden="true" />;
+    case "export-center":
+      return <Settings2 className={className} aria-hidden="true" />;
+    case "productivity":
+      return <Command className={className} aria-hidden="true" />;
     case "blank":
       return <FileText className={className} aria-hidden="true" />;
     case "history":

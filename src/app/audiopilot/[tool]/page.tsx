@@ -13,6 +13,11 @@ import { AudioSplitterSurface } from "@/components/audiopilot/surfaces/splitter"
 import { AudioMetadataEditorSurface } from "@/components/audiopilot/surfaces/metadata";
 import { AudioBatchSurface } from "@/components/audiopilot/surfaces/batch";
 import { AudioLibrarySurface } from "@/components/audiopilot/surfaces/library";
+import { AudioWaveformEditorSurface } from "@/components/audiopilot/surfaces/waveform-editor";
+import { AudioEffectsSurface } from "@/components/audiopilot/surfaces/effects";
+import { AudioSilenceSurface } from "@/components/audiopilot/surfaces/silence";
+import { AudioExportCenterSurface } from "@/components/audiopilot/surfaces/export-center";
+import { AudioProductivitySurface } from "@/components/audiopilot/surfaces/productivity";
 import {
   focusedSessions,
   getSessionBySlug,
@@ -99,6 +104,26 @@ function pickSessionComponents(kind: AudioSessionKind): {
     case "library":
       return {
         Surface: AudioLibrarySurface as unknown as SurfaceComponent,
+      };
+    case "waveform-editor":
+      return {
+        Surface: AudioWaveformEditorSurface as unknown as SurfaceComponent,
+      };
+    case "effects":
+      return {
+        Surface: AudioEffectsSurface as unknown as SurfaceComponent,
+      };
+    case "silence":
+      return {
+        Surface: AudioSilenceSurface as unknown as SurfaceComponent,
+      };
+    case "export-center":
+      return {
+        Surface: AudioExportCenterSurface as unknown as SurfaceComponent,
+      };
+    case "productivity":
+      return {
+        Surface: AudioProductivitySurface as unknown as SurfaceComponent,
       };
     default:
       return null;

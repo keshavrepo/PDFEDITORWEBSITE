@@ -221,10 +221,10 @@ export const products: Product[] = [
     name: "AudioPilot",
     tagline: "A professional audio workspace in your browser",
     description:
-      "A single audio workspace inside LaunchStack: an Audio Player with playback controls, waveform preview, seek, volume, mute, playback speed and loop, an Audio Trimmer with precision controls, live preview, undo / redo and export, an Audio Converter for MP3, WAV, OGG, FLAC and AAC with metadata preservation, a Recorder with microphone capture, pause, resume, playback and save, an Audio Merger with reorder, remove, gap and crossfade, an Audio Splitter with time / markers / equal / silence modes, a Metadata Editor with cover art, a Batch Processing queue with progress and cancel, and a searchable Audio Library. Everything runs in the browser, reuses the existing LaunchStack storage, autosave loop, dashboard, search, file manager, settings and notifications, and ships as a single workspace where future audio tools will live alongside the foundation.",
+      "A single audio workspace inside LaunchStack: an Audio Player with playback controls, waveform preview, seek, volume, mute, playback speed and loop, an Audio Trimmer with precision controls, live preview, undo / redo and export, an Audio Converter for MP3, WAV, OGG, FLAC and AAC with metadata preservation, a Recorder with microphone capture, pause, resume, playback and save, an Audio Merger with reorder, remove, gap and crossfade, an Audio Splitter with time / markers / equal / silence modes, a Metadata Editor with cover art, a Batch Processing queue with progress and cancel, a searchable Audio Library, a high-resolution Waveform Editor with zoom / scroll / selection / markers, an Audio Effects surface with fade / normalize / silence / reverse / speed / pitch, a Silence Detection surface with adjustable threshold, an Export Center with per-job progress and cancel, and a Workspace Productivity surface with Command Palette, keyboard shortcuts, recent sessions, quick actions and restore previous session. Everything runs in the browser, reuses the existing LaunchStack storage, autosave loop, dashboard, search, file manager, settings and notifications, and ships as a single workspace where future audio tools will live alongside the foundation.",
     status: "active",
     category: "Media",
-    version: "0.2.0",
+    version: "0.3.0",
     href: "/audiopilot",
     accent: "text-primary",
     highlights: [
@@ -237,9 +237,27 @@ export const products: Product[] = [
       "Metadata Editor — title, artist, album, genre, year, track number, comments, cover art, save metadata",
       "Batch Processing — batch convert, batch rename, batch metadata update, batch export, progress tracking, cancel processing",
       "Audio Library — recent files, favorites, search, sort, filter, duplicate, rename, delete",
+      "Waveform Editor — high resolution waveform, zoom in / out, horizontal scroll, timeline ruler, selection visualization, playback cursor, region markers",
+      "Audio Effects — fade in, fade out, normalize volume, silence generator, reverse, speed adjustment, pitch adjustment, preview before applying, undo, redo",
+      "Silence Detection — detect silence, jump between silence regions, split at silence, remove silence, adjustable threshold, adjustable minimum duration",
+      "Export Center — export selected region, export full audio, multiple formats, bitrate, sample rate, channel selection, progress indicator, cancel",
+      "Workspace Productivity — keyboard shortcuts, command palette, autosave improvements, recent sessions, quick actions, restore previous session",
       "Reuses the LaunchStack workspace shell, IndexedDB storage, autosave loop, dashboard, search, file manager, settings and notifications — no second workspace was created",
     ],
     releaseNotes: [
+      {
+        version: "0.3.0",
+        date: "2026-08-02",
+        changes: [
+          "Added the Waveform Editor surface: high-resolution waveform that scales with the active zoom level, zoom in / out, horizontal scroll, timeline ruler, click-and-drag selection, playback cursor and user-placed region markers",
+          "Added the Audio Effects surface: fade in, fade out, normalize volume, silence generator, reverse, speed adjustment, pitch adjustment, preview before applying and per-session undo / redo",
+          "Added the Silence Detection surface: energy-threshold silence walk with adjustable threshold and minimum duration, padding in seconds, jump between regions, split at silence and remove silence",
+          "Added the Export Center surface: per-job queue with target format, bitrate, sample rate and channels, selection-only export, progress indicator, cancel between jobs, downloads per completed job",
+          "Added the Workspace Productivity surface: Command Palette (Ctrl/Cmd + Shift + P) with fuzzy search, keyboard shortcut reference, recent sessions list, quick actions row and tunable workspace settings (autosave, word wrap, theme, minimap, indent, find shortcut)",
+          "Reused the existing AudioPilot workspace shell, IndexedDB storage, autosave loop, search index, dashboard and recent-mirror for every new tool — no second workspace was created and no shared infrastructure was duplicated",
+          "Added five new rail entries to the AudioPilot session switcher: waveform-editor, effects, silence, export-center, productivity",
+        ],
+      },
       {
         version: "0.2.0",
         date: "2026-08-02",

@@ -28,6 +28,11 @@ export type AudioSessionCategory =
   | "metadata"
   | "batch"
   | "library"
+  | "waveform-editor"
+  | "effects"
+  | "silence"
+  | "export-center"
+  | "productivity"
   | "custom";
 
 /** Audio formats AudioPilot can read and write. */
@@ -662,4 +667,314 @@ export interface AudioLibraryBody {
   selectedEntryId: string;
   /** Favourite flag. */
   isFavorite: boolean;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batch 3: waveform editor + effects + silence + export + productivity      */
+/* -------------------------------------------------------------------------- */
+
+/** A single point on a high-resolution waveform. Buckets are computed
+ * from the source `AudioBuffer` and the active zoom level. */
+export interface AudioWaveformEditorPoint {
+  /** 1-based sample bucket. */
+  index: number;
+  /** Normalised peak in the 0..1 range. */
+  peak: number;
+}
+
+/** A region marker the user can place on the waveform. */
+export interface AudioRegionMarker {
+  /** Stable id. */
+  id: string;
+  /** Marker label, e.g. "Intro", "Verse", "Chorus". */
+  label: string;
+  /** Marker time in seconds. */
+  timeSeconds: number;
+  /** Marker color, optional. */
+  color: string;
+}
+
+/** A selection range on the waveform editor. */
+export interface AudioWaveformEditorSelection {
+  /** Start time in seconds. */
+  startSeconds: number;
+  /** End time in seconds, exclusive. */
+  endSeconds: number;
+}
+
+/** The Waveform Editor body. Stores the high-resolution waveform for
+ * the active source along with the zoom level, scroll offset,
+ * selection, markers and the playback cursor. */
+export interface AudioWaveformEditorBody {
+  /** The source audio as a data URL. */
+  sourceDataUrl: string;
+  /** The detected audio format. */
+  sourceFormat: AudioFormat;
+  /** Original file name. */
+  fileName: string;
+  /** Total source duration in seconds. */
+  durationSeconds: number;
+  /** Number of waveform buckets at the current zoom level. */
+  bucketCount: number;
+  /** The high-resolution waveform at the current zoom level. */
+  waveform: AudioWaveformEditorPoint[];
+  /** Pixels per second. Higher = more zoomed in. */
+  zoom: number;
+  /** Horizontal scroll offset in seconds. */
+  scrollSeconds: number;
+  /** Current selection, if any. */
+  selection: AudioWaveformEditorSelection | null;
+  /** Region markers. */
+  markers: AudioRegionMarker[];
+  /** Playback cursor position in seconds. */
+  cursorSeconds: number;
+  /** Whether the editor is currently playing. */
+  isPlaying: boolean;
+  /** Timeline ruler increment in seconds, derived from the zoom. */
+  rulerStepSeconds: number;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** A single effect operation on the Effects surface. */
+export interface AudioEffectOp {
+  /** Stable id. */
+  id: string;
+  /** Effect kind. */
+  kind:
+    | "fade-in"
+    | "fade-out"
+    | "normalize"
+    | "silence"
+    | "reverse"
+    | "speed"
+    | "pitch";
+  /** Optional duration in seconds (fade-in, fade-out, silence). */
+  durationSeconds: number;
+  /** Speed multiplier (speed effect). */
+  speedFactor: number;
+  /** Pitch shift in semitones (pitch effect). */
+  pitchSemitones: number;
+  /** Target peak in 0..1 (normalize effect). */
+  targetPeak: number;
+  /** When the effect was applied. */
+  appliedAt: string;
+  /** Free-form note. */
+  note: string;
+}
+
+/** The Audio Effects body. Stores the source audio plus the per-effect
+ * history. The surface renders the preview of the latest effect on
+ * demand. */
+export interface AudioEffectsBody {
+  /** The source audio as a data URL. */
+  sourceDataUrl: string;
+  /** The detected audio format. */
+  sourceFormat: AudioFormat;
+  /** Original file name. */
+  fileName: string;
+  /** Total source duration in seconds. */
+  durationSeconds: number;
+  /** Fade-in duration in seconds. */
+  fadeInSeconds: number;
+  /** Fade-out duration in seconds. */
+  fadeOutSeconds: number;
+  /** Normalize target peak in 0..1. */
+  targetPeak: number;
+  /** Silence generator duration in seconds. */
+  silenceDurationSeconds: number;
+  /** Speed factor (1 = unchanged). */
+  speedFactor: number;
+  /** Pitch shift in semitones (0 = unchanged). */
+  pitchSemitones: number;
+  /** Per-effect history, newest last. */
+  history: AudioEffectOp[];
+  /** Pointer into the history stack. -1 means the user is past the end. */
+  historyIndex: number;
+  /** Last effect that produced a downloadable result, if any. */
+  lastResultDataUrl: string;
+  /** Format of the last result. */
+  lastResultFormat: AudioFormat;
+  /** When the last result was produced. */
+  lastResultAt: string;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** A single silence region detected by the Silence Detection surface. */
+export interface AudioSilenceRegion {
+  /** Stable id. */
+  id: string;
+  /** Start time in seconds. */
+  startSeconds: number;
+  /** End time in seconds, exclusive. */
+  endSeconds: number;
+  /** RMS value over the silence region. */
+  rms: number;
+  /** Whether the region is selected for removal. */
+  selected: boolean;
+}
+
+/** The Silence Detection body. Stores the source audio and the
+ * resolved silence regions. */
+export interface AudioSilenceBody {
+  /** The source audio as a data URL. */
+  sourceDataUrl: string;
+  /** The detected audio format. */
+  sourceFormat: AudioFormat;
+  /** Original file name. */
+  fileName: string;
+  /** Total source duration in seconds. */
+  durationSeconds: number;
+  /** RMS threshold in 0..1. Lower = stricter. */
+  threshold: number;
+  /** Minimum silence duration in seconds. */
+  minDurationSeconds: number;
+  /** Padding in seconds added around each silence region. */
+  paddingSeconds: number;
+  /** Detected silence regions. */
+  regions: AudioSilenceRegion[];
+  /** Active region id for the "jump" actions. */
+  activeRegionId: string;
+  /** Last result of a split/remove action. */
+  lastResultDataUrl: string;
+  /** When the last action ran. */
+  lastResultAt: string;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** A single export job in the Export Center queue. */
+export interface AudioExportJob {
+  /** Stable id. */
+  id: string;
+  /** Job label. */
+  label: string;
+  /** Source data URL. */
+  sourceDataUrl: string;
+  /** Source format. */
+  sourceFormat: AudioFormat;
+  /** Target format. */
+  targetFormat: AudioFormat;
+  /** Target bitrate in kbps. */
+  bitrateKbps: number;
+  /** Target sample rate in Hz (0 = source). */
+  sampleRate: number;
+  /** Target channel count (0 = source). */
+  channels: number;
+  /** Whether to export only the selection. */
+  selectionOnly: boolean;
+  /** Selection start in seconds. */
+  selectionStartSeconds: number;
+  /** Selection end in seconds. */
+  selectionEndSeconds: number;
+  /** Current job state. */
+  state: "pending" | "running" | "completed" | "failed" | "cancelled";
+  /** Progress in 0..1. */
+  progress: number;
+  /** Result data URL when completed. */
+  resultDataUrl: string;
+  /** Bytes written when completed. */
+  resultBytes: number;
+  /** When the job was last updated. */
+  updatedAt: string;
+  /** Free-form error message. */
+  errorMessage: string;
+}
+
+/** The Export Center body. Holds the export queue and the current
+ * job's progress. */
+export interface AudioExportCenterBody {
+  /** The source audio as a data URL. */
+  sourceDataUrl: string;
+  /** The detected audio format. */
+  sourceFormat: AudioFormat;
+  /** Original file name. */
+  fileName: string;
+  /** Total source duration in seconds. */
+  durationSeconds: number;
+  /** Source sample rate in Hz. */
+  sourceSampleRate: number;
+  /** Source channels. */
+  sourceChannels: number;
+  /** Whether to export the selection only. */
+  selectionOnly: boolean;
+  /** Selection start in seconds. */
+  selectionStartSeconds: number;
+  /** Selection end in seconds. */
+  selectionEndSeconds: number;
+  /** The export queue. */
+  jobs: AudioExportJob[];
+  /** Currently running job id, if any. */
+  runningJobId: string;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** A single command in the Workspace Productivity command palette. */
+export interface AudioProductivityCommand {
+  /** Stable id. */
+  id: string;
+  /** Display label. */
+  label: string;
+  /** Optional category. */
+  category: string;
+  /** Optional keyboard shortcut. */
+  shortcut?: string;
+  /** Free-form keywords for fuzzy matching. */
+  keywords: string[];
+  /** When the command was last invoked. */
+  lastInvokedAt: string;
+}
+
+/** A quick action on the Workspace Productivity surface. */
+export interface AudioProductivityQuickAction {
+  /** Stable id. */
+  id: string;
+  /** Display label. */
+  label: string;
+  /** Description. */
+  description: string;
+  /** Target slug the action opens, or a built-in action. */
+  target: string;
+  /** Optional shortcut. */
+  shortcut?: string;
+}
+
+/** The Workspace Productivity body. The surface hosts the Command
+ * Palette, the keyboard shortcut reference, the recent sessions
+ * list, the quick actions row and the workspace settings. */
+export interface AudioProductivityBody {
+  /** Whether the command palette is currently open. */
+  paletteOpen: boolean;
+  /** Current palette query. */
+  paletteQuery: string;
+  /** Recent sessions, newest first. Cap 12. */
+  recent: AudioProductivityRecent[];
+  /** Quick actions. Cap 12. */
+  quickActions: AudioProductivityQuickAction[];
+  /** Whether autosave is enabled. */
+  autosaveEnabled: boolean;
+  /** Autosave interval in milliseconds. */
+  autosaveIntervalMs: number;
+  /** Whether word wrap is enabled by default in the editors. */
+  wordWrap: boolean;
+  /** Whether the user prefers a dark / light theme. */
+  theme: "system" | "light" | "dark";
+  /** Whether the minimap is shown. */
+  minimap: boolean;
+  /** The user's preferred indent width (spaces). */
+  indent: number;
+  /** Whether the in-editor find bar opens on Ctrl/Cmd + F. */
+  findShortcut: boolean;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** A recent session entry shown in the productivity surface. */
+export interface AudioProductivityRecent {
+  id: string;
+  title: string;
+  kind: string;
+  openedAt: string;
 }

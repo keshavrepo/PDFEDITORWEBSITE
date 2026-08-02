@@ -92,6 +92,11 @@ const FEATURE_HIGHLIGHTS = [
 
 /** What ships across Batch 1 + Batch 2. */
 const LAUNCHED_CHECKLIST = [
+  "Batch 3 — Waveform Editor: high-resolution waveform, zoom in / out, horizontal scroll, timeline ruler, click-and-drag selection, playback cursor, region markers",
+  "Batch 3 — Audio Effects: fade in, fade out, normalize, silence generator, reverse, speed, pitch, preview before applying, per-session undo / redo",
+  "Batch 3 — Silence Detection: energy-threshold silence walk, adjustable threshold and minimum duration, jump between regions, split at silence, remove silence, per-region RMS",
+  "Batch 3 — Export Center: per-job queue, target format / bitrate / sample rate / channels, selection-only export, progress indicator, cancel between jobs, per-job download",
+  "Batch 3 — Workspace Productivity: Command Palette (Ctrl/Cmd + Shift + P) with fuzzy search, keyboard shortcut reference, recent sessions, quick actions, tunable workspace settings",
   "Batch 2 — Audio Merger: merge unlimited audio files, reorder and remove tracks, gap and crossfade between tracks, live preview, sample-accurate export through the platform's OfflineAudioContext",
   "Batch 2 — Audio Splitter: split by time, split by markers, split into equal parts, split by silence, preview every segment, export selected segments as a ZIP",
   "Batch 2 — Metadata Editor: standard tag fields (title, artist, album, genre, year, track number, comments), cover art, save metadata",

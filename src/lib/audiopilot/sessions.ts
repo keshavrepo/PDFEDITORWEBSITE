@@ -28,6 +28,11 @@ export const sessionCategoryOrder: AudioSessionCategory[] = [
   "metadata",
   "batch",
   "library",
+  "waveform-editor",
+  "effects",
+  "silence",
+  "export-center",
+  "productivity",
   "custom",
 ];
 
@@ -43,6 +48,11 @@ export const sessionCategoryLabels: Record<AudioSessionCategory, string> = {
   metadata: "Metadata",
   batch: "Batch",
   library: "Library",
+  "waveform-editor": "Waveform Editor",
+  effects: "Effects",
+  silence: "Silence Detection",
+  "export-center": "Export Center",
+  productivity: "Productivity",
   custom: "Custom",
 };
 
@@ -70,6 +80,16 @@ export const sessionCategoryDescriptions: Record<
     "Batch Processing — batch convert, batch rename, batch metadata update, batch export, progress tracking, cancel processing",
   library:
     "Audio Library — recent files, favorites, search, sort, filter, duplicate, rename, delete",
+  "waveform-editor":
+    "Waveform Editor — high resolution waveform, zoom in, zoom out, horizontal scroll, timeline ruler, selection visualization, playback cursor, region markers",
+  effects:
+    "Audio Effects — fade in, fade out, normalize volume, silence generator, reverse, speed adjustment, pitch adjustment, preview before applying, undo, redo",
+  silence:
+    "Silence Detection — detect silence, jump between regions, split at silence, remove silence, adjustable threshold, adjustable minimum duration",
+  "export-center":
+    "Export Center — export selected region, export full audio, multiple formats, bitrate, sample rate, channel selection, progress indicator, cancel",
+  productivity:
+    "Workspace Productivity — keyboard shortcuts, command palette, autosave improvements, recent sessions, quick actions, restore previous session",
   custom: "Anything else you build",
 };
 
@@ -397,6 +417,165 @@ export const sessions: AudioSessionDefinition[] = [
       "Sort by date, name, size, duration or last opened",
       "Filter by format or favourites-only",
       "Rename, duplicate and delete entries inline",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "audio-waveform-editor",
+    kind: "waveform-editor",
+    slug: "waveform-editor",
+    name: "Waveform Editor",
+    tagline:
+      "High resolution waveform, zoom in, zoom out, horizontal scroll, timeline ruler, selection visualization, playback cursor, region markers",
+    description:
+      "A professional Waveform Editor for AudioPilot. Open any MP3, WAV, OGG, FLAC or AAC file, see a high-resolution waveform that scales with the active zoom level, scroll horizontally through long files, pick a selection on the timeline, drop region markers for verses / choruses / cues, and follow the playback cursor as the audio plays. The editor reuses the same IndexedDB store every other surface uses, so the source and the active selection survive a reload.",
+    intro:
+      "Open the Waveform Editor to inspect and edit a file with a high-resolution waveform. Zoom in to see individual transients, scroll horizontally through a long file, drop region markers on the timeline, drag out a selection, and follow the playback cursor in real time. The editor's state persists in the same IndexedDB store every other surface uses.",
+    defaultCategory: "waveform-editor",
+    keywords: [
+      "audio",
+      "waveform",
+      "editor",
+      "zoom",
+      "scroll",
+      "selection",
+      "cursor",
+      "marker",
+      "AudioPilot",
+    ],
+    highlights: [
+      "High-resolution waveform that scales with the active zoom",
+      "Zoom in / zoom out, horizontal scroll, snap to ruler",
+      "Timeline ruler with adaptive step (0.1s, 1s, 5s, 10s)",
+      "Selection visualization with start and end times",
+      "Playback cursor that follows the audio in real time",
+      "Region markers for verses, choruses, cues, custom labels",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "audio-effects",
+    kind: "effects",
+    slug: "effects",
+    name: "Audio Effects",
+    tagline:
+      "Fade in, fade out, normalize volume, silence generator, reverse, speed adjustment, pitch adjustment, preview before applying, undo, redo",
+    description:
+      "A professional Audio Effects surface for AudioPilot. Apply fade in, fade out, normalize, silence generation, reverse, speed adjustment and pitch adjustment to any MP3, WAV, OGG, FLAC or AAC file. The surface previews the result on a temporary buffer before the user commits, keeps a per-session undo / redo stack so every adjustment is reversible, and writes the final result to the same IndexedDB store every other surface uses.",
+    intro:
+      "Open the Audio Effects surface to apply a single effect at a time. Set the parameters, hit preview to hear the result on a temporary buffer, hit apply to commit it, and use the undo / redo stack to walk back through every adjustment.",
+    defaultCategory: "effects",
+    keywords: [
+      "audio",
+      "effects",
+      "fade",
+      "normalize",
+      "silence",
+      "reverse",
+      "speed",
+      "pitch",
+      "AudioPilot",
+    ],
+    highlights: [
+      "Fade in / fade out with adjustable duration",
+      "Normalize volume to a target peak (0..1)",
+      "Silence generator with adjustable duration",
+      "Reverse audio, speed adjustment (0.25x..4x), pitch shift (+/-24 semitones)",
+      "Preview before applying, per-session undo / redo",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "audio-silence-detection",
+    kind: "silence",
+    slug: "silence",
+    name: "Silence Detection",
+    tagline:
+      "Detect silence, jump between silence regions, split at silence, remove silence, adjustable threshold, adjustable minimum duration",
+    description:
+      "A professional Silence Detection surface for AudioPilot. Run an energy-threshold walk over the source audio to find silence regions, jump between regions, split the source at every silence boundary, or remove the silence regions and stitch the active ranges back together. The threshold and the minimum silence duration are adjustable so the detector works on clean podcasts, noisy field recordings, and music alike.",
+    intro:
+      "Open the Silence Detection surface to find the silent parts of a file. Set the threshold and the minimum duration, run the detector, jump between regions, and either split the source at every silence or remove the silence to produce a tighter cut. The result is written to the same IndexedDB store every other surface uses.",
+    defaultCategory: "silence",
+    keywords: [
+      "audio",
+      "silence",
+      "detection",
+      "split",
+      "remove",
+      "threshold",
+      "AudioPilot",
+    ],
+    highlights: [
+      "Energy-threshold silence walk with adjustable threshold (0..1)",
+      "Adjustable minimum silence duration in seconds",
+      "Padding in seconds added around every region",
+      "Jump between regions, select multiple regions",
+      "Split at silence or remove silence to stitch the active ranges",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "audio-export-center",
+    kind: "export-center",
+    slug: "export-center",
+    name: "Export Center",
+    tagline:
+      "Export selected region, export full audio, multiple formats, bitrate selection, sample rate selection, channel selection, progress indicator, cancel",
+    description:
+      "A professional Export Center for AudioPilot. Queue one or more export jobs against a single source, export the full audio or just the active selection, pick a target format (MP3, WAV, OGG, FLAC, AAC), pick a target bitrate (32-320 kbps), pick a target sample rate and channel count, watch the progress indicator advance per-job, and cancel the queue between jobs. The Export Center reuses the same re-encoding pipeline the Converter / Trimmer / Batch Processing surfaces already use.",
+    intro:
+      "Open the Export Center to run one or more exports at once. Set the source, the target format, the bitrate, the sample rate and the channels, decide whether to export the selection or the full audio, and watch the progress bar advance per-job. The cancel button stops the queue between jobs so a long export never runs away.",
+    defaultCategory: "export-center",
+    keywords: [
+      "audio",
+      "export",
+      "queue",
+      "bitrate",
+      "sample rate",
+      "channels",
+      "progress",
+      "cancel",
+      "AudioPilot",
+    ],
+    highlights: [
+      "Export selected region or full audio",
+      "MP3, WAV, OGG, FLAC, AAC export with bitrate 32-320 kbps",
+      "Target sample rate 8-192 kHz and channel count 1-8",
+      "Per-job progress indicator and overall progress",
+      "Cancel button stops the queue between jobs",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "audio-workspace-productivity",
+    kind: "productivity",
+    slug: "productivity",
+    name: "Workspace Productivity",
+    tagline:
+      "Keyboard shortcuts, command palette, autosave improvements, recent sessions, quick actions, restore previous session",
+    description:
+      "A professional Workspace Productivity surface for AudioPilot. The user opens the Command Palette (Ctrl/Cmd + Shift + P) to fuzzy-search every command the workspace exposes, browses the recent sessions list, runs quick actions, tunes the workspace settings (autosave on / off, autosave interval, word wrap, theme, minimap, indent width, find shortcut), and restores the previous session on the next visit. The surface is the single place every other AudioPilot tool reads its defaults from.",
+    intro:
+      "Open the Workspace Productivity surface to tune AudioPilot. The Command Palette is the fastest way to reach any tool; the recent sessions list jumps straight back into the work in progress; the quick actions row covers the common flows; the settings panel persists through the autosave loop so the workspace looks the same on the next visit. The keyboard shortcut reference lists every shortcut the workspace exposes.",
+    defaultCategory: "productivity",
+    keywords: [
+      "audio",
+      "productivity",
+      "command palette",
+      "shortcut",
+      "recent",
+      "autosave",
+      "quick action",
+      "restore",
+      "AudioPilot",
+    ],
+    highlights: [
+      "Command Palette with fuzzy search (Ctrl/Cmd + Shift + P)",
+      "Keyboard shortcut reference for every workspace action",
+      "Recent sessions list with one-click reopen",
+      "Quick actions row: open player, open trimmer, run conversion, open export",
+      "Workspace settings: autosave, interval, word wrap, theme, minimap, indent, find shortcut",
     ],
     toolCount: 1,
   },

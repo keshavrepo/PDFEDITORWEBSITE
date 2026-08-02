@@ -7,3 +7,4 @@
 
 export * from "./audio";
 export * from "./audio-batch2";
+export * from "./audio-batch3";

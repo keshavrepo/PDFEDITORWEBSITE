@@ -17,6 +17,10 @@ import type {
   AudioBatchMode,
   AudioConverterBody,
   AudioCoverArt,
+  AudioEffectOp,
+  AudioEffectsBody,
+  AudioExportCenterBody,
+  AudioExportJob,
   AudioFormat,
   AudioLibraryBody,
   AudioLibraryEntry,
@@ -26,14 +30,24 @@ import type {
   AudioMetadataEditorBody,
   AudioMetadataTag,
   AudioPlayerBody,
+  AudioProductivityBody,
+  AudioProductivityCommand,
+  AudioProductivityQuickAction,
+  AudioProductivityRecent,
   AudioRecording,
+  AudioRegionMarker,
   AudioSessionCategory,
   AudioSessionKind,
+  AudioSilenceBody,
+  AudioSilenceRegion,
   AudioSplitMarker,
   AudioSplitSegment,
   AudioSplitterBody,
   AudioTrimOp,
   AudioTrimmerBody,
+  AudioWaveformEditorBody,
+  AudioWaveformEditorPoint,
+  AudioWaveformEditorSelection,
   AudioWaveformPoint,
   AudioRecorderBody,
 } from "./types";
@@ -45,6 +59,10 @@ export type {
   AudioBatchMode,
   AudioConverterBody,
   AudioCoverArt,
+  AudioEffectOp,
+  AudioEffectsBody,
+  AudioExportCenterBody,
+  AudioExportJob,
   AudioFormat,
   AudioLibraryBody,
   AudioLibraryEntry,
@@ -54,18 +72,28 @@ export type {
   AudioMetadataEditorBody,
   AudioMetadataTag,
   AudioPlayerBody,
+  AudioProductivityBody,
+  AudioProductivityCommand,
+  AudioProductivityQuickAction,
+  AudioProductivityRecent,
   AudioRecording,
+  AudioRegionMarker,
   AudioSessionCategory,
   AudioSessionDefinition,
   AudioSessionKind,
   AudioSessionMeta,
   AudioSessionSummary,
+  AudioSilenceBody,
+  AudioSilenceRegion,
   AudioSplitMarker,
   AudioSplitSegment,
   AudioSplitterBody,
   AudioTemplate,
   AudioTrimOp,
   AudioTrimmerBody,
+  AudioWaveformEditorBody,
+  AudioWaveformEditorPoint,
+  AudioWaveformEditorSelection,
   AudioWaveformPoint,
   AudioRecorderBody,
 } from "./types";
@@ -1058,6 +1086,625 @@ export function cloneLibraryBody(body: AudioLibraryBody): AudioLibraryBody {
     formatFilter: body.formatFilter,
     favoritesOnly: body.favoritesOnly,
     selectedEntryId: body.selectedEntryId,
+    isFavorite: body.isFavorite,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batch 3: Waveform Editor + Effects + Silence + Export + Productivity       */
+/* -------------------------------------------------------------------------- */
+
+function asWaveformEditorPoint(
+  value: unknown
+): AudioWaveformEditorPoint | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.index !== "number" || typeof record.peak !== "number") {
+    return null;
+  }
+  return {
+    index: clampNumber(record.index, 0, 1_000_000, 0),
+    peak: clampNumber(record.peak, 0, 1, 0),
+  };
+}
+
+function asRegionMarker(value: unknown): AudioRegionMarker | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.id !== "string" || typeof record.label !== "string") {
+    return null;
+  }
+  return {
+    id: record.id,
+    label: record.label,
+    timeSeconds: clampNumber(record.timeSeconds, 0, 24 * 60 * 60, 0),
+    color: typeof record.color === "string" ? record.color : "",
+  };
+}
+
+function asWaveformEditorSelection(
+  value: unknown
+): AudioWaveformEditorSelection | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.startSeconds !== "number" ||
+    typeof record.endSeconds !== "number"
+  ) {
+    return null;
+  }
+  const start = clampNumber(record.startSeconds, 0, 24 * 60 * 60, 0);
+  const end = clampNumber(record.endSeconds, 0, 24 * 60 * 60, 0);
+  if (end <= start) return null;
+  return { startSeconds: start, endSeconds: end };
+}
+
+export const DEFAULT_WAVEFORM_EDITOR_BODY: AudioWaveformEditorBody = {
+  sourceDataUrl: "",
+  sourceFormat: "wav",
+  fileName: "",
+  durationSeconds: 0,
+  bucketCount: 0,
+  waveform: [],
+  zoom: 1,
+  scrollSeconds: 0,
+  selection: null,
+  markers: [],
+  cursorSeconds: 0,
+  isPlaying: false,
+  rulerStepSeconds: 1,
+  isFavorite: false,
+};
+
+export function asWaveformEditorBody(
+  value: unknown
+): AudioWaveformEditorBody {
+  if (!value || typeof value !== "object")
+    return { ...DEFAULT_WAVEFORM_EDITOR_BODY };
+  const record = value as Record<string, unknown>;
+  const waveform = Array.isArray(record.waveform)
+    ? (record.waveform as unknown[])
+        .map((entry) => asWaveformEditorPoint(entry))
+        .filter(
+          (entry): entry is AudioWaveformEditorPoint => Boolean(entry)
+        )
+    : [];
+  const markers = Array.isArray(record.markers)
+    ? (record.markers as unknown[])
+        .map((entry) => asRegionMarker(entry))
+        .filter((entry): entry is AudioRegionMarker => Boolean(entry))
+        .slice(0, 64)
+    : [];
+  return {
+    sourceDataUrl:
+      typeof record.sourceDataUrl === "string" ? record.sourceDataUrl : "",
+    sourceFormat: asAudioFormat(record.sourceFormat),
+    fileName: typeof record.fileName === "string" ? record.fileName : "",
+    durationSeconds: clampNumber(
+      record.durationSeconds,
+      0,
+      24 * 60 * 60,
+      0
+    ),
+    bucketCount: clampNumber(record.bucketCount, 0, 64_000, 0),
+    waveform,
+    zoom: clampNumber(record.zoom, 0.25, 32, 1),
+    scrollSeconds: clampNumber(record.scrollSeconds, 0, 24 * 60 * 60, 0),
+    selection: asWaveformEditorSelection(record.selection),
+    markers,
+    cursorSeconds: clampNumber(record.cursorSeconds, 0, 24 * 60 * 60, 0),
+    isPlaying: record.isPlaying === true,
+    rulerStepSeconds: clampNumber(record.rulerStepSeconds, 0.01, 60, 1),
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export function cloneWaveformEditorBody(
+  body: AudioWaveformEditorBody
+): AudioWaveformEditorBody {
+  return {
+    sourceDataUrl: body.sourceDataUrl,
+    sourceFormat: body.sourceFormat,
+    fileName: body.fileName,
+    durationSeconds: body.durationSeconds,
+    bucketCount: body.bucketCount,
+    waveform: body.waveform.map((point) => ({ ...point })),
+    zoom: body.zoom,
+    scrollSeconds: body.scrollSeconds,
+    selection: body.selection ? { ...body.selection } : null,
+    markers: body.markers.map((marker) => ({ ...marker })),
+    cursorSeconds: body.cursorSeconds,
+    isPlaying: body.isPlaying,
+    rulerStepSeconds: body.rulerStepSeconds,
+    isFavorite: body.isFavorite,
+  };
+}
+
+const EFFECT_KINDS = new Set([
+  "fade-in",
+  "fade-out",
+  "normalize",
+  "silence",
+  "reverse",
+  "speed",
+  "pitch",
+] as const);
+
+function asEffectOp(value: unknown): AudioEffectOp | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.id !== "string") return null;
+  const kindRaw = record.kind;
+  const kind = (EFFECT_KINDS as Set<string>).has(kindRaw as string)
+    ? (kindRaw as AudioEffectOp["kind"])
+    : "fade-in";
+  return {
+    id: record.id,
+    kind,
+    durationSeconds: clampNumber(record.durationSeconds, 0, 24 * 60 * 60, 0),
+    speedFactor: clampNumber(record.speedFactor, 0.25, 4, 1),
+    pitchSemitones: clampNumber(record.pitchSemitones, -24, 24, 0),
+    targetPeak: clampNumber(record.targetPeak, 0, 1, 0.95),
+    appliedAt:
+      typeof record.appliedAt === "string"
+        ? record.appliedAt
+        : new Date().toISOString(),
+    note: typeof record.note === "string" ? record.note : "",
+  };
+}
+
+export const DEFAULT_EFFECTS_BODY: AudioEffectsBody = {
+  sourceDataUrl: "",
+  sourceFormat: "wav",
+  fileName: "",
+  durationSeconds: 0,
+  fadeInSeconds: 0.5,
+  fadeOutSeconds: 0.5,
+  targetPeak: 0.95,
+  silenceDurationSeconds: 1,
+  speedFactor: 1,
+  pitchSemitones: 0,
+  history: [],
+  historyIndex: -1,
+  lastResultDataUrl: "",
+  lastResultFormat: "wav",
+  lastResultAt: "",
+  isFavorite: false,
+};
+
+export function asEffectsBody(value: unknown): AudioEffectsBody {
+  if (!value || typeof value !== "object") return { ...DEFAULT_EFFECTS_BODY };
+  const record = value as Record<string, unknown>;
+  const history = Array.isArray(record.history)
+    ? (record.history as unknown[])
+        .map((entry) => asEffectOp(entry))
+        .filter((entry): entry is AudioEffectOp => Boolean(entry))
+        .slice(-100)
+    : [];
+  return {
+    sourceDataUrl:
+      typeof record.sourceDataUrl === "string" ? record.sourceDataUrl : "",
+    sourceFormat: asAudioFormat(record.sourceFormat),
+    fileName: typeof record.fileName === "string" ? record.fileName : "",
+    durationSeconds: clampNumber(
+      record.durationSeconds,
+      0,
+      24 * 60 * 60,
+      0
+    ),
+    fadeInSeconds: clampNumber(record.fadeInSeconds, 0, 60, 0.5),
+    fadeOutSeconds: clampNumber(record.fadeOutSeconds, 0, 60, 0.5),
+    targetPeak: clampNumber(record.targetPeak, 0, 1, 0.95),
+    silenceDurationSeconds: clampNumber(
+      record.silenceDurationSeconds,
+      0,
+      24 * 60 * 60,
+      1
+    ),
+    speedFactor: clampNumber(record.speedFactor, 0.25, 4, 1),
+    pitchSemitones: clampNumber(record.pitchSemitones, -24, 24, 0),
+    history,
+    historyIndex: clampNumber(record.historyIndex, -1, history.length, -1),
+    lastResultDataUrl:
+      typeof record.lastResultDataUrl === "string"
+        ? record.lastResultDataUrl
+        : "",
+    lastResultFormat: asAudioFormat(record.lastResultFormat),
+    lastResultAt:
+      typeof record.lastResultAt === "string" ? record.lastResultAt : "",
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export function cloneEffectsBody(body: AudioEffectsBody): AudioEffectsBody {
+  return {
+    sourceDataUrl: body.sourceDataUrl,
+    sourceFormat: body.sourceFormat,
+    fileName: body.fileName,
+    durationSeconds: body.durationSeconds,
+    fadeInSeconds: body.fadeInSeconds,
+    fadeOutSeconds: body.fadeOutSeconds,
+    targetPeak: body.targetPeak,
+    silenceDurationSeconds: body.silenceDurationSeconds,
+    speedFactor: body.speedFactor,
+    pitchSemitones: body.pitchSemitones,
+    history: body.history.map((entry) => ({ ...entry })),
+    historyIndex: body.historyIndex,
+    lastResultDataUrl: body.lastResultDataUrl,
+    lastResultFormat: body.lastResultFormat,
+    lastResultAt: body.lastResultAt,
+    isFavorite: body.isFavorite,
+  };
+}
+
+function asSilenceRegion(value: unknown): AudioSilenceRegion | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.id !== "string") return null;
+  return {
+    id: record.id,
+    startSeconds: clampNumber(record.startSeconds, 0, 24 * 60 * 60, 0),
+    endSeconds: clampNumber(record.endSeconds, 0, 24 * 60 * 60, 0),
+    rms: clampNumber(record.rms, 0, 1, 0),
+    selected: record.selected === true,
+  };
+}
+
+export const DEFAULT_SILENCE_BODY: AudioSilenceBody = {
+  sourceDataUrl: "",
+  sourceFormat: "wav",
+  fileName: "",
+  durationSeconds: 0,
+  threshold: 0.02,
+  minDurationSeconds: 0.5,
+  paddingSeconds: 0.05,
+  regions: [],
+  activeRegionId: "",
+  lastResultDataUrl: "",
+  lastResultAt: "",
+  isFavorite: false,
+};
+
+export function asSilenceBody(value: unknown): AudioSilenceBody {
+  if (!value || typeof value !== "object") return { ...DEFAULT_SILENCE_BODY };
+  const record = value as Record<string, unknown>;
+  const regions = Array.isArray(record.regions)
+    ? (record.regions as unknown[])
+        .map((entry) => asSilenceRegion(entry))
+        .filter((entry): entry is AudioSilenceRegion => Boolean(entry))
+        .slice(0, 200)
+    : [];
+  return {
+    sourceDataUrl:
+      typeof record.sourceDataUrl === "string" ? record.sourceDataUrl : "",
+    sourceFormat: asAudioFormat(record.sourceFormat),
+    fileName: typeof record.fileName === "string" ? record.fileName : "",
+    durationSeconds: clampNumber(
+      record.durationSeconds,
+      0,
+      24 * 60 * 60,
+      0
+    ),
+    threshold: clampNumber(record.threshold, 0, 1, 0.02),
+    minDurationSeconds: clampNumber(
+      record.minDurationSeconds,
+      0.05,
+      60,
+      0.5
+    ),
+    paddingSeconds: clampNumber(record.paddingSeconds, 0, 5, 0.05),
+    regions,
+    activeRegionId:
+      typeof record.activeRegionId === "string" ? record.activeRegionId : "",
+    lastResultDataUrl:
+      typeof record.lastResultDataUrl === "string"
+        ? record.lastResultDataUrl
+        : "",
+    lastResultAt:
+      typeof record.lastResultAt === "string" ? record.lastResultAt : "",
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export function cloneSilenceBody(body: AudioSilenceBody): AudioSilenceBody {
+  return {
+    sourceDataUrl: body.sourceDataUrl,
+    sourceFormat: body.sourceFormat,
+    fileName: body.fileName,
+    durationSeconds: body.durationSeconds,
+    threshold: body.threshold,
+    minDurationSeconds: body.minDurationSeconds,
+    paddingSeconds: body.paddingSeconds,
+    regions: body.regions.map((entry) => ({ ...entry })),
+    activeRegionId: body.activeRegionId,
+    lastResultDataUrl: body.lastResultDataUrl,
+    lastResultAt: body.lastResultAt,
+    isFavorite: body.isFavorite,
+  };
+}
+
+const EXPORT_JOB_STATES = new Set([
+  "pending",
+  "running",
+  "completed",
+  "failed",
+  "cancelled",
+] as const);
+
+function asExportJob(value: unknown): AudioExportJob | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.id !== "string" || typeof record.label !== "string") {
+    return null;
+  }
+  const state = (EXPORT_JOB_STATES as Set<string>).has(record.state as string)
+    ? (record.state as AudioExportJob["state"])
+    : "pending";
+  return {
+    id: record.id,
+    label: record.label,
+    sourceDataUrl:
+      typeof record.sourceDataUrl === "string" ? record.sourceDataUrl : "",
+    sourceFormat: asAudioFormat(record.sourceFormat),
+    targetFormat: asAudioFormat(record.targetFormat),
+    bitrateKbps: clampNumber(record.bitrateKbps, 32, 320, 192),
+    sampleRate: clampNumber(record.sampleRate, 0, 384_000, 0),
+    channels: clampNumber(record.channels, 0, 8, 0),
+    selectionOnly: record.selectionOnly === true,
+    selectionStartSeconds: clampNumber(
+      record.selectionStartSeconds,
+      0,
+      24 * 60 * 60,
+      0
+    ),
+    selectionEndSeconds: clampNumber(
+      record.selectionEndSeconds,
+      0,
+      24 * 60 * 60,
+      0
+    ),
+    state,
+    progress: clampNumber(record.progress, 0, 1, 0),
+    resultDataUrl:
+      typeof record.resultDataUrl === "string" ? record.resultDataUrl : "",
+    resultBytes: clampNumber(record.resultBytes, 0, 1_000_000_000, 0),
+    updatedAt:
+      typeof record.updatedAt === "string"
+        ? record.updatedAt
+        : new Date().toISOString(),
+    errorMessage:
+      typeof record.errorMessage === "string" ? record.errorMessage : "",
+  };
+}
+
+export const DEFAULT_EXPORT_CENTER_BODY: AudioExportCenterBody = {
+  sourceDataUrl: "",
+  sourceFormat: "wav",
+  fileName: "",
+  durationSeconds: 0,
+  sourceSampleRate: 44_100,
+  sourceChannels: 2,
+  selectionOnly: false,
+  selectionStartSeconds: 0,
+  selectionEndSeconds: 0,
+  jobs: [],
+  runningJobId: "",
+  isFavorite: false,
+};
+
+export function asExportCenterBody(
+  value: unknown
+): AudioExportCenterBody {
+  if (!value || typeof value !== "object")
+    return { ...DEFAULT_EXPORT_CENTER_BODY };
+  const record = value as Record<string, unknown>;
+  const jobs = Array.isArray(record.jobs)
+    ? (record.jobs as unknown[])
+        .map((entry) => asExportJob(entry))
+        .filter((entry): entry is AudioExportJob => Boolean(entry))
+        .slice(0, 32)
+    : [];
+  return {
+    sourceDataUrl:
+      typeof record.sourceDataUrl === "string" ? record.sourceDataUrl : "",
+    sourceFormat: asAudioFormat(record.sourceFormat),
+    fileName: typeof record.fileName === "string" ? record.fileName : "",
+    durationSeconds: clampNumber(
+      record.durationSeconds,
+      0,
+      24 * 60 * 60,
+      0
+    ),
+    sourceSampleRate: clampNumber(
+      record.sourceSampleRate,
+      1_000,
+      384_000,
+      44_100
+    ),
+    sourceChannels: clampNumber(record.sourceChannels, 1, 8, 2),
+    selectionOnly: record.selectionOnly === true,
+    selectionStartSeconds: clampNumber(
+      record.selectionStartSeconds,
+      0,
+      24 * 60 * 60,
+      0
+    ),
+    selectionEndSeconds: clampNumber(
+      record.selectionEndSeconds,
+      0,
+      24 * 60 * 60,
+      0
+    ),
+    jobs,
+    runningJobId:
+      typeof record.runningJobId === "string" ? record.runningJobId : "",
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export function cloneExportCenterBody(
+  body: AudioExportCenterBody
+): AudioExportCenterBody {
+  return {
+    sourceDataUrl: body.sourceDataUrl,
+    sourceFormat: body.sourceFormat,
+    fileName: body.fileName,
+    durationSeconds: body.durationSeconds,
+    sourceSampleRate: body.sourceSampleRate,
+    sourceChannels: body.sourceChannels,
+    selectionOnly: body.selectionOnly,
+    selectionStartSeconds: body.selectionStartSeconds,
+    selectionEndSeconds: body.selectionEndSeconds,
+    jobs: body.jobs.map((job) => ({ ...job })),
+    runningJobId: body.runningJobId,
+    isFavorite: body.isFavorite,
+  };
+}
+
+function asProductivityRecent(value: unknown): AudioProductivityRecent | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== "string" ||
+    typeof record.title !== "string" ||
+    typeof record.kind !== "string"
+  ) {
+    return null;
+  }
+  return {
+    id: record.id,
+    title: record.title,
+    kind: record.kind,
+    openedAt:
+      typeof record.openedAt === "string"
+        ? record.openedAt
+        : new Date().toISOString(),
+  };
+}
+
+function asProductivityCommand(
+  value: unknown
+): AudioProductivityCommand | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.id !== "string" || typeof record.label !== "string") {
+    return null;
+  }
+  return {
+    id: record.id,
+    label: record.label,
+    category: typeof record.category === "string" ? record.category : "",
+    shortcut: typeof record.shortcut === "string" ? record.shortcut : "",
+    keywords: Array.isArray(record.keywords)
+      ? (record.keywords as unknown[]).filter(
+          (entry): entry is string => typeof entry === "string"
+        )
+      : [],
+    lastInvokedAt:
+      typeof record.lastInvokedAt === "string"
+        ? record.lastInvokedAt
+        : "",
+  };
+}
+
+function asProductivityQuickAction(
+  value: unknown
+): AudioProductivityQuickAction | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== "string" ||
+    typeof record.label !== "string" ||
+    typeof record.target !== "string"
+  ) {
+    return null;
+  }
+  return {
+    id: record.id,
+    label: record.label,
+    description:
+      typeof record.description === "string" ? record.description : "",
+    target: record.target,
+    shortcut: typeof record.shortcut === "string" ? record.shortcut : "",
+  };
+}
+
+export const DEFAULT_PRODUCTIVITY_BODY: AudioProductivityBody = {
+  paletteOpen: false,
+  paletteQuery: "",
+  recent: [],
+  quickActions: [],
+  autosaveEnabled: true,
+  autosaveIntervalMs: 1500,
+  wordWrap: true,
+  theme: "system",
+  minimap: true,
+  indent: 2,
+  findShortcut: true,
+  isFavorite: false,
+};
+
+export function asProductivityBody(
+  value: unknown
+): AudioProductivityBody {
+  if (!value || typeof value !== "object")
+    return { ...DEFAULT_PRODUCTIVITY_BODY };
+  const record = value as Record<string, unknown>;
+  const recent = Array.isArray(record.recent)
+    ? (record.recent as unknown[])
+        .map((entry) => asProductivityRecent(entry))
+        .filter(
+          (entry): entry is AudioProductivityRecent => Boolean(entry)
+        )
+        .slice(0, 12)
+    : [];
+  const quickActions = Array.isArray(record.quickActions)
+    ? (record.quickActions as unknown[])
+        .map((entry) => asProductivityQuickAction(entry))
+        .filter(
+          (entry): entry is AudioProductivityQuickAction => Boolean(entry)
+        )
+    : [];
+  return {
+    paletteOpen: record.paletteOpen === true,
+    paletteQuery:
+      typeof record.paletteQuery === "string" ? record.paletteQuery : "",
+    recent,
+    quickActions,
+    autosaveEnabled: record.autosaveEnabled !== false,
+    autosaveIntervalMs: clampNumber(
+      record.autosaveIntervalMs,
+      250,
+      60_000,
+      1500
+    ),
+    wordWrap: record.wordWrap !== false,
+    theme:
+      record.theme === "light" || record.theme === "dark"
+        ? record.theme
+        : "system",
+    minimap: record.minimap !== false,
+    indent: clampNumber(record.indent, 0, 8, 2),
+    findShortcut: record.findShortcut !== false,
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export function cloneProductivityBody(
+  body: AudioProductivityBody
+): AudioProductivityBody {
+  return {
+    paletteOpen: body.paletteOpen,
+    paletteQuery: body.paletteQuery,
+    recent: body.recent.map((entry) => ({ ...entry })),
+    quickActions: body.quickActions.map((entry) => ({ ...entry })),
+    autosaveEnabled: body.autosaveEnabled,
+    autosaveIntervalMs: body.autosaveIntervalMs,
+    wordWrap: body.wordWrap,
+    theme: body.theme,
+    minimap: body.minimap,
+    indent: body.indent,
+    findShortcut: body.findShortcut,
     isFavorite: body.isFavorite,
   };
 }
