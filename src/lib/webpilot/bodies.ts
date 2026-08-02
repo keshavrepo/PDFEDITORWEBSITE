@@ -875,3 +875,1075 @@ function asUnitName(value: unknown, fallback: UnitName): UnitName {
     ? (value as UnitName)
     : fallback;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Batch 3: terminal + intelligence + validation + export + import +          */
+/* productivity normalisers                                                  */
+/* -------------------------------------------------------------------------- */
+
+import type {
+  WebCommandPaletteItem,
+  WebExportAsset,
+  WebExportBody,
+  WebExportEntry,
+  WebImportBody,
+  WebImportConflict,
+  WebIntelligenceBody,
+  WebIntelligenceBracket,
+  WebIntelligenceBreadcrumb,
+  WebIntelligenceFold,
+  WebIntelligenceSeverity,
+  WebIntelligenceSymbol,
+  WebProductivityBody,
+  WebProductivityQuickAction,
+  WebProductivityRecent,
+  WebTerminalBody,
+  WebTerminalCommand,
+  WebTerminalLine,
+  WebTerminalPane,
+  WebValidationBody,
+  WebValidationCategory,
+  WebValidationIssue,
+  WebValidationSeverity,
+  WebValidationSummary,
+} from "./types";
+
+export type {
+  WebCommandPaletteItem,
+  WebExportAsset,
+  WebExportBody,
+  WebExportEntry,
+  WebImportBody,
+  WebImportConflict,
+  WebIntelligenceBody,
+  WebIntelligenceBracket,
+  WebIntelligenceBreadcrumb,
+  WebIntelligenceFold,
+  WebIntelligenceSeverity,
+  WebIntelligenceSymbol,
+  WebProductivityBody,
+  WebProductivityQuickAction,
+  WebProductivityRecent,
+  WebTerminalBody,
+  WebTerminalCommand,
+  WebTerminalLine,
+  WebTerminalPane,
+  WebValidationBody,
+  WebValidationCategory,
+  WebValidationIssue,
+  WebValidationSeverity,
+  WebValidationSummary,
+} from "./types";
+
+/* ----------------------------- Terminal ----------------------------------- */
+
+const TERMINAL_LINE_KINDS = new Set([
+  "input",
+  "output",
+  "info",
+  "error",
+] as const);
+
+function asTerminalLineKind(
+  value: unknown
+): WebTerminalLine["kind"] {
+  return TERMINAL_LINE_KINDS.has(value as never)
+    ? (value as WebTerminalLine["kind"])
+    : "output";
+}
+
+function asTerminalLine(value: unknown): WebTerminalLine | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.id !== "string" || typeof record.text !== "string") {
+    return null;
+  }
+  return {
+    id: record.id,
+    kind: asTerminalLineKind(record.kind),
+    text: record.text,
+    createdAt:
+      typeof record.createdAt === "string"
+        ? record.createdAt
+        : new Date().toISOString(),
+  };
+}
+
+function asTerminalPane(value: unknown): WebTerminalPane | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.id !== "string" || typeof record.name !== "string") {
+    return null;
+  }
+  const lines = Array.isArray(record.lines)
+    ? (record.lines as unknown[])
+        .map((entry) => asTerminalLine(entry))
+        .filter((entry): entry is WebTerminalLine => Boolean(entry))
+        .slice(-500)
+    : [];
+  const history = Array.isArray(record.history)
+    ? (record.history as unknown[]).filter(
+        (entry): entry is string => typeof entry === "string"
+      )
+    : [];
+  return {
+    id: record.id,
+    name: record.name,
+    lines,
+    input: typeof record.input === "string" ? record.input : "",
+    history: history.slice(0, 100),
+    historyIndex:
+      typeof record.historyIndex === "number" &&
+      Number.isFinite(record.historyIndex)
+        ? Math.max(-1, Math.floor(record.historyIndex))
+        : -1,
+    cwd: typeof record.cwd === "string" ? record.cwd : "/",
+  };
+}
+
+function asTerminalCommand(value: unknown): WebTerminalCommand | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== "string" ||
+    typeof record.name !== "string" ||
+    typeof record.source !== "string"
+  ) {
+    return null;
+  }
+  return {
+    id: record.id,
+    name: record.name,
+    source: record.source,
+    runAt:
+      typeof record.runAt === "string"
+        ? record.runAt
+        : new Date().toISOString(),
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export const DEFAULT_TERMINAL_BODY: WebTerminalBody = {
+  activePaneId: "pane-default",
+  panes: [
+    {
+      id: "pane-default",
+      name: "Terminal 1",
+      lines: [
+        {
+          id: "line-info-1",
+          kind: "info",
+          text: "WebPilot · Integrated Terminal",
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: "line-info-2",
+          kind: "info",
+          text: "Type `help` to list built-in commands.",
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      input: "",
+      history: [],
+      historyIndex: -1,
+      cwd: "/",
+    },
+  ],
+  fullscreen: false,
+  commands: [],
+  fontSize: 13,
+  isFavorite: false,
+};
+
+export function asTerminalBody(value: unknown): WebTerminalBody {
+  if (!value || typeof value !== "object") {
+    return {
+      ...DEFAULT_TERMINAL_BODY,
+      panes: DEFAULT_TERMINAL_BODY.panes.map((pane) => ({
+        ...pane,
+        lines: pane.lines.map((line) => ({ ...line })),
+      })),
+    };
+  }
+  const record = value as Record<string, unknown>;
+  const panes = Array.isArray(record.panes)
+    ? (record.panes as unknown[])
+        .map((entry) => asTerminalPane(entry))
+        .filter((entry): entry is WebTerminalPane => Boolean(entry))
+    : [];
+  const finalPanes = panes.length > 0 ? panes : DEFAULT_TERMINAL_BODY.panes;
+  const activePaneId =
+    typeof record.activePaneId === "string" &&
+    finalPanes.some((pane) => pane.id === record.activePaneId)
+      ? record.activePaneId
+      : finalPanes[0]!.id;
+  const commands = Array.isArray(record.commands)
+    ? (record.commands as unknown[])
+        .map((entry) => asTerminalCommand(entry))
+        .filter((entry): entry is WebTerminalCommand => Boolean(entry))
+        .slice(0, 100)
+    : [];
+  return {
+    activePaneId,
+    panes: finalPanes,
+    fullscreen: record.fullscreen === true,
+    commands,
+    fontSize: clampNumber(record.fontSize, 10, 24, 13),
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export function cloneTerminalBody(body: WebTerminalBody): WebTerminalBody {
+  return {
+    activePaneId: body.activePaneId,
+    panes: body.panes.map((pane) => ({
+      ...pane,
+      lines: pane.lines.map((line) => ({ ...line })),
+      history: [...pane.history],
+    })),
+    fullscreen: body.fullscreen,
+    commands: body.commands.map((command) => ({ ...command })),
+    fontSize: body.fontSize,
+    isFavorite: body.isFavorite,
+  };
+}
+
+/* --------------------------- Intelligence --------------------------------- */
+
+const SYMBOL_KINDS = new Set([
+  "function",
+  "class",
+  "variable",
+  "method",
+  "selector",
+  "rule",
+  "id",
+  "tag",
+  "attribute",
+] as const);
+
+const FOLD_KINDS = new Set(["block", "function", "rule", "comment"] as const);
+
+function asSymbolKind(value: unknown): WebIntelligenceSymbol["kind"] {
+  return SYMBOL_KINDS.has(value as never)
+    ? (value as WebIntelligenceSymbol["kind"])
+    : "variable";
+}
+
+function asFoldKind(value: unknown): WebIntelligenceFold["kind"] {
+  return FOLD_KINDS.has(value as never)
+    ? (value as WebIntelligenceFold["kind"])
+    : "block";
+}
+
+function asIntelligenceSymbol(value: unknown): WebIntelligenceSymbol | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== "string" ||
+    typeof record.name !== "string" ||
+    typeof record.path !== "string"
+  ) {
+    return null;
+  }
+  return {
+    id: record.id,
+    name: record.name,
+    kind: asSymbolKind(record.kind),
+    path: record.path,
+    line: clampNumber(record.line, 1, 1_000_000, 1),
+    column: clampNumber(record.column, 1, 1_000_000, 1),
+    endLine: clampNumber(record.endLine, 1, 1_000_000, 1),
+    endColumn: clampNumber(record.endColumn, 1, 1_000_000, 1),
+    preview:
+      typeof record.preview === "string" ? record.preview : undefined,
+  };
+}
+
+function asIntelligenceBracket(value: unknown): WebIntelligenceBracket | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.path !== "string" ||
+    typeof record.openChar !== "string" ||
+    typeof record.closeChar !== "string"
+  ) {
+    return null;
+  }
+  return {
+    path: record.path,
+    openLine: clampNumber(record.openLine, 1, 1_000_000, 1),
+    openColumn: clampNumber(record.openColumn, 1, 1_000_000, 1),
+    closeLine: clampNumber(record.closeLine, 1, 1_000_000, 1),
+    closeColumn: clampNumber(record.closeColumn, 1, 1_000_000, 1),
+    openChar: record.openChar,
+    closeChar: record.closeChar,
+  };
+}
+
+function asIntelligenceFold(value: unknown): WebIntelligenceFold | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.path !== "string") return null;
+  return {
+    path: record.path,
+    startLine: clampNumber(record.startLine, 1, 1_000_000, 1),
+    endLine: clampNumber(record.endLine, 1, 1_000_000, 1),
+    kind: asFoldKind(record.kind),
+  };
+}
+
+function asIntelligenceBreadcrumb(
+  value: unknown
+): WebIntelligenceBreadcrumb | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.path !== "string") return null;
+  return {
+    path: record.path,
+    line: clampNumber(record.line, 1, 1_000_000, 1),
+    column:
+      typeof record.column === "number" && Number.isFinite(record.column)
+        ? clampNumber(record.column, 1, 1_000_000, 1)
+        : undefined,
+    label: typeof record.label === "string" ? record.label : undefined,
+  };
+}
+
+export const DEFAULT_INTELLIGENCE_BODY: WebIntelligenceBody = {
+  activePath: "",
+  symbols: [],
+  brackets: [],
+  folds: [],
+  breadcrumbs: [],
+  cursor: { line: 1, column: 1 },
+  goToLine: "",
+  goToSymbol: "",
+  foldedLines: [],
+  isFavorite: false,
+};
+
+export function asIntelligenceBody(value: unknown): WebIntelligenceBody {
+  if (!value || typeof value !== "object")
+    return cloneIntelligenceBody(DEFAULT_INTELLIGENCE_BODY);
+  const record = value as Record<string, unknown>;
+  const symbols = Array.isArray(record.symbols)
+    ? (record.symbols as unknown[])
+        .map((entry) => asIntelligenceSymbol(entry))
+        .filter((entry): entry is WebIntelligenceSymbol => Boolean(entry))
+    : [];
+  const brackets = Array.isArray(record.brackets)
+    ? (record.brackets as unknown[])
+        .map((entry) => asIntelligenceBracket(entry))
+        .filter((entry): entry is WebIntelligenceBracket => Boolean(entry))
+    : [];
+  const folds = Array.isArray(record.folds)
+    ? (record.folds as unknown[])
+        .map((entry) => asIntelligenceFold(entry))
+        .filter((entry): entry is WebIntelligenceFold => Boolean(entry))
+    : [];
+  const breadcrumbs = Array.isArray(record.breadcrumbs)
+    ? (record.breadcrumbs as unknown[])
+        .map((entry) => asIntelligenceBreadcrumb(entry))
+        .filter((entry): entry is WebIntelligenceBreadcrumb => Boolean(entry))
+    : [];
+  const foldedLines = Array.isArray(record.foldedLines)
+    ? (record.foldedLines as unknown[])
+        .filter((entry): entry is number => typeof entry === "number")
+        .map((entry) => clampNumber(entry, 1, 1_000_000, 1))
+    : [];
+  const cursor =
+    record.cursor &&
+    typeof record.cursor === "object" &&
+    typeof (record.cursor as Record<string, unknown>).line === "number" &&
+    typeof (record.cursor as Record<string, unknown>).column === "number"
+      ? {
+          line: clampNumber(
+            (record.cursor as Record<string, unknown>).line,
+            1,
+            1_000_000,
+            1
+          ),
+          column: clampNumber(
+            (record.cursor as Record<string, unknown>).column,
+            1,
+            1_000_000,
+            1
+          ),
+        }
+      : { line: 1, column: 1 };
+  return {
+    activePath:
+      typeof record.activePath === "string" ? record.activePath : "",
+    symbols,
+    brackets,
+    folds,
+    breadcrumbs,
+    cursor,
+    goToLine: typeof record.goToLine === "string" ? record.goToLine : "",
+    goToSymbol:
+      typeof record.goToSymbol === "string" ? record.goToSymbol : "",
+    foldedLines,
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export function cloneIntelligenceBody(
+  body: WebIntelligenceBody
+): WebIntelligenceBody {
+  return {
+    activePath: body.activePath,
+    symbols: body.symbols.map((entry) => ({ ...entry })),
+    brackets: body.brackets.map((entry) => ({ ...entry })),
+    folds: body.folds.map((entry) => ({ ...entry })),
+    breadcrumbs: body.breadcrumbs.map((entry) => ({ ...entry })),
+    cursor: { ...body.cursor },
+    goToLine: body.goToLine,
+    goToSymbol: body.goToSymbol,
+    foldedLines: [...body.foldedLines],
+    isFavorite: body.isFavorite,
+  };
+}
+
+/* --------------------------- Validation ----------------------------------- */
+
+const VALIDATION_SEVERITIES = new Set(["info", "warning", "error"] as const);
+const VALIDATION_CATEGORIES = new Set([
+  "html",
+  "css",
+  "javascript",
+  "link",
+  "asset",
+  "duplicate-id",
+  "accessibility",
+  "performance",
+] as const);
+
+function asValidationSeverity(
+  value: unknown
+): WebValidationSeverity {
+  return VALIDATION_SEVERITIES.has(value as never)
+    ? (value as WebValidationSeverity)
+    : "warning";
+}
+
+function asValidationCategory(
+  value: unknown
+): WebValidationCategory {
+  return VALIDATION_CATEGORIES.has(value as never)
+    ? (value as WebValidationCategory)
+    : "html";
+}
+
+function asValidationIssue(value: unknown): WebValidationIssue | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== "string" ||
+    typeof record.path !== "string" ||
+    typeof record.message !== "string"
+  ) {
+    return null;
+  }
+  return {
+    id: record.id,
+    severity: asValidationSeverity(record.severity),
+    category: asValidationCategory(record.category),
+    path: record.path,
+    line: clampNumber(record.line, 1, 1_000_000, 1),
+    message: record.message,
+    suggestion:
+      typeof record.suggestion === "string" ? record.suggestion : undefined,
+  };
+}
+
+export const DEFAULT_VALIDATION_BODY: WebValidationBody = {
+  issues: [],
+  summary: {
+    errors: 0,
+    warnings: 0,
+    info: 0,
+    files: 0,
+    ranAt: "",
+  },
+  categoryFilter: "",
+  severityFilter: "",
+  search: "",
+  enabledHtml: true,
+  enabledCss: true,
+  enabledJavascript: true,
+  enabledLink: true,
+  enabledAsset: true,
+  enabledDuplicateId: true,
+  enabledAccessibility: true,
+  enabledPerformance: true,
+  isFavorite: false,
+};
+
+export function asValidationBody(value: unknown): WebValidationBody {
+  if (!value || typeof value !== "object")
+    return { ...DEFAULT_VALIDATION_BODY };
+  const record = value as Record<string, unknown>;
+  const issues = Array.isArray(record.issues)
+    ? (record.issues as unknown[])
+        .map((entry) => asValidationIssue(entry))
+        .filter((entry): entry is WebValidationIssue => Boolean(entry))
+        .slice(0, 500)
+    : [];
+  return {
+    issues,
+    summary: {
+      errors: clampNumber(
+        (record.summary as Record<string, unknown> | undefined)?.errors,
+        0,
+        1_000_000,
+        0
+      ),
+      warnings: clampNumber(
+        (record.summary as Record<string, unknown> | undefined)?.warnings,
+        0,
+        1_000_000,
+        0
+      ),
+      info: clampNumber(
+        (record.summary as Record<string, unknown> | undefined)?.info,
+        0,
+        1_000_000,
+        0
+      ),
+      files: clampNumber(
+        (record.summary as Record<string, unknown> | undefined)?.files,
+        0,
+        1_000_000,
+        0
+      ),
+      ranAt:
+        typeof (record.summary as Record<string, unknown> | undefined)
+          ?.ranAt === "string"
+          ? ((record.summary as Record<string, unknown>).ranAt as string)
+          : "",
+    },
+    categoryFilter:
+      typeof record.categoryFilter === "string" ? record.categoryFilter : "",
+    severityFilter:
+      typeof record.severityFilter === "string"
+        ? record.severityFilter
+        : "",
+    search: typeof record.search === "string" ? record.search : "",
+    enabledHtml: record.enabledHtml !== false,
+    enabledCss: record.enabledCss !== false,
+    enabledJavascript: record.enabledJavascript !== false,
+    enabledLink: record.enabledLink !== false,
+    enabledAsset: record.enabledAsset !== false,
+    enabledDuplicateId: record.enabledDuplicateId !== false,
+    enabledAccessibility: record.enabledAccessibility !== false,
+    enabledPerformance: record.enabledPerformance !== false,
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+/* ----------------------------- Export ------------------------------------- */
+
+function asExportEntry(value: unknown): WebExportEntry | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.path !== "string" ||
+    (record.kind !== "file" && record.kind !== "folder")
+  ) {
+    return null;
+  }
+  return {
+    path: record.path,
+    kind: record.kind,
+    size:
+      typeof record.size === "number" && Number.isFinite(record.size)
+        ? Math.max(0, Math.floor(record.size))
+        : undefined,
+    mime: typeof record.mime === "string" ? record.mime : undefined,
+  };
+}
+
+function asExportAsset(value: unknown): WebExportAsset | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== "string" ||
+    typeof record.name !== "string" ||
+    typeof record.dataUrl !== "string"
+  ) {
+    return null;
+  }
+  return {
+    id: record.id,
+    name: record.name,
+    folder: typeof record.folder === "string" ? record.folder : "",
+    kind: asAssetKind(record.kind),
+    size:
+      typeof record.size === "number" && Number.isFinite(record.size)
+        ? Math.max(0, Math.floor(record.size))
+        : record.dataUrl.length,
+    dataUrl: record.dataUrl,
+  };
+}
+
+export const DEFAULT_EXPORT_BODY: WebExportBody = {
+  archiveName: "webpilot-project",
+  includeFolders: true,
+  includeAssets: true,
+  includeMetadata: true,
+  prettyPrint: true,
+  lastSize: 0,
+  lastBuiltAt: "",
+  isFavorite: false,
+};
+
+export function asExportBody(value: unknown): WebExportBody {
+  if (!value || typeof value !== "object")
+    return { ...DEFAULT_EXPORT_BODY };
+  const record = value as Record<string, unknown>;
+  return {
+    archiveName:
+      typeof record.archiveName === "string" && record.archiveName.trim()
+        ? record.archiveName.trim()
+        : DEFAULT_EXPORT_BODY.archiveName,
+    includeFolders: record.includeFolders !== false,
+    includeAssets: record.includeAssets !== false,
+    includeMetadata: record.includeMetadata !== false,
+    prettyPrint: record.prettyPrint !== false,
+    lastSize: clampNumber(record.lastSize, 0, 1_000_000_000, 0),
+    lastBuiltAt:
+      typeof record.lastBuiltAt === "string" ? record.lastBuiltAt : "",
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+/* ----------------------------- Import ------------------------------------- */
+
+const IMPORT_RESOLUTIONS = new Set([
+  "skip",
+  "replace",
+  "rename",
+  "merge",
+] as const);
+
+function asImportResolution(
+  value: unknown
+): WebImportConflict["resolution"] {
+  return IMPORT_RESOLUTIONS.has(value as never)
+    ? (value as WebImportConflict["resolution"])
+    : "skip";
+}
+
+function asImportConflict(value: unknown): WebImportConflict | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.path !== "string") return null;
+  return {
+    path: record.path,
+    kind:
+      record.kind === "folder" || record.kind === "asset"
+        ? record.kind
+        : "file",
+    resolution: asImportResolution(record.resolution),
+    resolvedAt:
+      typeof record.resolvedAt === "string"
+        ? record.resolvedAt
+        : new Date().toISOString(),
+  };
+}
+
+export const DEFAULT_IMPORT_BODY: WebImportBody = {
+  lastArchiveName: "",
+  lastImportAt: "",
+  lastFileCount: 0,
+  lastAssetCount: 0,
+  lastConflictCount: 0,
+  conflicts: [],
+  defaultResolution: "skip",
+  validateBeforeImport: true,
+  isFavorite: false,
+};
+
+export function asImportBody(value: unknown): WebImportBody {
+  if (!value || typeof value !== "object")
+    return { ...DEFAULT_IMPORT_BODY };
+  const record = value as Record<string, unknown>;
+  const conflicts = Array.isArray(record.conflicts)
+    ? (record.conflicts as unknown[])
+        .map((entry) => asImportConflict(entry))
+        .filter((entry): entry is WebImportConflict => Boolean(entry))
+    : [];
+  return {
+    lastArchiveName:
+      typeof record.lastArchiveName === "string"
+        ? record.lastArchiveName
+        : "",
+    lastImportAt:
+      typeof record.lastImportAt === "string" ? record.lastImportAt : "",
+    lastFileCount: clampNumber(record.lastFileCount, 0, 1_000_000, 0),
+    lastAssetCount: clampNumber(record.lastAssetCount, 0, 1_000_000, 0),
+    lastConflictCount: clampNumber(
+      record.lastConflictCount,
+      0,
+      1_000_000,
+      0
+    ),
+    conflicts,
+    defaultResolution:
+      record.defaultResolution === "replace"
+        ? "replace"
+        : record.defaultResolution === "rename"
+          ? "rename"
+          : "skip",
+    validateBeforeImport: record.validateBeforeImport !== false,
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+/* ------------------------- Productivity ----------------------------------- */
+
+function asCommandPaletteItem(
+  value: unknown
+): WebCommandPaletteItem | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.id !== "string" || typeof record.label !== "string") {
+    return null;
+  }
+  const keywords = Array.isArray(record.keywords)
+    ? (record.keywords as unknown[]).filter(
+        (entry): entry is string => typeof entry === "string"
+      )
+    : [];
+  return {
+    id: record.id,
+    label: record.label,
+    category: typeof record.category === "string" ? record.category : "",
+    shortcut: typeof record.shortcut === "string" ? record.shortcut : undefined,
+    keywords,
+    lastInvokedAt:
+      typeof record.lastInvokedAt === "string"
+        ? record.lastInvokedAt
+        : undefined,
+  };
+}
+
+function asProductivityRecent(value: unknown): WebProductivityRecent | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== "string" ||
+    typeof record.title !== "string" ||
+    typeof record.kind !== "string"
+  ) {
+    return null;
+  }
+  return {
+    id: record.id,
+    title: record.title,
+    kind: record.kind,
+    openedAt:
+      typeof record.openedAt === "string"
+        ? record.openedAt
+        : new Date().toISOString(),
+  };
+}
+
+function asQuickAction(value: unknown): WebProductivityQuickAction | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== "string" ||
+    typeof record.label !== "string" ||
+    typeof record.target !== "string"
+  ) {
+    return null;
+  }
+  return {
+    id: record.id,
+    label: record.label,
+    description:
+      typeof record.description === "string" ? record.description : "",
+    target: record.target,
+    shortcut: typeof record.shortcut === "string" ? record.shortcut : undefined,
+  };
+}
+
+const DEFAULT_QUICK_ACTIONS: WebProductivityQuickAction[] = [
+  {
+    id: "qa-projects",
+    label: "Open Project Explorer",
+    description: "Browse the project tree and edit files.",
+    target: "projects",
+    shortcut: "Ctrl/Cmd + 1",
+  },
+  {
+    id: "qa-assets",
+    label: "Open Asset Manager",
+    description: "Upload and organise project assets.",
+    target: "assets",
+    shortcut: "Ctrl/Cmd + 2",
+  },
+  {
+    id: "qa-workspace",
+    label: "Open Multi-file Workspace",
+    description: "Edit every file with tabs and autosave.",
+    target: "workspace",
+    shortcut: "Ctrl/Cmd + 3",
+  },
+  {
+    id: "qa-search",
+    label: "Open Professional Search",
+    description: "Find and replace across the project.",
+    target: "search",
+    shortcut: "Ctrl/Cmd + 4",
+  },
+  {
+    id: "qa-validation",
+    label: "Run Project Validation",
+    description: "Catch HTML, CSS, JS, link, asset, a11y, perf issues.",
+    target: "validation",
+    shortcut: "Ctrl/Cmd + 5",
+  },
+  {
+    id: "qa-export",
+    label: "Export the project",
+    description: "Build a ZIP archive of the project.",
+    target: "export",
+  },
+  {
+    id: "qa-import",
+    label: "Import a project",
+    description: "Bring a ZIP back into WebPilot.",
+    target: "import",
+  },
+  {
+    id: "qa-terminal",
+    label: "Open Integrated Terminal",
+    description: "Run a command in a sandboxed shell.",
+    target: "terminal",
+  },
+  {
+    id: "qa-intelligence",
+    label: "Open Code Intelligence",
+    description: "Symbols, brackets, folding, breadcrumbs.",
+    target: "intelligence",
+  },
+  {
+    id: "qa-utilities",
+    label: "Open Developer Utilities",
+    description: "Color picker, gradient, shadow, radius, units.",
+    target: "utilities",
+  },
+];
+
+const DEFAULT_PALETTE_ITEMS: WebCommandPaletteItem[] = [
+  {
+    id: "cmd-open-projects",
+    label: "Open Project Explorer",
+    category: "Tools",
+    shortcut: "Ctrl/Cmd + 1",
+    keywords: ["project", "explorer", "files", "tree", "folders", "WebPilot"],
+  },
+  {
+    id: "cmd-open-assets",
+    label: "Open Asset Manager",
+    category: "Tools",
+    shortcut: "Ctrl/Cmd + 2",
+    keywords: ["assets", "images", "fonts", "videos", "icons", "WebPilot"],
+  },
+  {
+    id: "cmd-open-workspace",
+    label: "Open Multi-file Workspace",
+    category: "Tools",
+    shortcut: "Ctrl/Cmd + 3",
+    keywords: ["workspace", "tabs", "autosave", "WebPilot"],
+  },
+  {
+    id: "cmd-open-search",
+    label: "Open Professional Search",
+    category: "Tools",
+    shortcut: "Ctrl/Cmd + 4",
+    keywords: ["search", "find", "replace", "regex", "WebPilot"],
+  },
+  {
+    id: "cmd-open-validation",
+    label: "Open Project Validation",
+    category: "Tools",
+    shortcut: "Ctrl/Cmd + 5",
+    keywords: ["validation", "lint", "broken", "a11y", "WebPilot"],
+  },
+  {
+    id: "cmd-open-export",
+    label: "Open Project Export",
+    category: "Tools",
+    keywords: ["export", "zip", "archive", "WebPilot"],
+  },
+  {
+    id: "cmd-open-import",
+    label: "Open Project Import",
+    category: "Tools",
+    keywords: ["import", "zip", "restore", "WebPilot"],
+  },
+  {
+    id: "cmd-open-terminal",
+    label: "Open Integrated Terminal",
+    category: "Tools",
+    keywords: ["terminal", "shell", "command", "WebPilot"],
+  },
+  {
+    id: "cmd-open-intelligence",
+    label: "Open Code Intelligence",
+    category: "Tools",
+    keywords: [
+      "intelligence",
+      "bracket",
+      "fold",
+      "outline",
+      "symbol",
+      "WebPilot",
+    ],
+  },
+  {
+    id: "cmd-open-utilities",
+    label: "Open Developer Utilities",
+    category: "Tools",
+    keywords: [
+      "utilities",
+      "color",
+      "gradient",
+      "shadow",
+      "radius",
+      "WebPilot",
+    ],
+  },
+  {
+    id: "cmd-toggle-palette",
+    label: "Toggle Command Palette",
+    category: "Workspace",
+    shortcut: "Ctrl/Cmd + Shift + P",
+    keywords: ["palette", "command", "WebPilot"],
+  },
+  {
+    id: "cmd-toggle-autosave",
+    label: "Toggle Autosave",
+    category: "Workspace",
+    keywords: ["autosave", "save", "WebPilot"],
+  },
+  {
+    id: "cmd-run-validation",
+    label: "Run Project Validation",
+    category: "Validation",
+    keywords: ["validation", "run", "WebPilot"],
+  },
+  {
+    id: "cmd-build-export",
+    label: "Build Project Export",
+    category: "Export",
+    keywords: ["export", "build", "zip", "WebPilot"],
+  },
+  {
+    id: "cmd-clear-terminal",
+    label: "Clear Integrated Terminal",
+    category: "Terminal",
+    shortcut: "Ctrl/Cmd + K",
+    keywords: ["terminal", "clear", "WebPilot"],
+  },
+  {
+    id: "cmd-new-terminal",
+    label: "New Terminal Pane",
+    category: "Terminal",
+    shortcut: "Ctrl/Cmd + T",
+    keywords: ["terminal", "new", "pane", "WebPilot"],
+  },
+  {
+    id: "cmd-fullscreen-terminal",
+    label: "Toggle Terminal Fullscreen",
+    category: "Terminal",
+    shortcut: "Ctrl/Cmd + Shift + F",
+    keywords: ["terminal", "fullscreen", "WebPilot"],
+  },
+  {
+    id: "cmd-copy-output",
+    label: "Copy Terminal Output",
+    category: "Terminal",
+    keywords: ["terminal", "copy", "WebPilot"],
+  },
+];
+
+export const DEFAULT_PRODUCTIVITY_BODY: WebProductivityBody = {
+  paletteOpen: false,
+  paletteQuery: "",
+  recent: [],
+  quickActions: DEFAULT_QUICK_ACTIONS,
+  autosaveEnabled: true,
+  autosaveIntervalMs: 1500,
+  wordWrap: true,
+  theme: "system",
+  minimap: true,
+  indent: 2,
+  findShortcut: true,
+  isFavorite: false,
+};
+
+export function asProductivityBody(value: unknown): WebProductivityBody {
+  if (!value || typeof value !== "object")
+    return cloneProductivityBody(DEFAULT_PRODUCTIVITY_BODY);
+  const record = value as Record<string, unknown>;
+  const recent = Array.isArray(record.recent)
+    ? (record.recent as unknown[])
+        .map((entry) => asProductivityRecent(entry))
+        .filter((entry): entry is WebProductivityRecent => Boolean(entry))
+        .slice(0, 12)
+    : [];
+  const quickActions = Array.isArray(record.quickActions)
+    ? (record.quickActions as unknown[])
+        .map((entry) => asQuickAction(entry))
+        .filter(
+          (entry): entry is WebProductivityQuickAction => Boolean(entry)
+        )
+    : DEFAULT_QUICK_ACTIONS;
+  return {
+    paletteOpen: record.paletteOpen === true,
+    paletteQuery:
+      typeof record.paletteQuery === "string" ? record.paletteQuery : "",
+    recent,
+    quickActions,
+    autosaveEnabled: record.autosaveEnabled !== false,
+    autosaveIntervalMs: clampNumber(
+      record.autosaveIntervalMs,
+      250,
+      60_000,
+      1500
+    ),
+    wordWrap: record.wordWrap !== false,
+    theme:
+      record.theme === "light" || record.theme === "dark"
+        ? record.theme
+        : "system",
+    minimap: record.minimap !== false,
+    indent: clampNumber(record.indent, 0, 8, 2),
+    findShortcut: record.findShortcut !== false,
+    isFavorite: record.isFavorite === true,
+  };
+}
+
+export function cloneProductivityBody(
+  body: WebProductivityBody
+): WebProductivityBody {
+  return {
+    paletteOpen: body.paletteOpen,
+    paletteQuery: body.paletteQuery,
+    recent: body.recent.map((entry) => ({ ...entry })),
+    quickActions: body.quickActions.map((entry) => ({ ...entry })),
+    autosaveEnabled: body.autosaveEnabled,
+    autosaveIntervalMs: body.autosaveIntervalMs,
+    wordWrap: body.wordWrap,
+    theme: body.theme,
+    minimap: body.minimap,
+    indent: body.indent,
+    findShortcut: body.findShortcut,
+    isFavorite: body.isFavorite,
+  };
+}

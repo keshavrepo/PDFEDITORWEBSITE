@@ -28,6 +28,12 @@ export const sessionCategoryOrder: WebSessionCategory[] = [
   "workspace",
   "search",
   "utilities",
+  "terminal",
+  "intelligence",
+  "validation",
+  "export",
+  "import",
+  "productivity",
   "history",
   "custom",
 ];
@@ -44,6 +50,12 @@ export const sessionCategoryLabels: Record<WebSessionCategory, string> = {
   workspace: "Workspace",
   search: "Search",
   utilities: "Utilities",
+  terminal: "Terminal",
+  intelligence: "Intelligence",
+  validation: "Validation",
+  export: "Export",
+  import: "Import",
+  productivity: "Productivity",
   history: "History",
   custom: "Custom",
 };
@@ -66,6 +78,18 @@ export const sessionCategoryDescriptions: Record<WebSessionCategory, string> = {
     "Professional Search — find in current file or across the project, replace and replace all, regex, match case and whole word",
   utilities:
     "Developer Utilities — color picker, gradient generator, box shadow generator, border radius generator, CSS unit converter, HTML entity, base64 and URL codecs",
+  terminal:
+    "Integrated Terminal — multiple terminals, history, clear, copy, resize, fullscreen and keyboard shortcuts",
+  intelligence:
+    "Code Intelligence — bracket matching, auto-closing pairs, auto indentation, code folding, breadcrumbs, symbol outline, go to line, go to symbol",
+  validation:
+    "Project Validation — HTML / CSS / JavaScript validation, broken link detection, missing asset detection, duplicate ID detection, accessibility warnings, performance hints",
+  export:
+    "Project Export — export the complete project as a ZIP, with clean folder structure, assets, folders and metadata preserved",
+  import:
+    "Project Import — import a ZIP, restore folders, assets and metadata, conflict handling, validation before import",
+  productivity:
+    "Workspace Productivity — Command Palette, keyboard shortcut reference, recent projects, quick actions, workspace settings, autosave controls",
   history: "Per-tool history with recent and favourites",
   custom: "Anything else you build",
 };
@@ -249,6 +273,214 @@ export const BATCH2_SESSIONS: WebSessionDefinition[] = [
   WORKSPACE_SESSION,
   SEARCH_SESSION,
   UTILITIES_SESSION,
+];
+
+/* -------------------------------------------------------------------------- */
+/* Batch 3: terminal, intelligence, validation, export, import, productivity  */
+/* -------------------------------------------------------------------------- */
+
+const TERMINAL_SESSION: WebSessionDefinition = {
+  id: "web-terminal",
+  kind: "terminal",
+  slug: "terminal",
+  name: "Integrated Terminal",
+  tagline:
+    "Multiple terminals, history, clear, copy, resize, fullscreen and keyboard shortcuts",
+  description:
+    "A professional Integrated Terminal for WebPilot. Open multiple terminal panes, scroll through their history, clear the buffer, copy the output, resize the panes, drop into fullscreen, and run every command from the keyboard. The terminal ships with a small set of built-in commands (echo, ls, pwd, cat, head, tail, wc, clear, help, exit) so the surface is fully usable even before the user extends it.",
+  intro:
+    "Open the Integrated Terminal to run a command without leaving WebPilot. The terminal is fully client-side: every command runs locally against the project files, the asset list, and the IndexedDB store, so the surface is responsive even when the user is offline. Use Ctrl/Cmd + T to spawn a new pane, Ctrl/Cmd + K to clear, and Ctrl/Cmd + Shift + F to enter fullscreen.",
+  defaultCategory: "terminal",
+  keywords: [
+    "terminal",
+    "shell",
+    "command",
+    "console",
+    "history",
+    "resize",
+    "fullscreen",
+    "WebPilot",
+  ],
+  highlights: [
+    "Multiple terminal panes with their own buffer and history",
+    "Clear the terminal, copy the output, resize the panes and drop into fullscreen",
+    "Built-in commands: echo, ls, pwd, cat, head, tail, wc, clear, help, exit",
+    "Favourite commands pinned to the top of the history",
+    "Keyboard shortcuts: Ctrl/Cmd + T, Ctrl/Cmd + K, Ctrl/Cmd + Shift + F, Up / Down for history",
+  ],
+  toolCount: 1,
+};
+
+const INTELLIGENCE_SESSION: WebSessionDefinition = {
+  id: "web-intelligence",
+  kind: "intelligence",
+  slug: "intelligence",
+  name: "Code Intelligence",
+  tagline:
+    "Bracket matching, auto-closing pairs, auto indentation, code folding, breadcrumbs, symbol outline, go to line and go to symbol",
+  description:
+    "A professional Code Intelligence surface. The user gets bracket matching for round, square, curly and angle brackets, auto-closing pairs for every common opening bracket and quote, automatic indentation that respects the current indent unit, code folding for blocks / functions / rules / comments, breadcrumb navigation that tracks the cursor, a symbol outline that lists every function, class, method, variable, rule, id and tag in the file, go-to-line and go-to-symbol jumps, and a folded-lines stack that remembers the user's view of the file.",
+  intro:
+    "Open the Code Intelligence surface to read the structure of every file in the project. The surface analyses HTML, CSS and JavaScript in one pass, surfaces every symbol in the symbol outline, and lets the user jump to a line or a symbol with one keystroke. Folding collapses blocks so the user can keep the file small, and the breadcrumbs track the cursor so the user always knows where they are.",
+  defaultCategory: "intelligence",
+  keywords: [
+    "intelligence",
+    "bracket",
+    "fold",
+    "breadcrumb",
+    "outline",
+    "symbol",
+    "go to line",
+    "WebPilot",
+  ],
+  highlights: [
+    "Bracket matching for round, square, curly and angle brackets",
+    "Auto-closing pairs for brackets and quotes",
+    "Auto indentation that respects the current indent unit",
+    "Code folding for blocks, functions, rules and comments",
+    "Breadcrumb navigation that tracks the cursor",
+    "Symbol outline with functions, classes, methods, variables, rules, ids and tags",
+    "Go to line and go to symbol jumps",
+  ],
+  toolCount: 1,
+};
+
+const VALIDATION_SESSION: WebSessionDefinition = {
+  id: "web-validation",
+  kind: "validation",
+  slug: "validation",
+  name: "Project Validation",
+  tagline:
+    "HTML / CSS / JavaScript validation, broken link detection, missing asset detection, duplicate ID detection, accessibility warnings and performance hints",
+  description:
+    "A professional Project Validation surface. The user runs a single pass that runs HTML, CSS and JavaScript validators, walks every <a href>, <img src>, <link href> and <script src> to flag broken links and missing assets, scans every id attribute for duplicates, surfaces accessibility warnings (missing alt, missing label, missing lang, no <main>), and reports performance hints (large inline scripts, blocking scripts, missing <meta viewport>, missing <title>). The result is a categorised issue list with severity, line number and a suggested fix.",
+  intro:
+    "Open the Project Validation surface to catch every issue before you ship. Pick which checks to enable, run the pass, and the surface produces a flat issue list with severity, category, file path, line number and a one-line suggestion. Filter by category, severity or search term, click an issue to open the file in the multi-file workspace, and re-run the pass after every fix.",
+  defaultCategory: "validation",
+  keywords: [
+    "validation",
+    "lint",
+    "broken link",
+    "missing asset",
+    "duplicate id",
+    "accessibility",
+    "performance",
+    "WebPilot",
+  ],
+  highlights: [
+    "HTML, CSS and JavaScript validators run in one pass",
+    "Broken link detection across href, src and url() references",
+    "Missing asset detection for images, fonts and scripts",
+    "Duplicate ID detection across every HTML file",
+    "Accessibility warnings (missing alt, missing label, missing lang, no main)",
+    "Performance hints (large inline scripts, missing viewport, missing title)",
+    "Issue list with severity, category, line number and a suggested fix",
+  ],
+  toolCount: 1,
+};
+
+const EXPORT_SESSION: WebSessionDefinition = {
+  id: "web-export",
+  kind: "export",
+  slug: "export",
+  name: "Project Export",
+  tagline:
+    "Export the complete project as a ZIP, with clean folder structure, assets, folders and metadata preserved",
+  description:
+    "A professional Project Export surface. The user picks an archive name, chooses what to include (files, folders, assets, metadata), and the surface builds a clean ZIP that mirrors the project tree: every file lands at its logical path, every folder is recreated, every asset ships as a data URL, and the metadata (project name, created at, updated at, version) is captured in a project.json manifest. The ZIP is downloaded through the browser's native download pipeline so the user can move it to a server, a colleague, or a CI job.",
+  intro:
+    "Open the Project Export surface to ship the project. The surface walks the project tree, builds a deterministic archive, and reports the archive size and the time of the last build. Reuse the same surface every time the project changes — the export is reproducible, so a CI job that runs it twice will produce the same archive.",
+  defaultCategory: "export",
+  keywords: [
+    "export",
+    "zip",
+    "archive",
+    "download",
+    "manifest",
+    "WebPilot",
+  ],
+  highlights: [
+    "Export the complete project as a single ZIP archive",
+    "Clean folder structure that mirrors the project tree",
+    "Assets preserved as data URLs in the archive",
+    "Folders recreated at the right depth",
+    "Project metadata captured in a project.json manifest",
+    "Reproducible builds so the same project always produces the same archive",
+  ],
+  toolCount: 1,
+};
+
+const IMPORT_SESSION: WebSessionDefinition = {
+  id: "web-import",
+  kind: "import",
+  slug: "import",
+  name: "Project Import",
+  tagline:
+    "Import a ZIP, restore folders, assets and metadata, with conflict handling and validation before import",
+  description:
+    "A professional Project Import surface. The user picks a ZIP archive the Project Export surface produced, the surface reads the manifest, validates the file list, then merges the project back into the workspace. Conflicts (a file with the same path already exists, an asset with the same id, a folder with the same path) are surfaced one by one and resolved with skip, replace, rename or merge. Validation before import is the default — the surface rejects malformed archives, files at illegal paths, and unknown MIME types.",
+  intro:
+    "Open the Project Import surface to bring a project back into WebPilot. The surface walks the ZIP, surfaces every conflict, and lets the user decide what to do. The default resolution is skip (so an import never silently overwrites a file); the user can change it to replace or rename before the pass starts.",
+  defaultCategory: "import",
+  keywords: [
+    "import",
+    "zip",
+    "restore",
+    "merge",
+    "conflict",
+    "validation",
+    "WebPilot",
+  ],
+  highlights: [
+    "Import a ZIP archive the Project Export surface produced",
+    "Restore folders, files, assets and metadata in a single pass",
+    "Conflict resolution per file: skip, replace, rename or merge",
+    "Default resolution: skip (an import never silently overwrites a file)",
+    "Validation before import rejects malformed archives and illegal paths",
+    "Audit trail: every conflict and its resolution is recorded on the body",
+  ],
+  toolCount: 1,
+};
+
+const PRODUCTIVITY_SESSION: WebSessionDefinition = {
+  id: "web-productivity",
+  kind: "productivity",
+  slug: "productivity",
+  name: "Workspace Productivity",
+  tagline:
+    "Command Palette, keyboard shortcut reference, recent projects, quick actions, workspace settings and autosave controls",
+  description:
+    "A professional Workspace Productivity surface. The user opens the Command Palette (Ctrl/Cmd + Shift + P) to fuzzy-search every command the workspace exposes, browses the recent projects list, runs quick actions (open the project, open the assets, run validation, open the export, open the import), and tunes the workspace settings: autosave on / off, autosave interval, word wrap, theme, minimap, indent width, find shortcut. The surface is the single place every other tool reads its defaults from.",
+  intro:
+    "Open the Workspace Productivity surface to tune WebPilot. The Command Palette is the fastest way to reach any tool; the recent projects list jumps straight back into the work in progress; the quick actions row covers the common flows; the settings panel persists through the autosave loop so the workspace looks the same on the next visit. The keyboard shortcut reference lists every shortcut the workspace exposes.",
+  defaultCategory: "productivity",
+  keywords: [
+    "productivity",
+    "command palette",
+    "shortcut",
+    "recent",
+    "settings",
+    "autosave",
+    "WebPilot",
+  ],
+  highlights: [
+    "Command Palette with fuzzy search (Ctrl/Cmd + Shift + P)",
+    "Keyboard shortcut reference for every workspace action",
+    "Recent projects list with one-click reopen",
+    "Quick actions row: open the project, open the assets, run validation, export, import",
+    "Workspace settings: autosave, interval, word wrap, theme, minimap, indent, find shortcut",
+    "Settings persist through the autosave loop",
+  ],
+  toolCount: 1,
+};
+
+export const BATCH3_SESSIONS: WebSessionDefinition[] = [
+  TERMINAL_SESSION,
+  INTELLIGENCE_SESSION,
+  VALIDATION_SESSION,
+  EXPORT_SESSION,
+  IMPORT_SESSION,
+  PRODUCTIVITY_SESSION,
 ];
 
 export const sessions: WebSessionDefinition[] = [
@@ -439,6 +671,7 @@ export const sessions: WebSessionDefinition[] = [
     toolCount: 1,
   },
   ...BATCH2_SESSIONS,
+  ...BATCH3_SESSIONS,
 ]
 
 export function getSession(

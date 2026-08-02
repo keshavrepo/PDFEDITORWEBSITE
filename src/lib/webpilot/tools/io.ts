@@ -93,3 +93,13 @@ export function readImageDimensions(
     image.src = dataUrl;
   });
 }
+
+/** Format a byte count as a human-readable string. */
+export function formatBytes(bytes: number): string {
+  const value = Math.max(0, Math.floor(bytes));
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  if (value < 1024 * 1024 * 1024)
+    return `${(value / (1024 * 1024)).toFixed(2)} MB`;
+  return `${(value / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}

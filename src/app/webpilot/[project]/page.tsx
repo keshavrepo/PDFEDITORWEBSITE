@@ -14,6 +14,12 @@ import { AssetsSurface } from "@/components/webpilot/surfaces/assets";
 import { WorkspaceSurface } from "@/components/webpilot/surfaces/workspace";
 import { SearchSurface } from "@/components/webpilot/surfaces/search";
 import { UtilitiesSurface } from "@/components/webpilot/surfaces/utilities";
+import { TerminalSurface } from "@/components/webpilot/surfaces/terminal";
+import { IntelligenceSurface } from "@/components/webpilot/surfaces/intelligence";
+import { ValidationSurface } from "@/components/webpilot/surfaces/validation";
+import { ExportSurface } from "@/components/webpilot/surfaces/export";
+import { ImportSurface } from "@/components/webpilot/surfaces/import";
+import { ProductivitySurface } from "@/components/webpilot/surfaces/productivity";
 import { WorkspaceDashboard } from "@/components/webpilot/surfaces/workspace-dashboard";
 import {
   focusedSessions,
@@ -86,6 +92,18 @@ function pickSurface(session: WebSessionDefinition): SurfaceComponent {
       return SearchSurface as unknown as SurfaceComponent;
     case "utilities":
       return UtilitiesSurface as unknown as SurfaceComponent;
+    case "terminal":
+      return TerminalSurface as unknown as SurfaceComponent;
+    case "intelligence":
+      return IntelligenceSurface as unknown as SurfaceComponent;
+    case "validation":
+      return ValidationSurface as unknown as SurfaceComponent;
+    case "export":
+      return ExportSurface as unknown as SurfaceComponent;
+    case "import":
+      return ImportSurface as unknown as SurfaceComponent;
+    case "productivity":
+      return ProductivitySurface as unknown as SurfaceComponent;
     case "blank":
     default:
       return WorkspaceDashboard as unknown as SurfaceComponent;

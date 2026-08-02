@@ -19,15 +19,24 @@ import { sessionCategoryOrder } from "./sessions";
 import {
   DEFAULT_ASSETS_BODY,
   DEFAULT_CSS_BODY,
+  DEFAULT_EXPORT_BODY,
   DEFAULT_HISTORY_BODY,
   DEFAULT_HTML_BODY,
+  DEFAULT_IMPORT_BODY,
+  DEFAULT_INTELLIGENCE_BODY,
   DEFAULT_JS_BODY,
   DEFAULT_PREVIEW_BODY,
+  DEFAULT_PRODUCTIVITY_BODY,
   DEFAULT_PROJECTS_BODY,
   DEFAULT_SEARCH_BODY,
+  DEFAULT_TERMINAL_BODY,
   DEFAULT_UTILITIES_BODY,
+  DEFAULT_VALIDATION_BODY,
   DEFAULT_WORKSPACE_BODY,
+  cloneIntelligenceBody,
+  cloneProductivityBody,
   cloneProjectsBody,
+  cloneTerminalBody,
 } from "./bodies";
 import type {
   WebSessionCategory,
@@ -63,6 +72,18 @@ export function createBlankBody(kind: WebSessionKind): unknown {
       return { ...DEFAULT_SEARCH_BODY };
     case "utilities":
       return { ...DEFAULT_UTILITIES_BODY };
+    case "terminal":
+      return cloneTerminalBody(DEFAULT_TERMINAL_BODY);
+    case "intelligence":
+      return cloneIntelligenceBody(DEFAULT_INTELLIGENCE_BODY);
+    case "validation":
+      return { ...DEFAULT_VALIDATION_BODY };
+    case "export":
+      return { ...DEFAULT_EXPORT_BODY };
+    case "import":
+      return { ...DEFAULT_IMPORT_BODY };
+    case "productivity":
+      return cloneProductivityBody(DEFAULT_PRODUCTIVITY_BODY);
     case "blank":
     case "custom":
     default:

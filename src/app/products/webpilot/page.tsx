@@ -14,22 +14,30 @@ const product = getProduct("webpilot");
 const url = `${getAppUrl()}/products/webpilot`;
 const description =
   product?.description ??
-  "WebPilot is LaunchStack's web workspace. Batch 1 ships a reusable web workspace with a syntax-highlighted HTML editor, a CSS editor with auto-complete and color preview, a JavaScript editor with console preview, and a live preview that combines all three into a working browser surface. Batch 2 adds Project Explorer, Asset Manager, Multi-file Workspace, Professional Search and Developer Utilities. The same LaunchStack platform hosts PDFPilot, ImagePilot, OfficePilot, DevPilot, SocialPilot and FinancePilot.";
+  "WebPilot is LaunchStack's web workspace. Batch 1 ships a reusable web workspace with a syntax-highlighted HTML editor, a CSS editor with auto-complete and color preview, a JavaScript editor with console preview, and a live preview that combines all three into a working browser surface. Batch 2 adds Project Explorer, Asset Manager, Multi-file Workspace, Professional Search and Developer Utilities. Batch 3 adds Integrated Terminal, Code Intelligence, Project Validation, Project Export, Project Import and Workspace Productivity. The same LaunchStack platform hosts PDFPilot, ImagePilot, OfficePilot, DevPilot, SocialPilot and FinancePilot.";
 
 /** The features the product page advertises. */
 const FEATURE_HIGHLIGHTS = [
-  "Project Explorer — folder tree with nested folders, create / rename / delete / duplicate, drag and drop, search, recent files and pinned favourites",
-  "Asset Manager — upload images, SVG, fonts, videos and icons, organise folders, inline preview, rename, delete and copy URL",
-  "Multi-file Workspace — open every project file as a tab, unsaved indicator, autosave, restore session, close and reopen tabs, split editor and quick switch",
-  "Professional Search — find in current file or across the project, replace, replace all, regex, match case and whole word toggles",
-  "Developer Utilities — color picker, gradient generator, box shadow generator, border radius generator, CSS unit converter, HTML entity, base64 and URL codecs",
-  "Reusable web-workspace shell with a left navigation rail, workspace header, tool switcher, status bar, recent sessions, favourites, autosave and keyboard shortcuts — the same shell OfficePilot, SocialPilot, FinancePilot and DevPilot ship",
+  "Integrated Terminal — multiple terminal panes, command history, clear, copy, font-size controls, fullscreen, and a sandboxed built-in command set with keyboard shortcuts (Ctrl/Cmd + T, K, Shift + F)",
+  "Code Intelligence — bracket matching, auto-closing pairs, auto-indent, code folding, breadcrumbs, symbol outline, go to line, go to symbol",
+  "Project Validation — HTML / CSS / JavaScript validators in one pass, broken link detection, missing asset detection, duplicate ID detection, accessibility warnings, performance hints",
+  "Project Export — deterministic ZIP archive with clean folder structure, every asset preserved as a data URL, and a project.json manifest",
+  "Project Import — restore a ZIP back into the workspace with per-file conflict resolution (skip, replace, rename, merge) and validation before import",
+  "Workspace Productivity — Command Palette with fuzzy search, keyboard shortcut reference, recent projects, quick actions, autosave controls, workspace settings",
+  "Project Explorer, Asset Manager, Multi-file Workspace, Professional Search and Developer Utilities from Batch 2, all still shipping",
   "HTML, CSS, JavaScript editors and Live Preview from Batch 1, all still shipping in the same workspace",
+  "Reusable web-workspace shell with a left navigation rail, workspace header, tool switcher, status bar, recent sessions, favourites, autosave and keyboard shortcuts — the same shell OfficePilot, SocialPilot, FinancePilot and DevPilot ship",
   "IndexedDB-backed autosave loop and server-side recent-sessions mirror, the same architecture proven by OfficePilot, SocialPilot, FinancePilot and DevPilot",
 ];
 
-/** What ships across Batches 1 and 2. */
+/** What ships across Batches 1, 2 and 3. */
 const LAUNCHED_CHECKLIST = [
+  "Batch 3 — Integrated Terminal with multiple panes, history, clear, copy, resize, fullscreen and keyboard shortcuts",
+  "Batch 3 — Code Intelligence with bracket matching, auto-closing pairs, auto-indent, code folding, breadcrumbs, symbol outline, go to line and go to symbol",
+  "Batch 3 — Project Validation with HTML / CSS / JavaScript validators, broken link detection, missing asset detection, duplicate ID detection, accessibility warnings and performance hints",
+  "Batch 3 — Project Export as a deterministic ZIP with clean folder structure, every asset preserved and a project.json manifest",
+  "Batch 3 — Project Import with per-file conflict resolution (skip, replace, rename, merge) and validation before import",
+  "Batch 3 — Workspace Productivity with Command Palette, keyboard shortcut reference, recent projects, quick actions, autosave controls and workspace settings",
   "Batch 2 — Project Explorer with folder tree, nested folders, create file / folder, rename, delete, duplicate, drag and drop, search, recent files and favourites",
   "Batch 2 — Asset Manager with upload (images, SVG, fonts, videos, icons), folder organisation, inline preview, rename, delete and copy URL",
   "Batch 2 — Multi-file Workspace with tabs, unsaved indicator, autosave, restore session, close and reopen tabs, split editor and quick switch (Ctrl/Cmd + Tab)",
@@ -47,8 +55,8 @@ const LAUNCHED_CHECKLIST = [
 
 /** What the future batches will add. */
 const ROADMAP = [
-  "Batch 3 — SEO inspector: meta-tag audits, open-graph previews, structured-data validation and lighthouse-style accessibility hints",
-  "Batch 3 — Asset generator: favicon, manifest, OG image, robots.txt and sitemap.xml from a single form",
+  "Batch 4 — SEO inspector: meta-tag audits, open-graph previews, structured-data validation and lighthouse-style accessibility hints",
+  "Batch 4 — Asset generator: favicon, manifest, OG image, robots.txt and sitemap.xml from a single form",
   "Batch 4 — Site linter and accessibility checker built on top of the same HTML editor and the live preview",
   "Batch 4 — Snippet library for HTML, CSS and JavaScript components, reuses the DevPilot snippet model",
 ];
@@ -80,7 +88,7 @@ export default async function WebPilotProductPage() {
           <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-20">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs">
               <Sparkles className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
-              Batch 2 · Project workspace
+              Batch 3 · Browser IDE
             </div>
             <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
               {product?.name ?? "WebPilot"}
@@ -113,7 +121,7 @@ export default async function WebPilotProductPage() {
 
         <section className="border-b border-border/40">
           <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
-            <h2 className="mb-6 text-lg font-semibold">What ships across Batches 1 and 2</h2>
+            <h2 className="mb-6 text-lg font-semibold">What ships across Batches 1, 2 and 3</h2>
             <Card className="p-6">
               <ul className="space-y-2 text-sm">
                 {LAUNCHED_CHECKLIST.map((item) => (
@@ -166,7 +174,7 @@ export default async function WebPilotProductPage() {
 
         <section className="border-b border-border/40 bg-card/40">
           <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
-            <h2 className="mb-6 text-lg font-semibold">Sessions included in Batches 1 and 2</h2>
+            <h2 className="mb-6 text-lg font-semibold">Sessions included in Batches 1, 2 and 3</h2>
             <ul className="grid gap-3 sm:grid-cols-2">
               {sessions.map((entry) => (
                 <li key={entry.kind}>

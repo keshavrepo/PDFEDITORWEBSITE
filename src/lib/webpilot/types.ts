@@ -30,6 +30,12 @@ export type WebSessionCategory =
   | "workspace"
   | "search"
   | "utilities"
+  | "terminal"
+  | "intelligence"
+  | "validation"
+  | "export"
+  | "import"
+  | "productivity"
   | "custom";
 
 /** Persistent metadata stored alongside the session body. */
@@ -474,6 +480,377 @@ export interface WebUtilitiesBody {
   /** URL Encode/Decode state. */
   urlMode: "encode" | "decode";
   urlInput: string;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batch 3: terminal + intelligence + validation + export + import +          */
+/* productivity bodies                                                       */
+/* -------------------------------------------------------------------------- */
+
+/** A single line in a terminal buffer. */
+export interface WebTerminalLine {
+  /** Stable id. */
+  id: string;
+  /** The kind of line — input (the user typed it) or output (the
+   * shell wrote it back). */
+  kind: "input" | "output" | "info" | "error";
+  /** The line text. */
+  text: string;
+  /** When the line was written. */
+  createdAt: string;
+}
+
+/** A single terminal pane inside the Integrated Terminal. */
+export interface WebTerminalPane {
+  /** Stable id, used as the rail key and the tab id. */
+  id: string;
+  /** Display name shown in the tab bar. */
+  name: string;
+  /** Buffer of lines, oldest first. Capped at 500. */
+  lines: WebTerminalLine[];
+  /** Current input the user is editing. */
+  input: string;
+  /** History of previously entered commands, newest first. Capped at 100. */
+  history: string[];
+  /** Current history cursor; -1 means the user is typing a fresh line. */
+  historyIndex: number;
+  /** Working directory shown in the prompt. */
+  cwd: string;
+}
+
+/** A command that the Integrated Terminal can run. The list is
+ * intentionally small and dependency-free; the user can extend it
+ * with custom commands from the Workspace Productivity surface. */
+export interface WebTerminalCommand {
+  /** Stable id. */
+  id: string;
+  /** Command name (e.g. "echo", "ls", "pwd", "help", "clear"). */
+  name: string;
+  /** The full source line the user typed. */
+  source: string;
+  /** When the command was last run. */
+  runAt: string;
+  /** Favourite flag — pinned to the history. */
+  isFavorite: boolean;
+}
+
+/** The Integrated Terminal body. */
+export interface WebTerminalBody {
+  /** Active pane id. */
+  activePaneId: string;
+  /** All panes. */
+  panes: WebTerminalPane[];
+  /** True when the terminal is in fullscreen mode. */
+  fullscreen: boolean;
+  /** Logged commands, newest first. Capped at 100. */
+  commands: WebTerminalCommand[];
+  /** Current font size in pixels. */
+  fontSize: number;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** Severity of a code-intelligence issue. */
+export type WebIntelligenceSeverity = "info" | "warning" | "error";
+
+/** A single symbol in a file (function, class, variable, etc.). */
+export interface WebIntelligenceSymbol {
+  /** Stable id. */
+  id: string;
+  /** Display name. */
+  name: string;
+  /** Symbol kind. */
+  kind: "function" | "class" | "variable" | "method" | "selector" | "rule" | "id" | "tag" | "attribute";
+  /** The file path. */
+  path: string;
+  /** 1-based line number. */
+  line: number;
+  /** 1-based column. */
+  column: number;
+  /** End line (1-based). */
+  endLine: number;
+  /** End column (1-based). */
+  endColumn: number;
+  /** Optional preview of the matching line. */
+  preview?: string;
+}
+
+/** A bracket pair (round, square, curly, angle). */
+export interface WebIntelligenceBracket {
+  /** File path. */
+  path: string;
+  /** 1-based line of the open. */
+  openLine: number;
+  /** 1-based column of the open. */
+  openColumn: number;
+  /** 1-based line of the close. */
+  closeLine: number;
+  /** 1-based column of the close. */
+  closeColumn: number;
+  /** Bracket character: "(", ")", "[", "]", "{", "}", "<", ">". */
+  openChar: string;
+  closeChar: string;
+}
+
+/** A single folding range. */
+export interface WebIntelligenceFold {
+  /** File path. */
+  path: string;
+  /** 1-based start line of the range (the header line). */
+  startLine: number;
+  /** 1-based end line of the range. */
+  endLine: number;
+  /** What kind of block this fold represents. */
+  kind: "block" | "function" | "rule" | "comment";
+}
+
+/** A breadcrumb in the path bar. */
+export interface WebIntelligenceBreadcrumb {
+  /** File path. */
+  path: string;
+  /** 1-based line. */
+  line: number;
+  /** Optional column (1-based). */
+  column?: number;
+  /** Optional symbol name at this position. */
+  label?: string;
+}
+
+/** The Code Intelligence body. */
+export interface WebIntelligenceBody {
+  /** File currently in focus. */
+  activePath: string;
+  /** Symbol outline for the active file. */
+  symbols: WebIntelligenceSymbol[];
+  /** Bracket pairs for the active file. */
+  brackets: WebIntelligenceBracket[];
+  /** Folding ranges for the active file. */
+  folds: WebIntelligenceFold[];
+  /** Breadcrumbs derived from the cursor position. */
+  breadcrumbs: WebIntelligenceBreadcrumb[];
+  /** The cursor position (line, column) for breadcrumb derivation. */
+  cursor: { line: number; column: number };
+  /** "Go to line" input, persisted between sessions. */
+  goToLine: string;
+  /** "Go to symbol" input, persisted between sessions. */
+  goToSymbol: string;
+  /** Set of line numbers that are currently folded. */
+  foldedLines: number[];
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** Severity for a project validation issue. */
+export type WebValidationSeverity = "info" | "warning" | "error";
+
+/** A category of validation issue. */
+export type WebValidationCategory =
+  | "html"
+  | "css"
+  | "javascript"
+  | "link"
+  | "asset"
+  | "duplicate-id"
+  | "accessibility"
+  | "performance";
+
+/** A single validation issue. */
+export interface WebValidationIssue {
+  /** Stable id. */
+  id: string;
+  /** Severity. */
+  severity: WebValidationSeverity;
+  /** Category. */
+  category: WebValidationCategory;
+  /** File path the issue is in. */
+  path: string;
+  /** 1-based line number, if known. */
+  line: number;
+  /** Short message describing the issue. */
+  message: string;
+  /** Optional suggested fix. */
+  suggestion?: string;
+}
+
+/** A summary of the validation pass. */
+export interface WebValidationSummary {
+  /** Total errors. */
+  errors: number;
+  /** Total warnings. */
+  warnings: number;
+  /** Total info-level issues. */
+  info: number;
+  /** Total number of files inspected. */
+  files: number;
+  /** When the validation last ran. */
+  ranAt: string;
+}
+
+/** The Project Validation body. */
+export interface WebValidationBody {
+  /** Most recent issues, newest first. Capped at 500. */
+  issues: WebValidationIssue[];
+  /** Summary of the most recent run. */
+  summary: WebValidationSummary;
+  /** Selected category filter — empty string means "all". */
+  categoryFilter: string;
+  /** Selected severity filter — empty string means "all". */
+  severityFilter: string;
+  /** Search term. */
+  search: string;
+  /** Whether the next run should include the html check. */
+  enabledHtml: boolean;
+  enabledCss: boolean;
+  enabledJavascript: boolean;
+  enabledLink: boolean;
+  enabledAsset: boolean;
+  enabledDuplicateId: boolean;
+  enabledAccessibility: boolean;
+  enabledPerformance: boolean;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** A single entry in the Project Export body — one per file or
+ * folder in the project tree. */
+export interface WebExportEntry {
+  /** Logical path. */
+  path: string;
+  /** "file" or "folder". */
+  kind: "file" | "folder";
+  /** Bytes for files; undefined for folders. */
+  size?: number;
+  /** MIME type for files; undefined for folders. */
+  mime?: string;
+}
+
+/** A snapshot of the assets that ship with the project. */
+export interface WebExportAsset {
+  id: string;
+  name: string;
+  folder: string;
+  kind: WebAsset["kind"];
+  size: number;
+  dataUrl: string;
+}
+
+/** The Project Export body. */
+export interface WebExportBody {
+  /** File name used for the downloaded zip (without extension). */
+  archiveName: string;
+  /** Whether folders should be included in the archive. */
+  includeFolders: boolean;
+  /** Whether assets should be included in the archive. */
+  includeAssets: boolean;
+  /** Whether metadata should be included in the archive. */
+  includeMetadata: boolean;
+  /** Whether the JSON manifest should be pretty-printed. */
+  prettyPrint: boolean;
+  /** Last archive size in bytes, 0 if no archive has been built. */
+  lastSize: number;
+  /** When the last archive was built. */
+  lastBuiltAt: string;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** A single conflict encountered during a Project Import. */
+export interface WebImportConflict {
+  /** Logical path that conflicted. */
+  path: string;
+  /** "file", "folder", or "asset". */
+  kind: "file" | "folder" | "asset";
+  /** The resolution strategy the user picked. */
+  resolution: "skip" | "replace" | "rename" | "merge";
+  /** When the conflict was resolved. */
+  resolvedAt: string;
+}
+
+/** The Project Import body. */
+export interface WebImportBody {
+  /** Last archive name (without extension) the user imported. */
+  lastArchiveName: string;
+  /** When the last import ran. */
+  lastImportAt: string;
+  /** Total files imported in the last run. */
+  lastFileCount: number;
+  /** Total assets imported in the last run. */
+  lastAssetCount: number;
+  /** Total conflicts encountered in the last run. */
+  lastConflictCount: number;
+  /** Conflicts from the last run, for the conflict-resolution UI. */
+  conflicts: WebImportConflict[];
+  /** When the next run should default to "skip" / "replace" / "rename". */
+  defaultResolution: "skip" | "replace" | "rename";
+  /** Whether the next run should validate before import. */
+  validateBeforeImport: boolean;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** A single entry in the Command Palette. */
+export interface WebCommandPaletteItem {
+  id: string;
+  /** The command label shown in the palette. */
+  label: string;
+  /** Optional category for grouping. */
+  category: string;
+  /** Optional keyboard shortcut shown next to the label. */
+  shortcut?: string;
+  /** Free-form keywords for fuzzy matching. */
+  keywords: string[];
+  /** When the command was last invoked. */
+  lastInvokedAt?: string;
+}
+
+/** A recent project the user has opened. Mirrors the global
+ * recent-sessions list but is a per-product cache so the
+ * productivity surface stays open even when the global store
+ * changes. */
+export interface WebProductivityRecent {
+  id: string;
+  title: string;
+  kind: string;
+  openedAt: string;
+}
+
+/** A quick action the productivity surface exposes. */
+export interface WebProductivityQuickAction {
+  id: string;
+  label: string;
+  description: string;
+  /** The rail slug the action opens, or a built-in action. */
+  target: string;
+  /** Optional keyboard shortcut. */
+  shortcut?: string;
+}
+
+/** The Workspace Productivity body. */
+export interface WebProductivityBody {
+  /** Whether the Command Palette is currently open. */
+  paletteOpen: boolean;
+  /** The current palette query. */
+  paletteQuery: string;
+  /** Recent projects (cap 12). */
+  recent: WebProductivityRecent[];
+  /** Quick actions (cap 12). */
+  quickActions: WebProductivityQuickAction[];
+  /** Whether autosave is enabled. */
+  autosaveEnabled: boolean;
+  /** Autosave interval in milliseconds. */
+  autosaveIntervalMs: number;
+  /** Whether word wrap is enabled by default in the editors. */
+  wordWrap: boolean;
+  /** Whether the user prefers a dark / light theme. */
+  theme: "system" | "light" | "dark";
+  /** Whether the minimap is shown. */
+  minimap: boolean;
+  /** The user's preferred indent width (spaces). */
+  indent: number;
+  /** Whether the in-editor find bar opens on Ctrl/Cmd + F. */
+  findShortcut: boolean;
   /** Favourite flag. */
   isFavorite: boolean;
 }
