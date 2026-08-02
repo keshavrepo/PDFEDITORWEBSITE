@@ -219,15 +219,37 @@ export const products: Product[] = [
   {
     id: "webpilot",
     name: "WebPilot",
-    tagline: "Site and SEO tooling",
+    tagline: "A professional web workspace in your browser",
     description:
-      "Audit performance, inspect metadata and generate the assets a site needs before it ships.",
-    status: "coming-soon",
+      "A web workspace for HTML, CSS and JavaScript with a live preview. Batch 1 ships the foundation: a reusable workspace shell that hosts a syntax-highlighted HTML editor, a CSS editor with variables and a color preview, a JavaScript editor with a console preview, and a live preview that combines all three into a working browser surface. Future web tools (SEO, metadata, asset generation) will reuse the same shell, the same autosave loop and the same platform infrastructure as every other LaunchStack product.",
+    status: "active",
     category: "Web",
-    version: "0.0.0",
-    accent: "text-muted-foreground",
-    highlights: ["SEO audits", "Metadata tools", "Asset generation"],
-    releaseNotes: [],
+    version: "0.1.0",
+    href: "/webpilot",
+    accent: "text-primary",
+    highlights: [
+      "HTML editor with syntax highlighting, line numbers, find / replace, undo / redo, format / minify / beautify, word wrap, import and export",
+      "CSS editor with syntax highlighting, auto-complete for properties and values, color preview, variables, format / minify / beautify, import and export",
+      "JavaScript editor with syntax highlighting, auto-complete, format / minify / beautify, console preview, import and export",
+      "Live Preview that runs HTML, CSS and JavaScript together in a sandboxed browser surface",
+      "Reusable WebPilot workspace shell, autosave, recent mirror and dashboard integration",
+    ],
+    releaseNotes: [
+      {
+        version: "0.1.0",
+        date: "2026-08-02",
+        changes: [
+          "Added the WebPilot workspace shell: left navigation, tool switcher, workspace header, activity panel, properties panel, search, recent sessions, favourites, autosave and keyboard shortcuts — consistent with OfficePilot, SocialPilot, FinancePilot and DevPilot",
+          "Added the HTML editor: syntax highlighting, line numbers, auto-indentation, find and replace, undo and redo, format, minify and beautify, word wrap, import and export, with a Workspace Dashboard that surfaces recent and favourite sessions",
+          "Added the CSS editor: syntax highlighting, property and value auto-complete, color preview swatches, variable usage detection, format, minify and beautify, import and export",
+          "Added the JavaScript editor: syntax highlighting, identifier auto-complete, format, minify and beautify, an in-page console preview that captures console.log / console.warn / console.error output, import and export",
+          "Added the Live Preview surface: combines the HTML, CSS and JavaScript bodies into a working browser surface with auto-refresh and a console output panel",
+          "Added two new database tables: webSessions and webHistory, both keyed per user, mirroring the FinancePilot / SocialPilot / DevPilot recent-mirror pattern",
+          "Added two new API endpoints: /api/webpilot/{sessions, history}, both rate-limited and origin-checked",
+          "The default /webpilot landing opens the Workspace Dashboard; the rail and the new-session menu link to every other surface",
+        ],
+      },
+    ],
   },
   {
     id: "socialpilot",
@@ -388,5 +410,5 @@ export const platform = {
   name: "LaunchStack",
   tagline: "One platform. Every tool you need.",
   description:
-    "LaunchStack is a growing suite of focused, privacy-first productivity products. PDFPilot is available today, with more modules on the way.",
+    "LaunchStack is a growing suite of focused, privacy-first productivity products. PDFPilot, ImagePilot, OfficePilot, DevPilot, SocialPilot, FinancePilot and WebPilot are available today, with more modules on the way.",
 } as const;
