@@ -17,6 +17,7 @@ import type {
   AudioBatchMode,
   AudioConverterBody,
   AudioCoverArt,
+  AudioDownloadEntry,
   AudioEffectOp,
   AudioEffectsBody,
   AudioExportCenterBody,
@@ -59,6 +60,7 @@ export type {
   AudioBatchMode,
   AudioConverterBody,
   AudioCoverArt,
+  AudioDownloadEntry,
   AudioEffectOp,
   AudioEffectsBody,
   AudioExportCenterBody,
@@ -985,6 +987,34 @@ export function cloneBatchBody(body: AudioBatchBody): AudioBatchBody {
   };
 }
 
+function asDownloadEntry(value: unknown): AudioDownloadEntry | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== "string" ||
+    typeof record.label !== "string" ||
+    typeof record.fileName !== "string"
+  ) {
+    return null;
+  }
+  return {
+    id: record.id,
+    label: record.label,
+    fileName: record.fileName,
+    format: asAudioFormat(record.format),
+    bytes: clampNumber(record.bytes, 0, 1_000_000_000, 0),
+    exportedAt:
+      typeof record.exportedAt === "string"
+        ? record.exportedAt
+        : new Date().toISOString(),
+    sourceSessionId:
+      typeof record.sourceSessionId === "string"
+        ? record.sourceSessionId
+        : "",
+    note: typeof record.note === "string" ? record.note : "",
+  };
+}
+
 function asLibraryEntry(value: unknown): AudioLibraryEntry | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
@@ -1045,6 +1075,7 @@ export const DEFAULT_LIBRARY_BODY: AudioLibraryBody = {
   formatFilter: "",
   favoritesOnly: false,
   selectedEntryId: "",
+  downloads: [],
   isFavorite: false,
 };
 
@@ -1063,6 +1094,12 @@ export function asLibraryBody(value: unknown): AudioLibraryBody {
   ).has(sortFieldRaw as AudioLibraryBody["sortField"])
     ? (sortFieldRaw as AudioLibraryBody["sortField"])
     : "addedAt";
+  const downloads = Array.isArray(record.downloads)
+    ? (record.downloads as unknown[])
+        .map((entry) => asDownloadEntry(entry))
+        .filter((entry): entry is AudioDownloadEntry => Boolean(entry))
+        .slice(0, 100)
+    : [];
   return {
     entries,
     search: typeof record.search === "string" ? record.search : "",
@@ -1073,6 +1110,7 @@ export function asLibraryBody(value: unknown): AudioLibraryBody {
     favoritesOnly: record.favoritesOnly === true,
     selectedEntryId:
       typeof record.selectedEntryId === "string" ? record.selectedEntryId : "",
+    downloads,
     isFavorite: record.isFavorite === true,
   };
 }
@@ -1086,6 +1124,7 @@ export function cloneLibraryBody(body: AudioLibraryBody): AudioLibraryBody {
     formatFilter: body.formatFilter,
     favoritesOnly: body.favoritesOnly,
     selectedEntryId: body.selectedEntryId,
+    downloads: body.downloads.map((entry) => ({ ...entry })),
     isFavorite: body.isFavorite,
   };
 }

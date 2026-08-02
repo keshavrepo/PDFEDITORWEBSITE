@@ -665,6 +665,8 @@ export interface AudioLibraryBody {
   favoritesOnly: boolean;
   /** Currently selected entry id, for the details panel. */
   selectedEntryId: string;
+  /** Per-session download history. Newest first. Capped at 100. */
+  downloads: AudioDownloadEntry[];
   /** Favourite flag. */
   isFavorite: boolean;
 }
@@ -977,4 +979,55 @@ export interface AudioProductivityRecent {
   title: string;
   kind: string;
   openedAt: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batch 4: download history + project manager                                 */
+/* -------------------------------------------------------------------------- */
+
+/** A single row in the AudioPilot download history. The history
+ * is keyed per session, so the user can revisit every export the
+ * workspace has produced. */
+export interface AudioDownloadEntry {
+  /** Stable id. */
+  id: string;
+  /** Display label, e.g. "Landing page · mp3 · 192 kbps". */
+  label: string;
+  /** The exported file name. */
+  fileName: string;
+  /** The exported format. */
+  format: AudioFormat;
+  /** Bytes written. */
+  bytes: number;
+  /** When the export happened. */
+  exportedAt: string;
+  /** Optional source session id, for cross-session navigation. */
+  sourceSessionId: string;
+  /** Free-form note the surface can attach. */
+  note: string;
+}
+
+/** A project the Project Manager surface tracks. Projects are
+ * first-class entries the user can create, open, duplicate,
+ * rename, delete, favourite and search; they map to a
+ * `AudioSession` on the storage layer. */
+export interface AudioProject {
+  /** Stable id. */
+  id: string;
+  /** Project name. */
+  name: string;
+  /** Free-form description. */
+  description: string;
+  /** Owning session id (the workspace's session of record). */
+  sessionId: string;
+  /** ISO timestamp of creation. */
+  createdAt: string;
+  /** ISO timestamp of the last user edit. */
+  updatedAt: string;
+  /** Whether the project is favourited. */
+  isFavorite: boolean;
+  /** Tags, lowercase, free-form. */
+  tags: string[];
+  /** Optional cover art (data URL). */
+  coverArt: string;
 }

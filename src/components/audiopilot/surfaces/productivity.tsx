@@ -119,6 +119,13 @@ const DEFAULT_QUICK_ACTIONS: AudioProductivityQuickAction[] = [
     description: "Detect, jump, split, remove silence.",
     target: "silence",
   },
+  {
+    id: "qa-projects",
+    label: "Manage projects",
+    description:
+      "Create, open, duplicate, rename, delete, favourite, search and reopen recent projects.",
+    target: "library",
+  },
 ];
 
 const DEFAULT_COMMANDS: AudioProductivityCommand[] = [
@@ -217,6 +224,24 @@ const DEFAULT_COMMANDS: AudioProductivityCommand[] = [
     label: "Open Metadata Editor",
     category: "Tools",
     keywords: ["metadata", "tags", "id3", "cover art", "title"],
+    lastInvokedAt: "",
+  },
+  {
+    id: "cmd-manage-projects",
+    label: "Manage projects",
+    category: "Workspace",
+    keywords: [
+      "project",
+      "manage",
+      "create",
+      "open",
+      "duplicate",
+      "rename",
+      "delete",
+      "favourite",
+      "search",
+      "recent",
+    ],
     lastInvokedAt: "",
   },
   {

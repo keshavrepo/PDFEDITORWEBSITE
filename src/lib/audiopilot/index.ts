@@ -14,6 +14,7 @@ export * from "./sessions";
 export * from "./templates";
 export * from "./engine";
 export * from "./tools";
+export * from "./utils";
 export {
   DEFAULT_PLAYER_BODY,
   DEFAULT_TRIMMER_BODY,
@@ -24,6 +25,11 @@ export {
   DEFAULT_METADATA_EDITOR_BODY,
   DEFAULT_BATCH_BODY,
   DEFAULT_LIBRARY_BODY,
+  DEFAULT_WAVEFORM_EDITOR_BODY,
+  DEFAULT_EFFECTS_BODY,
+  DEFAULT_SILENCE_BODY,
+  DEFAULT_EXPORT_CENTER_BODY,
+  DEFAULT_PRODUCTIVITY_BODY,
   asPlayerBody,
   asTrimmerBody,
   asConverterBody,
@@ -33,6 +39,11 @@ export {
   asMetadataEditorBody,
   asBatchBody,
   asLibraryBody,
+  asWaveformEditorBody,
+  asEffectsBody,
+  asSilenceBody,
+  asExportCenterBody,
+  asProductivityBody,
   clonePlayerBody,
   cloneTrimmerBody,
   cloneConverterBody,
@@ -42,6 +53,11 @@ export {
   cloneMetadataEditorBody,
   cloneBatchBody,
   cloneLibraryBody,
+  cloneWaveformEditorBody,
+  cloneEffectsBody,
+  cloneSilenceBody,
+  cloneExportCenterBody,
+  cloneProductivityBody,
 } from "./bodies";
 export {
   STORAGE_DATABASE,
@@ -69,3 +85,6 @@ export {
   deleteSessionStorage,
   generateSessionId,
 } from "./client-storage";
+// Hooks are intentionally NOT re-exported here. They must be
+// imported from "@/lib/audiopilot/hooks/<name>" so surfaces
+// only pull in the hooks they actually use.

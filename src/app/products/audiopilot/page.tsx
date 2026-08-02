@@ -90,8 +90,15 @@ const FEATURE_HIGHLIGHTS = [
   "Reuses the LaunchStack workspace shell, IndexedDB storage, autosave loop, dashboard, search, file manager, settings and notifications — no second workspace was created",
 ];
 
-/** What ships across Batch 1 + Batch 2. */
+/** What ships across Batch 1 + Batch 2 + Batch 3 + Batch 4. */
 const LAUNCHED_CHECKLIST = [
+  "Batch 4 — Project Manager: every workspace-rail capability (create, open, duplicate, rename, delete, favourite, search, recent) surfaced in the Productivity quick actions and the Command Palette",
+  "Batch 4 — Session recovery: when the workspace shell mounts with no open tabs, a card at the top of the main area offers to restore the most recent sessions for the current tool",
+  "Batch 4 — Drag & drop upload: every surface that accepts audio now mounts a shared drop zone that highlights on hover and forwards dropped files to the same handler the file input uses",
+  "Batch 4 — Multi-file upload: the Library, Batch and Merger surfaces accept multiple files at once through a single file input",
+  "Batch 4 — File naming and collision handling: every export helper funnels through a single safeFileName helper that strips illegal characters and appends ' (n)' on collision",
+  "Batch 4 — Download history: the Library body now carries a per-session download history, rendered as a separate card on the Library surface",
+  "Batch 4 — Shared hooks and utilities: useFileDrop, useKeyboardShortcuts, safeFileName, triggerDownload, shortUid, formatBytesShort, isValidExportResult live in src/lib/audiopilot/hooks/ and src/lib/audiopilot/utils.ts",
   "Batch 3 — Waveform Editor: high-resolution waveform, zoom in / out, horizontal scroll, timeline ruler, click-and-drag selection, playback cursor, region markers",
   "Batch 3 — Audio Effects: fade in, fade out, normalize, silence generator, reverse, speed, pitch, preview before applying, per-session undo / redo",
   "Batch 3 — Silence Detection: energy-threshold silence walk, adjustable threshold and minimum duration, jump between regions, split at silence, remove silence, per-region RMS",

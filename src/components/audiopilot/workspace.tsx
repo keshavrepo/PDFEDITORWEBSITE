@@ -40,6 +40,8 @@ import {
   Star,
   Trash2,
   X,
+  XCircle,
+  History as HistoryIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -118,6 +120,11 @@ function AudioWorkspaceInner({ kind, Surface }: AudioWorkspaceProps) {
   const [renameValue, setRenameValue] = useState("");
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
+  // Session-recovery: when the user has no open tabs and a recent
+  // session for the current kind exists, offer to restore it.
+  // The flag flips to `true` once the user dismisses the prompt so
+  // it does not nag on every render.
+  const [recoveryDismissed, setRecoveryDismissed] = useState(false);
 
   const autosaveTimers = useRef<Map<string, number>>(new Map());
   const openTabsRef = useRef<AudioSession[]>([]);
@@ -680,6 +687,19 @@ function AudioWorkspaceInner({ kind, Surface }: AudioWorkspaceProps) {
         />
 
         <main className="flex min-w-0 flex-1 flex-col">
+          {!activeSession &&
+            !recoveryDismissed &&
+            !loadingRecent &&
+            filteredRecent.filter((entry) => entry.kind === kind).length > 0 && (
+              <RecoveryCard
+                recent={filteredRecent.filter((entry) => entry.kind === kind)}
+                onOpen={async (id) => {
+                  await openExisting(id);
+                  setRecoveryDismissed(true);
+                }}
+                onDismiss={() => setRecoveryDismissed(true)}
+              />
+            )}
           {activeSession ? (
             <Surface session={activeSession} onChange={updateActive} />
           ) : (
@@ -1074,6 +1094,66 @@ function NavigationRail({
         </ul>
       </div>
     </nav>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Session recovery                                                           */
+/* -------------------------------------------------------------------------- */
+
+interface RecoveryCardProps {
+  recent: AudioSessionSummary[];
+  onOpen: (id: string) => Promise<void>;
+  onDismiss: () => void;
+}
+
+function RecoveryCard({ recent, onOpen, onDismiss }: RecoveryCardProps) {
+  const top = recent.slice(0, 3);
+  if (top.length === 0) return null;
+  return (
+    <div className="m-4 flex flex-col gap-2 rounded-lg border border-primary/40 bg-primary/5 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <HistoryIcon
+            className="h-4 w-4 text-primary"
+            aria-hidden="true"
+          />
+          Restore previous session
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 w-7"
+          onClick={onDismiss}
+          aria-label="Dismiss"
+          title="Dismiss"
+        >
+          <X className="h-3.5 w-3.5" aria-hidden="true" />
+        </Button>
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        We saved a few recent sessions for this tool. Pick one to
+        restore, or hit the workspace rail to start a new one.
+      </p>
+      <ul className="grid gap-2 sm:grid-cols-3">
+        {top.map((entry) => (
+          <li key={entry.id}>
+            <button
+              type="button"
+              onClick={() => void onOpen(entry.id)}
+              className="flex w-full flex-col items-start gap-1 rounded-md border border-border bg-card px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
+            >
+              <span className="line-clamp-1 w-full font-medium">
+                {entry.title}
+              </span>
+              <span className="text-[10px] text-muted-foreground">
+                {new Date(entry.updatedAt).toLocaleString()}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

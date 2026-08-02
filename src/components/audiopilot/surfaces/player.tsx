@@ -54,6 +54,7 @@ import {
   TransportControls,
   VolumeSlider,
 } from "./shared/transport";
+import { DropZone } from "./shared/drop-zone";
 
 interface AudioPlayerSurfaceProps {
   session: AudioSession;
@@ -350,7 +351,14 @@ export function AudioPlayerSurface({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
-      <Card className="p-4">
+      <DropZone
+        onFiles={(files) => {
+          const first = files[0];
+          if (first) void handleFile(first);
+        }}
+        multiple={false}
+      >
+        <Card className="p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="flex items-center gap-2 text-base font-semibold">
@@ -515,6 +523,7 @@ export function AudioPlayerSurface({
           session body so they survive a reload.
         </p>
       </Card>
+      </DropZone>
     </div>
   );
 }
