@@ -609,7 +609,7 @@ function AudioWorkspaceInner({ kind, Surface }: AudioWorkspaceProps) {
                     type="button"
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => closeTab(p.meta.id)}
-                    className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover:opacity-100"
+                    className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
                     aria-label={`Close ${p.meta.title}`}
                     data-tab-control="close"
                   >
@@ -824,7 +824,7 @@ function NavigationRail({
                 <button
                   type="button"
                   onClick={() => void onTemplate(template)}
-                  className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent"
+                  className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
                 >
                   <FileText
                     className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground"
@@ -904,7 +904,7 @@ function NavigationRail({
                     <button
                       type="button"
                       onClick={() => void onOpen(entry.id)}
-                      className="flex flex-1 items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent"
+                      className="flex flex-1 items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
                     >
                       <FileText
                         className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground"
@@ -930,7 +930,7 @@ function NavigationRail({
                         type="button"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => void onToggleFavorite(entry.id)}
-                        className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
                         aria-label={entry.isFavorite ? "Unfavourite" : "Favourite"}
                         data-rail-control="favorite"
                       >
@@ -946,7 +946,7 @@ function NavigationRail({
                         type="button"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => void onRename(entry.id, entry.title)}
-                        className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
                         aria-label={`Rename ${entry.title}`}
                         data-rail-control="rename"
                       >
@@ -956,7 +956,7 @@ function NavigationRail({
                         type="button"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => void onDelete(entry.id)}
-                        className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
                         aria-label={`Delete ${entry.title}`}
                         data-rail-control="delete"
                       >
@@ -982,7 +982,7 @@ function NavigationRail({
                 <button
                   type="button"
                   onClick={() => void onOpen(entry.id)}
-                  className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent"
+                  className="flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
                 >
                   <Star
                     className="mt-0.5 h-3.5 w-3.5 shrink-0 fill-primary text-primary"
@@ -1018,7 +1018,7 @@ function NavigationRail({
                   <Link
                     href={sessionHref(other)}
                     className={cn(
-                      "flex items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent",
+                      "flex items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                       isActive && "bg-accent"
                     )}
                     aria-current={isActive ? "page" : undefined}
@@ -1111,7 +1111,7 @@ function RecoveryCard({ recent, onOpen, onDismiss }: RecoveryCardProps) {
   const top = recent.slice(0, 3);
   if (top.length === 0) return null;
   return (
-    <div className="m-4 flex flex-col gap-2 rounded-lg border border-primary/40 bg-primary/5 p-4">
+    <div className="m-4 flex flex-col gap-2 rounded-lg border border-primary/40 bg-primary/5 p-4 animate-surface-in">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm font-semibold">
           <HistoryIcon
@@ -1141,7 +1141,7 @@ function RecoveryCard({ recent, onOpen, onDismiss }: RecoveryCardProps) {
             <button
               type="button"
               onClick={() => void onOpen(entry.id)}
-              className="flex w-full flex-col items-start gap-1 rounded-md border border-border bg-card px-3 py-2 text-left text-xs transition-colors hover:bg-accent"
+              className="flex w-full flex-col items-start gap-1 rounded-md border border-border bg-card px-3 py-2 text-left text-xs transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
             >
               <span className="line-clamp-1 w-full font-medium">
                 {entry.title}
@@ -1182,7 +1182,7 @@ function EmptyState({
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">
       <div className="w-full max-w-3xl space-y-8">
-        <Card className="p-8 text-center">
+        <Card className="p-8 text-center animate-surface-in">
           <FileText
             className="mx-auto mb-4 h-10 w-10 text-muted-foreground"
             aria-hidden="true"
@@ -1294,7 +1294,7 @@ function ShortcutsDialog({
   ];
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-overlay-in"
       role="dialog"
       aria-modal="true"
       aria-label="Keyboard shortcuts"
@@ -1302,14 +1302,14 @@ function ShortcutsDialog({
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl animate-modal-in">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold">Keyboard shortcuts</h2>
           <button
             ref={closeButtonRef}
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
             aria-label="Close"
           >
             <X className="h-4 w-4" aria-hidden="true" />

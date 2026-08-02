@@ -35,6 +35,9 @@ export interface ToastOptions {
 interface ToastEntry extends Required<Pick<ToastOptions, "tone" | "duration">> {
   id: string;
   message: string;
+  /** When true the toast is playing its exit animation before being
+   * removed from the queue. */
+  leaving?: boolean;
 }
 
 interface ToastContextValue {
@@ -46,6 +49,26 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastEntry[]>([]);
   const timers = useRef<Map<string, number>>(new Map());
+
+  /** Toast dismissal plays a short exit animation before the entry is
+   * removed from the queue. The exit matches the 150ms
+   * `animate-toast-out` token defined in `globals.css` so the
+   * surface feels one motion system. */
+  const dismiss = useCallback((id: string) => {
+    setToasts((current) =>
+      current.map((entry) =>
+        entry.id === id ? { ...entry, leaving: true } : entry
+      )
+    );
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((entry) => entry.id !== id));
+      const handle = timers.current.get(id);
+      if (handle !== undefined) {
+        window.clearTimeout(handle);
+        timers.current.delete(id);
+      }
+    }, 160);
+  }, []);
 
   const remove = useCallback((id: string) => {
     setToasts((current) => current.filter((entry) => entry.id !== id));
@@ -66,10 +89,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         duration: options.duration ?? 3200,
       };
       setToasts((current) => [...current, entry]);
-      const handle = window.setTimeout(() => remove(id), entry.duration);
+      // Use the dismiss path so the exit animation plays; the
+      // dismiss helper itself clears the auto-dismiss timer.
+      const handle = window.setTimeout(() => dismiss(id), entry.duration);
       timers.current.set(id, handle);
     },
-    [remove]
+    [dismiss]
   );
 
   useEffect(() => {
@@ -128,6 +153,8 @@ function ToastHostView({ toasts, onDismiss }: ToastHostProps) {
           role="status"
           className={cn(
             "pointer-events-auto flex w-full max-w-sm items-start gap-2 rounded-lg border bg-card px-3 py-2 text-xs shadow-lg",
+            "transition-shadow duration-200",
+            entry.leaving ? "animate-toast-out" : "animate-toast-in",
             entry.tone === "success" && "border-primary/40",
             entry.tone === "error" && "border-destructive/60",
             entry.tone === "info" && "border-border"
@@ -154,7 +181,7 @@ function ToastHostView({ toasts, onDismiss }: ToastHostProps) {
           <button
             type="button"
             onClick={() => onDismiss(entry.id)}
-            className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
             aria-label="Dismiss"
           >
             <X className="h-3 w-3" aria-hidden="true" />

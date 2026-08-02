@@ -78,6 +78,18 @@
   h1, h2, h3, h4, h5, h6 {
     font-weight: 600;
     letter-spacing: -0.025em;
+    line-height: 1.25;
+  }
+
+  h1 { letter-spacing: -0.035em; }
+  h2 { letter-spacing: -0.03em; }
+  h3 { letter-spacing: -0.02em; }
+  h4, h5, h6 { letter-spacing: -0.015em; }
+
+  /* Tighten label / caption / muted text so the body text reads cleaner
+   * than the chrome typography. */
+  .text-\[10px\], .text-\[11px\] {
+    letter-spacing: 0.01em;
   }
 }
 
@@ -121,8 +133,8 @@
 /* -------------------------------------------------------------------------- */
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -130,12 +142,23 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.2);
+  background: hsl(var(--muted-foreground) / 0.18);
   border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.3);
+  background: hsl(var(--muted-foreground) / 0.32);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+/* Firefox scrollbar styling. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.22) transparent;
 }
 
 /* Selection */
@@ -161,6 +184,137 @@
 
 .animate-fade-in {
   animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Toast animation (AudioPilot)                                               */
+/* -------------------------------------------------------------------------- */
+/*                                                                            */
+/* The AudioPilot toast appears in the bottom-centre stack; the keyframes     */
+/* below give it a subtle slide-up + fade-in on enter and a faster fade-out  */
+/* on exit, matching the dropdown timing tokens so the surface feels one     */
+/* motion system.                                                             */
+/* -------------------------------------------------------------------------- */
+
+@keyframes ui-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ui-toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(0.25rem) scale(0.98);
+  }
+}
+
+.animate-toast-in {
+  animation: ui-toast-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-toast-out {
+  animation: ui-toast-out 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Modal animation (AudioPilot shortcuts dialog, recovery overlay)            */
+/* -------------------------------------------------------------------------- */
+
+@keyframes ui-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.25rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ui-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-modal-in {
+  animation: ui-modal-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: center;
+}
+
+.animate-overlay-in {
+  animation: ui-overlay-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Recovery card / surface card subtle entrance                              */
+/* -------------------------------------------------------------------------- */
+
+@keyframes ui-surface-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.375rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-surface-in {
+  animation: ui-surface-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Subtle pulse for inline loading dots                                       */
+/* -------------------------------------------------------------------------- */
+
+@keyframes ui-dot-pulse {
+  0%, 80%, 100% { opacity: 0.25; }
+  40% { opacity: 1; }
+}
+
+.animate-dot-pulse > * {
+  animation: ui-dot-pulse 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite both;
+}
+
+.animate-dot-pulse > *:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.animate-dot-pulse > *:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Reduced motion guard                                                       */
+/* -------------------------------------------------------------------------- */
+/*                                                                            */
+/* Every animation token above respects prefers-reduced-motion. Users who    */
+/* have the OS-level reduce-motion setting flip it on see all the toast /    */
+/* modal / fade-in / pulse animations collapse to an instant state change.    */
+/* The dropdown data-state tokens below do the same so the platform chrome   */
+/* stays accessible.                                                          */
+/* -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* -------------------------------------------------------------------------- */

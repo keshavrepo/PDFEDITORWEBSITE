@@ -191,7 +191,7 @@ export function WorkspaceDashboard({ session }: WorkspaceDashboardProps) {
               <li key={entry.kind}>
                 <Link
                   href={sessionHref(entry)}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
                 >
                   <ToolIcon kind={entry.kind} />
                   <span className="flex-1 truncate">{entry.name}</span>
@@ -323,7 +323,7 @@ function RecentSessionsCard({
     <Card className="p-4">
       <h3 className="mb-3 text-sm font-semibold">Recent sessions</h3>
       {loading ? (
-        <p className="text-xs text-muted-foreground">Loading…</p>
+        <LoadingDots />
       ) : recent.length === 0 ? (
         <p className="text-xs text-muted-foreground">No recent sessions yet</p>
       ) : (
@@ -338,7 +338,7 @@ function RecentSessionsCard({
                         getSession(entry.kind) ?? getSession("blank")!
                       )
                 }
-                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
               >
                 <FileText
                   className="h-3.5 w-3.5 text-muted-foreground"
@@ -368,7 +368,7 @@ function FavouriteHistoryCard({
     <Card className="p-4">
       <h3 className="mb-3 text-sm font-semibold">Favourite history</h3>
       {loading ? (
-        <p className="text-xs text-muted-foreground">Loading…</p>
+        <LoadingDots />
       ) : entries.length === 0 ? (
         <p className="text-xs text-muted-foreground">No favourites yet</p>
       ) : (
@@ -405,7 +405,7 @@ function FavouriteToolsCard({
     <Card className="p-4">
       <h3 className="mb-3 text-sm font-semibold">Favourite tools</h3>
       {loading ? (
-        <p className="text-xs text-muted-foreground">Loading…</p>
+        <LoadingDots />
       ) : favourites.length === 0 ? (
         <p className="text-xs text-muted-foreground">
           Star a tool session to see it here. The dashboard pulls from the
@@ -419,7 +419,7 @@ function FavouriteToolsCard({
                 href={sessionHref(
                   getSession(entry.kind) ?? getSession("blank")!
                 )}
-                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
               >
                 <Star
                   className="h-3.5 w-3.5 fill-primary text-primary"
@@ -450,7 +450,7 @@ function PerKindCard({
     <Card className="p-4">
       <h3 className="mb-3 text-sm font-semibold">Workspace statistics</h3>
       {loading ? (
-        <p className="text-xs text-muted-foreground">Loading…</p>
+        <LoadingDots />
       ) : perKind.length === 0 ? (
         <p className="text-xs text-muted-foreground">
           Create your first session to see the breakdown.
@@ -476,5 +476,40 @@ function PerKindCard({
         </ul>
       )}
     </Card>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Inline loading dots                                                        */
+/* -------------------------------------------------------------------------- */
+/*                                                                            */
+/* The dashboard cards call this in place of a plain "Loading…" label so    */
+/* the user sees a Linear-style micro-loader without the chrome changing.  */
+/* Three small dots pulse in sequence using the `animate-dot-pulse` token  */
+/* defined in globals.css. The component is purely presentational; the    */
+/* loading flag is the only state the parent tracks.                        */
+/* -------------------------------------------------------------------------- */
+
+function LoadingDots() {
+  return (
+    <p
+      className="flex items-center gap-1 text-xs text-muted-foreground animate-dot-pulse"
+      role="status"
+      aria-live="polite"
+    >
+      <span
+        aria-hidden="true"
+        className="inline-block h-1 w-1 rounded-full bg-muted-foreground"
+      />
+      <span
+        aria-hidden="true"
+        className="inline-block h-1 w-1 rounded-full bg-muted-foreground"
+      />
+      <span
+        aria-hidden="true"
+        className="inline-block h-1 w-1 rounded-full bg-muted-foreground"
+      />
+      <span className="sr-only">Loading</span>
+    </p>
   );
 }
