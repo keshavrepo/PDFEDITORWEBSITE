@@ -162,7 +162,7 @@ function SocialWorkspaceInner({
     setLoadingRecent(true);
     try {
       const [list, favs] = await Promise.all([
-        listSocialProjects({ kind: project?.kind, limit: 50 }),
+        listSocialProjects({ limit: 50 }),
         listSocialProjects({ favoritesOnly: true, limit: 50 }),
       ]);
       setRecent(list);
@@ -170,7 +170,7 @@ function SocialWorkspaceInner({
     } finally {
       setLoadingRecent(false);
     }
-  }, [project?.kind]);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void refreshRecent(), 0);

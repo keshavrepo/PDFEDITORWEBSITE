@@ -25,12 +25,33 @@ function summariseBody(value: unknown): string {
   if (typeof record.notes === "string" && record.notes.trim()) {
     return `Notes · ${record.notes.slice(0, 40)}${record.notes.length > 40 ? "…" : ""}`;
   }
+  if (typeof record.text === "string" && record.text.trim()) {
+    return `Text · ${record.text.slice(0, 40)}${record.text.length > 40 ? "…" : ""}`;
+  }
+  if (typeof record.plainText === "string" && record.plainText.trim()) {
+    return `Text · ${record.plainText.slice(0, 40)}${record.plainText.length > 40 ? "…" : ""}`;
+  }
+  if (typeof record.name === "string" && record.name.trim()) {
+    return `Name · ${record.name.slice(0, 40)}${record.name.length > 40 ? "…" : ""}`;
+  }
+  if (Array.isArray(record.items) && record.items.length > 0) {
+    return `Items · ${record.items.length} queued`;
+  }
+  if (Array.isArray(record.plans) && record.plans.length > 0) {
+    return `Plans · ${record.plans.length} scheduled`;
+  }
   if (record.fields && typeof record.fields === "object") {
     const fields = record.fields as Record<string, unknown>;
     const keys = Object.keys(fields).filter(
       (key) => typeof fields[key] === "string" && (fields[key] as string).length > 0
     );
     if (keys.length > 0) return `Fields · ${keys.length} filled`;
+  }
+  if (Array.isArray(record.logos) && record.logos.length > 0) {
+    return `Logos · ${record.logos.length}`;
+  }
+  if (Array.isArray(record.templates) && record.templates.length > 0) {
+    return `Templates · ${record.templates.length}`;
   }
   return "Empty body";
 }

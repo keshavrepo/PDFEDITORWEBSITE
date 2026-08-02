@@ -159,6 +159,10 @@ export function PostCreator({ project, onChange }: PostCreatorProps) {
     commit({ ...body, category: value });
   }
 
+  function setPlatform(value: string) {
+    commit({ ...body, platform: value });
+  }
+
   function attachMedia(id: string) {
     if (body.mediaIds.includes(id)) return;
     commit({ ...body, mediaIds: [...body.mediaIds, id] });
@@ -219,7 +223,7 @@ export function PostCreator({ project, onChange }: PostCreatorProps) {
               <span className="font-medium">Platform</span>
               <select
                 value={body.platform ?? ""}
-                onChange={(event) => setCategory(event.target.value)}
+                onChange={(event) => setPlatform(event.target.value)}
                 className="rounded border border-border bg-background px-2 py-1 text-sm"
                 aria-label="Platform"
               >

@@ -17,7 +17,6 @@ import {
   FileVideo,
   Folder,
   Grid2X2,
-  Heart,
   List,
   Plus,
   Search,

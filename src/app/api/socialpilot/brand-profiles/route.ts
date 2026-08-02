@@ -138,11 +138,19 @@ export async function PUT(request: NextRequest) {
   }
 
   const now = new Date().toISOString();
-  const brands = parsed.data.brands.map((brand) => ({
-    ...brand,
-    createdAt: now,
-    updatedAt: now,
-  }));
+  // Preserve each brand's existing createdAt if it already exists on
+  // the server; otherwise stamp it now. This avoids overwriting the
+  // original creation time on every save.
+  const existing = await getBrandProfiles(user.id);
+  const existingById = new Map(existing.map((brand) => [brand.id, brand]));
+  const brands = parsed.data.brands.map((brand) => {
+    const previous = existingById.get(brand.id);
+    return {
+      ...brand,
+      createdAt: previous?.createdAt ?? now,
+      updatedAt: now,
+    };
+  });
 
   const saved = await saveBrandProfiles(user.id, brands);
   return Response.json({ brands: saved });

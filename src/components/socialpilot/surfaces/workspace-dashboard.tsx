@@ -17,7 +17,6 @@ import {
   Hash,
   Image as ImageIcon,
   Palette,
-  Star,
   Users,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -66,17 +65,12 @@ export function WorkspaceDashboard({ project }: WorkspaceDashboardProps) {
   const { toast } = useToast();
   const [recent, setRecent] = useState<SocialProjectSummary[]>([]);
   const [recentAssets, setRecentAssets] = useState<SocialMediaAsset[]>([]);
-  const [favouriteAssets, setFavouriteAssets] = useState<SocialMediaAsset[]>(
-    []
-  );
   const [favouriteCaptions, setFavouriteCaptions] = useState<
     FavouriteCaptionSummary[]
   >([]);
   const [favouriteHashtags, setFavouriteHashtags] = useState<
     FavouriteHashtagSummary[]
   >([]);
-  const [brands, setBrands] = useState<SocialBrand[]>([]);
-  const [profiles, setProfiles] = useState<SocialPlatformProfile[]>([]);
   const [activeBrand, setActiveBrand] = useState<SocialBrand | null>(null);
   const [activeProfile, setActiveProfile] = useState<SocialPlatformProfile | null>(
     null
@@ -116,7 +110,6 @@ export function WorkspaceDashboard({ project }: WorkspaceDashboardProps) {
         }
         if (cancelled) return;
         setRecentAssets(fullAssets);
-        setFavouriteAssets(fullAssets.slice(0, 6));
 
         const brandsData = (await brandRes
           .json()
@@ -130,8 +123,6 @@ export function WorkspaceDashboard({ project }: WorkspaceDashboardProps) {
           state: { activeBrandId: string; activeProfileId: string };
         };
         if (cancelled) return;
-        setBrands(brandsData.brands ?? []);
-        setProfiles(profilesData.profiles ?? []);
         const activeBrandEntry =
           (brandsData.brands ?? []).find(
             (brand) => brand.id === stateData.state?.activeBrandId
@@ -374,41 +365,6 @@ export function WorkspaceDashboard({ project }: WorkspaceDashboardProps) {
         ) : (
           <ul className="grid grid-cols-3 gap-2">
             {recentAssets.slice(0, 6).map((asset) => (
-              <li
-                key={asset.id}
-                className="overflow-hidden rounded border border-border bg-muted"
-              >
-                {asset.kind === "image" && asset.objectUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={asset.objectUrl}
-                    alt={asset.title}
-                    className="h-16 w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-16 items-center justify-center text-[10px] text-muted-foreground">
-                    {asset.kind}
-                  </div>
-                )}
-                <p className="truncate p-1 text-[10px]">{asset.title}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-
-      <Card className="p-4">
-        <SectionTitle
-          icon={<Star className="h-4 w-4" />}
-          title="Favourite assets"
-        />
-        {favouriteAssets.length === 0 ? (
-          <p className="text-xs text-muted-foreground">
-            Mark assets as favourites from the Media Workspace.
-          </p>
-        ) : (
-          <ul className="grid grid-cols-3 gap-2">
-            {favouriteAssets.slice(0, 6).map((asset) => (
               <li
                 key={asset.id}
                 className="overflow-hidden rounded border border-border bg-muted"

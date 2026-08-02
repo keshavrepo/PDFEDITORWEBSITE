@@ -45,6 +45,7 @@ const recordSchema = z.object({
   size: z.number().int().nonnegative().max(64 * 1024 * 1024),
   isFavorite: z.boolean().optional(),
   updatedAt: z.string().trim().min(1).max(40),
+  createdAt: z.string().trim().min(1).max(40).optional(),
 });
 
 /** Upserts a recent-project row. */
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
       kind: data.kind as never,
       title: data.title,
       category: data.category as never,
-      createdAt: data.updatedAt,
+      createdAt: data.createdAt ?? data.updatedAt,
       updatedAt: data.updatedAt,
       autosavedAt: data.updatedAt,
       version: data.version,

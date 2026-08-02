@@ -15,7 +15,6 @@ import {
   ChevronRight,
   Plus,
   Search,
-  Star,
   Trash2,
   X,
 } from "lucide-react";
@@ -47,8 +46,6 @@ const COLOR_CLASSES: Record<SocialContentPlan["color"], string> = {
   purple: "bg-violet-500/20 text-violet-600 border-violet-500/30 dark:text-violet-300",
   orange: "bg-orange-500/20 text-orange-600 border-orange-500/30 dark:text-orange-300",
 };
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 function randomId(): string {
   return `plan-${Math.random().toString(36).slice(2, 10)}`;
@@ -402,12 +399,19 @@ function MonthView({ cursor, plans, onAdd, onEdit, onMove }: ViewProps) {
           const dayPlans = plansByDay.get(iso) ?? [];
           const inMonth = day.getMonth() === cursor.getMonth();
           return (
-            <button
-              type="button"
+            <div
               key={iso}
               onClick={() => onAdd(day)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onAdd(day);
+                }
+              }}
+              role="button"
+              tabIndex={0}
               className={cn(
-                "flex h-24 flex-col items-start gap-1 rounded border border-border p-1 text-left text-[10px] hover:bg-accent",
+                "flex h-24 cursor-pointer flex-col items-start gap-1 rounded border border-border p-1 text-left text-[10px] hover:bg-accent focus:outline-none focus:ring-2 focus:ring-foreground/30",
                 !inMonth && "opacity-50"
               )}
               aria-label={`Add plan on ${formatDate(day)}`}
@@ -435,7 +439,7 @@ function MonthView({ cursor, plans, onAdd, onEdit, onMove }: ViewProps) {
                   </li>
                 )}
               </ul>
-            </button>
+            </div>
           );
         })}
       </div>
@@ -464,11 +468,18 @@ function WeekView({ cursor, plans, onAdd, onEdit, onMove }: ViewProps) {
           const iso = isoDate(day);
           const dayPlans = plansByDay.get(iso) ?? [];
           return (
-            <button
-              type="button"
+            <div
               key={iso}
               onClick={() => onAdd(day)}
-              className="flex h-64 flex-col items-stretch gap-1 rounded border border-border p-1 text-left text-[10px] hover:bg-accent"
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onAdd(day);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              className="flex h-64 cursor-pointer flex-col items-stretch gap-1 rounded border border-border p-1 text-left text-[10px] hover:bg-accent focus:outline-none focus:ring-2 focus:ring-foreground/30"
               aria-label={`Add plan on ${formatDate(day)}`}
             >
               <div className="flex items-center justify-between">
@@ -493,7 +504,7 @@ function WeekView({ cursor, plans, onAdd, onEdit, onMove }: ViewProps) {
                   </li>
                 ))}
               </ul>
-            </button>
+            </div>
           );
         })}
       </div>

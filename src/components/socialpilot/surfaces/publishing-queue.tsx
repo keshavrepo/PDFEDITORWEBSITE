@@ -77,12 +77,6 @@ function randomId(): string {
   return `item-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function isoDate(date: Date): string {
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
-    .toISOString()
-    .slice(0, 10);
-}
-
 export function PublishingQueue({ project, onChange }: PublishingQueueProps) {
   const body = asQueueBody(project.body);
   const { toast } = useToast();
@@ -133,8 +127,16 @@ export function PublishingQueue({ project, onChange }: PublishingQueueProps) {
     if (editing?.id === id) setEditing(null);
   }
 
-  function reorderItems(items: SocialQueueItem[]) {
-    commit({ ...body, items });
+  function reorderItems(sourceId: string, targetId: string) {
+    const sourceIndex = body.items.findIndex((entry) => entry.id === sourceId);
+    const targetIndex = body.items.findIndex((entry) => entry.id === targetId);
+    if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) return;
+    const next = [...body.items];
+    const [moved] = next.splice(sourceIndex, 1);
+    next.splice(targetIndex, 0, moved!);
+    // Recompute priorities so the order is stable across saves.
+    const updated = next.map((entry, index) => ({ ...entry, priority: index }));
+    commit({ ...body, items: updated });
   }
 
   function moveItemTo(id: string, status: SocialQueueStatus) {
@@ -415,7 +417,7 @@ interface QueueColumnProps {
   onEdit: (item: SocialQueueItem) => void;
   onDelete: (id: string) => void;
   onMoveTo: (id: string, status: SocialQueueStatus) => void;
-  onReorder: (items: SocialQueueItem[]) => void;
+  onReorder: (sourceId: string, targetId: string) => void;
   draggingId: string | null;
   setDraggingId: (id: string | null) => void;
   dragOverStatus: SocialQueueStatus | null;
@@ -490,14 +492,7 @@ function QueueColumn({
             onDragOver={(event) => {
               event.preventDefault();
               if (draggingId && draggingId !== item.id) {
-                // Reorder within the column.
-                const sourceId = draggingId;
-                const targetId = item.id;
-                if (sourceId !== targetId) {
-                  // We can't reorder in the parent's array directly;
-                  // emit a synthetic move by swapping priorities.
-                  setDraggingId(sourceId);
-                }
+                setDraggingId(draggingId);
               }
             }}
             onDrop={(event) => {
@@ -506,7 +501,14 @@ function QueueColumn({
               const sourceId = dragRef.current;
               if (!sourceId || sourceId === item.id) return;
               dragRef.current = "self";
-              onMoveTo(sourceId, status);
+              // If the drop is on another column, change status;
+              // otherwise reorder within the column.
+              if (status !== dragOverStatus) {
+                onMoveTo(sourceId, status);
+              } else {
+                onReorder(sourceId, item.id);
+                dragRef.current = null;
+              }
             }}
             className={cn(
               "rounded-lg border bg-background p-2 text-xs",

@@ -10,9 +10,7 @@
  */
 
 import {
-  useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -74,7 +72,7 @@ export function MediaLibraryPanel({
   const [search, setSearch] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = async () => {
     setLoading(true);
     try {
       const next = await listMediaAssets({
@@ -89,7 +87,7 @@ export function MediaLibraryPanel({
     } finally {
       setLoading(false);
     }
-  }, [projectId, kind, search, limit]);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -114,8 +112,6 @@ export function MediaLibraryPanel({
       cancelled = true;
     };
   }, [projectId, kind, search, limit]);
-
-  const filtered = useMemo(() => assets, [assets]);
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -231,13 +227,13 @@ export function MediaLibraryPanel({
 
       {loading ? (
         <p className="text-[11px] text-muted-foreground">Loading…</p>
-      ) : filtered.length === 0 ? (
+      ) : assets.length === 0 ? (
         <Card className="p-4 text-center text-[11px] text-muted-foreground">
           No media assets yet
         </Card>
       ) : (
         <ul className={compact ? "space-y-1" : "grid grid-cols-2 gap-2"}>
-          {filtered.map((asset) => {
+          {assets.map((asset) => {
             const Icon = KIND_ICON[asset.kind];
             return (
               <li key={asset.id}>
