@@ -21,6 +21,12 @@ export const sessionCategoryOrder: DevSessionCategory[] = [
   "blank",
   "snippet",
   "history",
+  "json",
+  "jwt",
+  "base64",
+  "uuid",
+  "hash",
+  "url",
   "custom",
 ];
 
@@ -29,6 +35,12 @@ export const sessionCategoryLabels: Record<DevSessionCategory, string> = {
   blank: "Blank",
   snippet: "Snippet",
   history: "History",
+  json: "JSON",
+  jwt: "JWT",
+  base64: "Base64",
+  uuid: "UUID",
+  hash: "Hash",
+  url: "URL",
   custom: "Custom",
 };
 
@@ -37,6 +49,12 @@ export const sessionCategoryDescriptions: Record<DevSessionCategory, string> = {
   blank: "Start from an empty session",
   snippet: "Reusable code snippet with categories, languages and favourites",
   history: "Per-tool history with recent and favourites",
+  json: "JSON formatter, minifier, validator, tree view and search",
+  jwt: "JSON Web Token decoder with header, payload and expiry",
+  base64: "Base64 encoder / decoder for text and files",
+  uuid: "UUID v4 generator with bulk output",
+  hash: "MD5, SHA-1, SHA-256 and SHA-512 for text and files",
+  url: "URL encode, decode, parse and query parameters",
   custom: "Anything else you build",
 };
 
@@ -126,6 +144,129 @@ export const sessions: DevSessionDefinition[] = [
       "Search",
       "Restore",
       "Favourite toggle",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-json",
+    kind: "json",
+    slug: "json",
+    name: "JSON workspace",
+    tagline: "Format, minify, validate, browse, search, copy and download",
+    description:
+      "A professional JSON editor that runs entirely in the browser. Format with configurable indent, minify, validate against the JSON spec, browse a tree view, search by value, copy the result and download the file. Upload a JSON file to start.",
+    intro:
+      "Open the JSON workspace to format, minify and validate JSON in your browser. The tree view lets you explore nested objects; search finds any value by key or content; copy and download the result. Autosave mirrors the body to IndexedDB so closing the tab does not lose your work.",
+    defaultCategory: "json",
+    keywords: ["json", "format", "minify", "validate", "tree", "DevPilot"],
+    highlights: [
+      "Format with configurable indent",
+      "Minify",
+      "Validate with parser errors",
+      "Tree view with collapsible nodes",
+      "Search by value or key",
+      "Copy and download",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-jwt",
+    kind: "jwt",
+    slug: "jwt",
+    name: "JWT workspace",
+    tagline: "Decode the three segments, inspect claims, check expiry",
+    description:
+      "Decode any JSON Web Token. The workspace splits the token into its three segments, shows the header and payload as pretty JSON, displays the signature, and surfaces the standard expiry, issued-at and not-before claims. No signing, no verification.",
+    intro:
+      "Open the JWT workspace to decode any JSON Web Token. The tool never signs or verifies — it just decodes what you paste and reads the standard time-based claims. Useful for inspecting tokens during development.",
+    defaultCategory: "jwt",
+    keywords: ["jwt", "json web token", "decode", "header", "payload", "expiry", "DevPilot"],
+    highlights: [
+      "Decode header and payload",
+      "Pretty view for both segments",
+      "Expiry information from the standard `exp` claim",
+      "Issued-at and not-before context",
+      "Copy any segment",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-base64",
+    kind: "base64",
+    slug: "base64",
+    name: "Base64 workspace",
+    tagline: "Encode and decode text and files to and from base64",
+    description:
+      "Encode any text to base64, or decode base64 back to text. Switch the input mode to upload a file and the tool encodes the file binary to base64, or decodes a base64 string back to the original file. Copy the result or download it.",
+    intro:
+      "Open the Base64 workspace to encode and decode base64. Switch between text and file inputs; copy the result or download the decoded file. The tool runs entirely in the browser, so the data never leaves the device.",
+    defaultCategory: "base64",
+    keywords: ["base64", "encode", "decode", "text", "file", "DevPilot"],
+    highlights: [
+      "Encode text to base64",
+      "Decode base64 to text or file",
+      "File upload for binary input",
+      "Copy and download",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-uuid",
+    kind: "uuid",
+    slug: "uuid",
+    name: "UUID workspace",
+    tagline: "Generate RFC 4122 v4 UUIDs in any batch size",
+    description:
+      "Generate v4 UUIDs one at a time or in bulk. Pick a count, generate, and copy individual UUIDs or the whole batch. Download the batch as a text file. The generator uses the browser's secure random source.",
+    intro:
+      "Open the UUID workspace to generate RFC 4122 v4 UUIDs. Pick a count, generate, and copy the batch or individual UUIDs. Download the batch when you need to ship a list.",
+    defaultCategory: "uuid",
+    keywords: ["uuid", "guid", "v4", "generate", "DevPilot"],
+    highlights: [
+      "RFC 4122 v4 generation",
+      "Bulk output (1-200)",
+      "Copy individual or full batch",
+      "Download as text",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-hash",
+    kind: "hash",
+    slug: "hash",
+    name: "Hash workspace",
+    tagline: "MD5, SHA-1, SHA-256 and SHA-512 for text and files",
+    description:
+      "Hash text or files with MD5, SHA-1, SHA-256 and SHA-512. The tool computes all four algorithms at once, lets you copy any individual digest, and downloads the full report. SHA-2 algorithms use the browser's SubtleCrypto; MD5 and SHA-1 use a built-in reference implementation.",
+    intro:
+      "Open the Hash workspace to compute MD5, SHA-1, SHA-256 and SHA-512 for any text or file. The tool runs entirely in the browser. Copy a single digest or download the full report.",
+    defaultCategory: "hash",
+    keywords: ["md5", "sha1", "sha256", "sha512", "hash", "checksum", "DevPilot"],
+    highlights: [
+      "All four algorithms at once",
+      "Text and file input",
+      "Copy any digest",
+      "Download the full report",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-url",
+    kind: "url",
+    slug: "url",
+    name: "URL workspace",
+    tagline: "Encode, decode and parse URLs",
+    description:
+      "Encode the whole URL or any component, decode encoded URLs, and parse a URL into its protocol, host, path, query and hash. The query-parameter viewer lists every parameter with its value and lets you copy the reconstructed query string.",
+    intro:
+      "Open the URL workspace to encode, decode and parse URLs. Switch the direction, paste a URL, and the tool shows the encoded or decoded form, the parsed components and the query parameters.",
+    defaultCategory: "url",
+    keywords: ["url", "encode", "decode", "parse", "query", "DevPilot"],
+    highlights: [
+      "Encode / decode the full URL or components",
+      "Parse into protocol, host, path, query and hash",
+      "Query parameters viewer",
+      "Copy any output",
     ],
     toolCount: 1,
   },

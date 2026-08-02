@@ -15,8 +15,20 @@ export * from "./engine";
 export {
   DEFAULT_SNIPPET_BODY,
   DEFAULT_HISTORY_BODY,
+  DEFAULT_JSON_BODY,
+  DEFAULT_JWT_BODY,
+  DEFAULT_BASE64_BODY,
+  DEFAULT_UUID_BODY,
+  DEFAULT_HASH_BODY,
+  DEFAULT_URL_BODY,
   asSnippetBody,
   asHistoryBody,
+  asJsonBody,
+  asJwtBody,
+  asBase64Body,
+  asUuidBody,
+  asHashBody,
+  asUrlBody,
 } from "./bodies";
 export {
   STORAGE_DATABASE,
@@ -43,3 +55,4 @@ export {
   toggleFavoriteHistoryStorage,
   generateHistoryId,
 } from "./client-storage";
+export * from "./tools";

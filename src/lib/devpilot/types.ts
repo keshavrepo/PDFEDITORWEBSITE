@@ -20,6 +20,12 @@ export type DevSessionCategory =
   | "blank"
   | "snippet"
   | "history"
+  | "json"
+  | "jwt"
+  | "base64"
+  | "uuid"
+  | "hash"
+  | "url"
   | "custom";
 
 /** Persistent metadata stored alongside the session body. */
@@ -167,4 +173,80 @@ export interface DevHistoryBody {
   toolFilter: string;
   /** Default search term. */
   search: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batch 2: tool bodies                                                       */
+/* -------------------------------------------------------------------------- */
+
+/** JSON workspace body. */
+export interface DevJsonBody {
+  /** The user's input text. */
+  input: string;
+  /** Optional sorted key order when pretty-printing. */
+  sortKeys: boolean;
+  /** Indent width used when formatting. */
+  indent: number;
+  /** Free-form note shown in the properties panel. */
+  note: string;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** JWT workspace body. */
+export interface DevJwtBody {
+  /** The encoded JWT, three dot-separated segments. */
+  token: string;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** Base64 workspace body. */
+export interface DevBase64Body {
+  /** Input mode: text or file. */
+  mode: "text" | "file";
+  /** Text input (used when mode === "text"). */
+  text: string;
+  /** Original filename (used when mode === "file"). */
+  filename: string;
+  /** Base64 representation of the file binary (used when mode === "file"). */
+  fileBase64: string;
+  /** Free-form note. */
+  note: string;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** UUID workspace body. */
+export interface DevUuidBody {
+  /** Number of UUIDs to generate. */
+  count: number;
+  /** Last generated batch. */
+  generated: string[];
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** Hash workspace body. */
+export interface DevHashBody {
+  /** Input mode: text or file. */
+  mode: "text" | "file";
+  /** Text input (used when mode === "text"). */
+  text: string;
+  /** Original filename (used when mode === "file"). */
+  filename: string;
+  /** File binary as a data URL (used when mode === "file"). */
+  fileDataUrl: string;
+  /** Favourite flag. */
+  isFavorite: boolean;
+}
+
+/** URL workspace body. */
+export interface DevUrlBody {
+  /** Input text. */
+  input: string;
+  /** Direction: encode or decode. */
+  direction: "encode" | "decode";
+  /** Favourite flag. */
+  isFavorite: boolean;
 }

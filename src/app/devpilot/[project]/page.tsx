@@ -6,6 +6,12 @@ import { DevWorkspace } from "@/components/devpilot/workspace";
 import { BlankSurface } from "@/components/devpilot/surfaces/blank";
 import { SnippetSurface } from "@/components/devpilot/surfaces/snippet";
 import { HistorySurface } from "@/components/devpilot/surfaces/history";
+import { JsonSurface } from "@/components/devpilot/surfaces/json";
+import { JwtSurface } from "@/components/devpilot/surfaces/jwt";
+import { Base64Surface } from "@/components/devpilot/surfaces/base64";
+import { UuidSurface } from "@/components/devpilot/surfaces/uuid";
+import { HashSurface } from "@/components/devpilot/surfaces/hash";
+import { UrlSurface } from "@/components/devpilot/surfaces/url";
 import { WorkspaceDashboard } from "@/components/devpilot/surfaces/workspace-dashboard";
 import {
   focusedSessions,
@@ -62,6 +68,18 @@ function pickSurface(session: DevSessionDefinition): SurfaceComponent {
       return SnippetSurface as unknown as SurfaceComponent;
     case "history":
       return HistorySurface as unknown as SurfaceComponent;
+    case "json":
+      return JsonSurface as unknown as SurfaceComponent;
+    case "jwt":
+      return JwtSurface as unknown as SurfaceComponent;
+    case "base64":
+      return Base64Surface as unknown as SurfaceComponent;
+    case "uuid":
+      return UuidSurface as unknown as SurfaceComponent;
+    case "hash":
+      return HashSurface as unknown as SurfaceComponent;
+    case "url":
+      return UrlSurface as unknown as SurfaceComponent;
     case "blank":
     default:
       return WorkspaceDashboard as unknown as SurfaceComponent;
