@@ -639,7 +639,15 @@ export function replaceInText(
   options: FindOptions & { replaceAll?: boolean; from?: number } = {}
 ): { next: string; count: number } {
   if (!query) return { next: text, count: 0 };
-  const flags = options.caseSensitive ? "g" : "gi";
+  // For single-replace we use a non-global regex so the engine
+  // matches at most once. For replace-all we keep the global flag.
+  const flags = options.caseSensitive
+    ? options.replaceAll
+      ? "g"
+      : ""
+    : options.replaceAll
+      ? "gi"
+      : "i";
   let pattern: RegExp;
   try {
     pattern = options.regex
@@ -649,19 +657,27 @@ export function replaceInText(
     return { next: text, count: 0 };
   }
   if (options.wholeWord && !options.regex) {
+    // Re-build with the same flag policy so the g flag is
+    // preserved when replaceAll is true.
     pattern = new RegExp(`\\b${escapeRegex(query)}\\b`, flags);
   }
-  let count = 0;
-  const next = text.replace(pattern, (matched) => {
-    if (!options.replaceAll) {
-      // Replace only the first match starting at or after `from`.
-      const from = options.from ?? 0;
-      const before = text.slice(0, from);
-      const occurrence = text.indexOf(matched, from);
-      if (occurrence === -1) return matched;
-      // Only replace the first occurrence per call when replaceAll is false.
-      if (text.indexOf(matched) !== occurrence) return matched;
+  if (!options.replaceAll) {
+    // Anchor a non-global pattern to the first match at or after
+    // `from`. Setting `lastIndex` before exec lets us find the
+    // first match past the cursor.
+    const from = Math.max(0, options.from ?? 0);
+    pattern.lastIndex = from;
+    const exec = pattern.exec(text);
+    if (!exec) {
+      return { next: text, count: 0 };
     }
+    const start = exec.index;
+    const end = start + exec[0].length;
+    const next = text.slice(0, start) + replacement + text.slice(end);
+    return { next, count: 1 };
+  }
+  let count = 0;
+  const next = text.replace(pattern, () => {
     count += 1;
     return replacement;
   });

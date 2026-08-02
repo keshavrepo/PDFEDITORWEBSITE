@@ -44,7 +44,7 @@ import {
   sessionHref,
   type ProfessionalProjectTemplate,
 } from "@/lib/webpilot";
-import type { WebSession } from "@/lib/webpilot";
+import type { WebProjectsBody, WebSession } from "@/lib/webpilot";
 
 interface TemplatesSurfaceProps {
   session: WebSession;
@@ -83,16 +83,38 @@ export function TemplatesSurface({
     setBusy(template.id);
     try {
       const built = buildProjectTemplateBody(template);
+      // Persist the built project tree as the new session's
+      // body. Without `initialBody` the engine would have created
+      // an empty `projects` session and the template would have
+      // been silently discarded.
+      const initialBody: WebProjectsBody = {
+        projectId: "",
+        projectName: built.projectName,
+        folders: built.folders.map((path) => ({
+          id: `folder-${path}`,
+          path,
+          updatedAt: new Date(0).toISOString(),
+        })),
+        files: built.files.map((file) => ({
+          id: `file-${file.path}`,
+          path: file.path,
+          kind: file.kind,
+          source: file.source,
+          savedSource: file.source,
+          updatedAt: new Date(0).toISOString(),
+        })),
+        selectedPath: built.files[0]?.path ?? "index.html",
+        search: "",
+        recent: [],
+        favorites: [],
+        isFavorite: false,
+      };
       const next = await createWebSession("projects", {
         title: built.projectName,
+        initialBody,
       });
-      // Patch the new session body with the template's starter
-      // content. The onChange hook is ignored here because we
-      // are creating a brand new session through the engine.
-      void next;
-      // Persist the template body to the parent session as a
-      // history record so the user can re-open the templates
-      // surface and find what they built last.
+      // Record the template that was applied to the parent
+      // session so the user can see what they built last.
       onChange({
         ...session,
         body: {
@@ -108,6 +130,7 @@ export function TemplatesSurface({
       // Open the multi-file workspace on the new project.
       // eslint-disable-next-line react-hooks/immutability
       window.location.href = "/webpilot/projects";
+      void next;
     } catch (err) {
       toast({
         message:

@@ -15,7 +15,7 @@
  * added to the LaunchStack infrastructure to ship this surface.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   BarChart3,
@@ -70,6 +70,15 @@ export function DashboardIntegrationSurface({
     onChange({ ...session, body: { ...body, ...patch } });
   }
 
+  // Keep a stable ref of the assets so the mount-only fetch can
+  // read the current asset list without re-running the effect.
+  // The ref is updated inside an effect (not during render) so
+  // the React Compiler / hook lint rules accept it.
+  const assetsRef = useRef(assets.assets);
+  useEffect(() => {
+    assetsRef.current = assets.assets;
+  }, [assets.assets]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -86,11 +95,14 @@ export function DashboardIntegrationSurface({
         setHistoryCount(historyEntries.length);
         // Rebuild storage summary and activity rows from the
         // server mirror, then write them into the body so the
-        // user sees them as the "official" numbers.
+        // user sees them as the "official" numbers. We read the
+        // current assets through the ref so a late mount of the
+        // asset surface does not leave the dashboard with a
+        // stale count.
         const storage = buildStorageSummary(
           sessions,
           historyEntries,
-          assets.assets
+          assetsRef.current
         );
         const activity = buildActivityRows(sessions);
         commit({

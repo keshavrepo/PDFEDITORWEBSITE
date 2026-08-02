@@ -59,14 +59,25 @@ function sessionCategoryTitle(category: WebSessionCategory): string {
 /**
  * Creates a fresh session. The optional `template` argument loads a
  * starter body and category; without it, the session is blank.
+ *
+ * The optional `initialBody` argument lets callers persist a
+ * pre-built body — used by the templates surface, which builds a
+ * project tree in memory and ships it as the starter content.
+ * When `initialBody` is provided it overrides the default body
+ * the kind would otherwise produce.
  */
 export async function createWebSession(
   kind: WebSessionKind,
-  options: { template?: WebTemplate; title?: string } = {}
+  options: { template?: WebTemplate; title?: string; initialBody?: unknown } = {}
 ): Promise<WebSession> {
   const template = options.template;
   const category = template?.category ?? "blank";
-  const body = template ? loadTemplateBody(template) : createBlankBody(kind);
+  const body =
+    options.initialBody !== undefined
+      ? options.initialBody
+      : template
+        ? loadTemplateBody(template)
+        : createBlankBody(kind);
   const now = new Date().toISOString();
   const id = generateSessionId(kind);
   const session: WebSession = {

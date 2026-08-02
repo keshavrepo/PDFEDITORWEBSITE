@@ -67,13 +67,18 @@ export function WorkspaceDashboard({ session }: WorkspaceDashboardProps) {
     let cancelled = false;
     (async () => {
       try {
-        const [sessions, historyRes, allSessionsList] = await Promise.all([
-          listWebSessions({ limit: 8 }),
-          fetch("/api/webpilot/history?limit=12"),
+        // Fetch the full session list once and derive both the
+        // "recent" subset (first 8) and the per-kind statistics.
+        // The dashboard used to issue the same `listWebSessions`
+        // call twice (limit 8 + limit 200); the network round
+        // trip was wasted because the second list always
+        // contains the first.
+        const [allSessionsList, historyRes] = await Promise.all([
           listWebSessions({ limit: 200 }),
+          fetch("/api/webpilot/history?limit=12"),
         ]);
         if (cancelled) return;
-        setRecent(sessions);
+        setRecent(allSessionsList.slice(0, 8));
 
         const historyData = (await historyRes
           .json()

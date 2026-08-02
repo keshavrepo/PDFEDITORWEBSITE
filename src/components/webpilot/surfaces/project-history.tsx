@@ -16,7 +16,7 @@
  * every other WebPilot tool.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Copy,
   History as HistoryIcon,
@@ -66,8 +66,11 @@ export function ProjectHistorySurface({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
-  // Refresh the recent list every time the body changes, so the
-  // surface reflects duplicate / rename / delete in real time.
+  // Track whether the initial fetch from the server has already
+  // populated the body, so we only write once on mount and avoid
+  // a re-render loop. The tombstone dep re-runs the effect after
+  // a restore so the recent list is fresh.
+  const initialFetchedRef = useRef(false);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -75,18 +78,17 @@ export function ProjectHistorySurface({
         const list = await listWebSessions({ limit: 50 });
         if (cancelled) return;
         setServerRecent(list);
-        // Merge server-side recents into the local body, so the
-        // recent list survives a reload.
-        const recent = list.map(recentEntryFromSummary);
-        if (
-          recent.length > 0 &&
-          (body.recent.length === 0 ||
-            body.recent[0]?.id !== recent[0]?.id)
-        ) {
+        // Only seed the body's recent list once. The comparison
+        // above (`sameId`) also guards against a re-write, but
+        // the ref gives us an extra safety net against identity
+        // changes that do not show up in the id comparison.
+        if (!initialFetchedRef.current) {
+          const recent = list.map(recentEntryFromSummary);
           onChange({
             ...session,
             body: { ...body, recent },
           });
+          initialFetchedRef.current = true;
         }
       } catch (err) {
         if (!cancelled) {
@@ -104,7 +106,7 @@ export function ProjectHistorySurface({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [body.recent.length, body.tombstones.length]);
+  }, [body.tombstones.length]);
 
   const filtered = useMemo(
     () => filterRecent(body.recent, body.search),
