@@ -113,7 +113,7 @@ export default async function SocialPilotProductPage() {
       />
       <Navbar user={user} />
 
-      <main className="bg-background">
+      <main className="bg-background animate-page-in">
         <section className="border-b border-border/40 bg-card/40">
           <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-24">
             <nav

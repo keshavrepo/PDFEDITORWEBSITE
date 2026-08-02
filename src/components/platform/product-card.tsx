@@ -15,8 +15,8 @@ export function ProductCard({ product }: { product: Product }) {
 
   const body = (
     <Card
-      className={`p-6 h-full flex flex-col ${
-        isActive ? "hover:scale-[1.02] cursor-pointer group" : "opacity-75"
+      className={`p-6 h-full flex flex-col transition-colors ${
+        isActive ? "cursor-pointer group hover:bg-accent/50" : "opacity-75"
       }`}
     >
       <div className="flex items-start justify-between gap-3 mb-4">
@@ -107,7 +107,11 @@ export function ProductCard({ product }: { product: Product }) {
 
   return (
     <li>
-      <Link href={product.href} aria-label={`Open ${product.name}`}>
+      <Link
+        href={product.href}
+        aria-label={`Open ${product.name}`}
+        className="rounded-2xl focus-visible:outline-none"
+      >
         {body}
       </Link>
     </li>

@@ -83,7 +83,7 @@ export default async function OfficePilotProductPage() {
       />
       <Navbar user={user} />
 
-      <main className="pt-16">
+      <main className="pt-16 animate-page-in">
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-14">
           <nav aria-label="Breadcrumb" className="mb-8">
             <ol className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">

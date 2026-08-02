@@ -74,7 +74,7 @@ export default async function BlogPage({ searchParams }: BlogPageProps) {
   return (
     <>
       <Navbar user={user} />
-      <main>
+      <main className="animate-page-in">
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-12">
           <div className="max-w-2xl"><h1 className="text-4xl md:text-5xl font-bold mb-4">Blog</h1><p className="text-lg text-muted-foreground mb-7">Practical guidance for safer, faster document work.</p><form className="flex gap-3"><Input name="q" defaultValue={search} placeholder="Search articles" aria-label="Search articles" /><Button variant="outline">Search</Button></form>{user?.role === "admin" && <Link className="inline-block mt-4 text-sm underline underline-offset-4" href="/admin/posts">Manage posts</Link>}</div>
         </section>

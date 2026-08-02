@@ -125,7 +125,7 @@ export default async function ImagePilotProductPage() {
       />
       <Navbar user={user} />
 
-      <main className="pt-16">
+      <main className="pt-16 animate-page-in">
         <section className="mx-auto max-w-7xl px-4 pb-14 pt-20 sm:px-6 lg:px-8">
           <nav aria-label="Breadcrumb" className="mb-8">
             <ol className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">

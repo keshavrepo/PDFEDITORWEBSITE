@@ -73,12 +73,13 @@
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    line-height: 1.55;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-weight: 600;
     letter-spacing: -0.025em;
-    line-height: 1.25;
+    line-height: 1.2;
   }
 
   h1 { letter-spacing: -0.035em; }
@@ -90,6 +91,41 @@
    * than the chrome typography. */
   .text-\[10px\], .text-\[11px\] {
     letter-spacing: 0.01em;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Global transition defaults                                       */
+  /* ---------------------------------------------------------------- */
+  /* Every interactive surface in the platform uses the same motion  */
+  /* language: 200ms with cubic-bezier(0.16, 1, 0.3, 1). The base  */
+  /* rules below make sure plain <a> / <button> elements inherit a  */
+  /* sane transition when the component does not specify one, and   */
+  /* give every focusable element a visible focus ring so keyboard  */
+  /* navigation always lands somewhere the eye can find.           */
+  /* ---------------------------------------------------------------- */
+
+  a,
+  button {
+    transition-property: color, background-color, border-color, opacity, box-shadow, transform;
+    transition-duration: 200ms;
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Reduced-motion: prefer instant feedback. */
+  @media (prefers-reduced-motion: reduce) {
+    a,
+    button {
+      transition-duration: 0.01ms;
+    }
+  }
+
+  /* Default focus ring. Component-level rules that already declare
+   * a stronger focus ring (e.g. `focus-visible:ring-2`) still take
+   * precedence because of the cascade ordering. */
+  :where(a, button, [role="button"], input, textarea, select, summary):focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring) / 0.6);
+    border-radius: 4px;
   }
 }
 
@@ -170,11 +206,17 @@
 /* -------------------------------------------------------------------------- */
 /* Fade in animation                                                          */
 /* -------------------------------------------------------------------------- */
+/*                                                                            */
+/* The legacy `fadeIn` keyframe is preserved for any product that still      */
+/* references it. The timing now matches the rest of the motion system      */
+/* (200ms / cubic-bezier(0.16, 1, 0.3, 1)) so a page that uses it lands    */
+/* instantly rather than sliding in from 10px below.                        */
+/* -------------------------------------------------------------------------- */
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(0.375rem);
   }
   to {
     opacity: 1;
@@ -183,7 +225,7 @@
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: fadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -272,6 +314,33 @@
 
 .animate-surface-in {
   animation: ui-surface-in 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Page-level entrance (marketing / dashboard / settings)                   */
+/* -------------------------------------------------------------------------- */
+/*                                                                            */
+/* A subtle 240ms slide-in for the main content of any product page. The   */
+/* shell (navbar, footer) is not animated so the chrome stays anchored     */
+/* while the content arrives — the same way Linear, Vercel and Notion feel  */
+/* when a route transitions. Pages that already own their entrance (e.g.    */
+/* AudioPilot's `animate-surface-in`) keep their own animation and ignore  */
+/* this class.                                                              */
+/* -------------------------------------------------------------------------- */
+
+@keyframes ui-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-in {
+  animation: ui-page-in 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* -------------------------------------------------------------------------- */

@@ -68,7 +68,7 @@ export default async function DevPilotProductPage() {
   return (
     <>
       <Navbar user={user} />
-      <main>
+      <main className="animate-page-in">
         <section className="border-b border-border/40 bg-card/40">
           <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 sm:py-20">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs">

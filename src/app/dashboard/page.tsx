@@ -94,7 +94,7 @@ export default async function DashboardPage() {
     <>
       <Navbar user={user} />
 
-      <main>
+      <main className="animate-page-in">
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-10">
           <h1 className="text-3xl md:text-4xl font-bold mb-2">Dashboard</h1>
           <p className="text-muted-foreground">Welcome back, {user.name || "there"}</p>
@@ -176,7 +176,7 @@ export default async function DashboardPage() {
                 </h2>
                 <Link
                   href="/files"
-                  className="text-sm hover:underline inline-flex items-center"
+                  className="text-sm hover:underline inline-flex items-center transition-colors rounded-md px-1 -mx-1"
                 >
                   Open file manager
                   <ArrowRight className="ml-1 h-3 w-3" aria-hidden="true" />
@@ -276,7 +276,11 @@ export default async function DashboardPage() {
                     const href =
                       doc.kind === "word" ? "/officepilot" : `/officepilot/${doc.kind}`;
                     return (
-                      <Link key={doc.id} href={href}>
+                      <Link
+                        key={doc.id}
+                        href={href}
+                        className="rounded-2xl focus-visible:outline-none"
+                      >
                         <Card className="p-4 hover:bg-accent transition-colors cursor-pointer group flex items-center gap-2">
                           <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
                           <div className="min-w-0 flex-1">
@@ -304,7 +308,11 @@ export default async function DashboardPage() {
                     const href =
                       entry.kind === "blank" ? "/socialpilot" : `/socialpilot/${entry.kind}`;
                     return (
-                      <Link key={entry.id} href={href}>
+                      <Link
+                        key={entry.id}
+                        href={href}
+                        className="rounded-2xl focus-visible:outline-none"
+                      >
                         <Card className="p-4 hover:bg-accent transition-colors cursor-pointer group flex items-center gap-2">
                           <GenericFileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" aria-hidden="true" />
                           <div className="min-w-0 flex-1">
@@ -339,7 +347,11 @@ export default async function DashboardPage() {
                       href: tool.href,
                     }))
                 ).map((entry) => (
-                  <Link key={entry.key} href={entry.href}>
+                  <Link
+                    key={entry.key}
+                    href={entry.href}
+                    className="rounded-2xl focus-visible:outline-none"
+                  >
                     <Card className="p-4 hover:bg-accent transition-colors cursor-pointer group flex items-center gap-2">
                       {favorites.tools.length > 0 && (
                         <Star className="h-3.5 w-3.5 fill-primary text-primary shrink-0" aria-hidden="true" />
@@ -366,7 +378,11 @@ export default async function DashboardPage() {
                 </h2>
                 <div className="space-y-2">
                   {favorites.products.map((product) => (
-                    <Link key={product.identifier} href={product.href}>
+                    <Link
+                      key={product.identifier}
+                      href={product.href}
+                      className="rounded-2xl focus-visible:outline-none"
+                    >
                       <Card className="p-4 hover:bg-accent transition-colors cursor-pointer flex items-center gap-2">
                         <Star className="h-3.5 w-3.5 fill-primary text-primary shrink-0" aria-hidden="true" />
                         <p className="text-sm font-medium">{product.name}</p>
@@ -387,7 +403,10 @@ export default async function DashboardPage() {
                   {usage.topTools.map((entry) => (
                     <div key={entry.toolName} className="flex items-center justify-between gap-3">
                       {entry.href ? (
-                        <Link href={entry.href} className="text-sm truncate hover:underline">
+                        <Link
+                          href={entry.href}
+                          className="text-sm truncate hover:underline transition-colors rounded-md px-1 -mx-1"
+                        >
                           {entry.toolName}
                         </Link>
                       ) : (

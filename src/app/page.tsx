@@ -64,7 +64,7 @@ export default async function HomePage() {
     <>
       <Navbar user={user} />
 
-      <main className="pt-16">
+      <main className="pt-16 animate-page-in">
         {/* Hero */}
         <section className="relative overflow-hidden bg-gradient-to-b from-background to-muted/30">
           <div className="max-w-7xl mx-auto px-6 lg:px-8 pt-20 pb-20 md:pt-28 md:pb-24">
@@ -164,10 +164,14 @@ export default async function HomePage() {
 
               <div className="grid sm:grid-cols-2 gap-4">
                 {tools.slice(0, 8).map((tool) => (
-                  <Link key={tool.id} href={tool.href}>
-                    <Card className="p-5 h-full hover:scale-[1.02] transition-all group cursor-pointer">
+                  <Link
+                    key={tool.id}
+                    href={tool.href}
+                    className="rounded-2xl focus-visible:outline-none"
+                  >
+                    <Card className="p-5 h-full transition-colors group cursor-pointer hover:bg-accent/50">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors flex-shrink-0">
+                        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 flex-shrink-0">
                           <div className="w-2 h-2 rounded-full bg-primary" />
                         </div>
                         <div className="min-w-0">

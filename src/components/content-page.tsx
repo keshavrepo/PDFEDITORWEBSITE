@@ -29,7 +29,7 @@ export function ContentPage({
   return (
     <>
       <Navbar user={user} />
-      <main className="min-h-screen">
+      <main className="min-h-screen animate-page-in">
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-14">
           <div className="max-w-3xl">
             {eyebrow && (

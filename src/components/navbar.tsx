@@ -188,7 +188,7 @@ export function Navbar({ user: serverUser }: NavbarProps) {
             <GlobalSearch />
             {user && <NotificationCenter />}
             <button
-              className="p-2 rounded-xl hover:bg-accent transition-colors"
+              className="p-2 rounded-xl hover:bg-accent transition-colors focus-visible:outline-none"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
             >

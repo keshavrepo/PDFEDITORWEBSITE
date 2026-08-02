@@ -75,7 +75,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
   return (
     <>
       <Navbar user={user} />
-      <main>
+      <main className="animate-page-in">
         <article>
           <header className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-10">
             <Link href="/blog" className="text-sm text-muted-foreground hover:text-foreground">← Back to blog</Link>
