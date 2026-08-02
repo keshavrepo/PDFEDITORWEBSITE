@@ -28,7 +28,6 @@ import {
   Library,
   Pause,
   Play,
-  Plus,
   Settings2,
   Star,
   Trash2,
@@ -51,7 +50,6 @@ import {
   resolveMergeTimeline,
   shortId,
   toDataUrl,
-  trimAudioBuffer,
   type AudioFormat,
 } from "@/lib/audiopilot";
 import type {

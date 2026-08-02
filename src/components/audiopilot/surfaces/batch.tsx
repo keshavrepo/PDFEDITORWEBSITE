@@ -54,19 +54,6 @@ interface AudioBatchSurfaceProps {
   onChange: (next: AudioSession) => void;
 }
 
-const DEFAULT_BODY_RESET: AudioBatchBody = {
-  mode: "convert",
-  running: false,
-  cancelled: false,
-  currentIndex: 0,
-  progress: 0,
-  items: [],
-  startedAt: "",
-  finishedAt: "",
-  lastZipDataUrl: "",
-  isFavorite: false,
-};
-
 export function AudioBatchSurface({
   session,
   onChange,
@@ -393,19 +380,9 @@ export function AudioBatchSurface({
       <LibraryPicker
         surface="batch"
         onPick={(entry) => {
-          const next = body.items;
+          // The picker stays open so the user can keep adding
+          // entries; only the explicit Cancel button closes it.
           onPick([entry]);
-          // The picker closes itself; the consumer takes the
-          // entries through `onPick`. We manually re-open the
-          // picker so the user can keep adding entries.
-          setIsPicking(false);
-          // Restore the queue that was there before the picker
-          // overlay mounted.
-          commit({ ...body, items: next });
-          // Re-add the picked entry.
-          setTimeout(() => {
-            onPick([entry]);
-          }, 0);
         }}
         onCancel={() => setIsPicking(false)}
       />

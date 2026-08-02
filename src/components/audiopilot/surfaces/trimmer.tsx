@@ -322,10 +322,7 @@ export function AudioTrimmerSurface({
         body.startSeconds,
         body.endSeconds
       );
-      const target: AudioFormat =
-        decoded.format === body.sourceFormat
-          ? body.sourceFormat
-          : body.sourceFormat;
+      const target: AudioFormat = body.sourceFormat;
       const encoded = await encodeAudioBuffer(trimmed, target);
       const dataUrl = encoded
         ? toDataUrl(encoded.bytes, encoded.mime)
@@ -669,22 +666,6 @@ export function AudioTrimmerSurface({
     </div>
   );
 }
-
-const DEFAULT_BODY_RESET: AudioTrimmerBody = {
-  sourceDataUrl: "",
-  sourceFormat: "wav",
-  fileName: "",
-  durationSeconds: 0,
-  startSeconds: 0,
-  endSeconds: 0,
-  precision: 0.05,
-  history: [],
-  historyIndex: -1,
-  lastExportDataUrl: "",
-  lastExportFormat: "wav",
-  lastExportAt: "",
-  isFavorite: false,
-};
 
 /** Rounds a number to the closest multiple of `precision`. */
 function roundToPrecision(value: number, precision: number): number {
