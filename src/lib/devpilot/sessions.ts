@@ -27,6 +27,15 @@ export const sessionCategoryOrder: DevSessionCategory[] = [
   "uuid",
   "hash",
   "url",
+  "api",
+  "regex",
+  "diff",
+  "sql",
+  "html",
+  "css",
+  "javascript",
+  "cron",
+  "timestamp",
   "custom",
 ];
 
@@ -41,6 +50,15 @@ export const sessionCategoryLabels: Record<DevSessionCategory, string> = {
   uuid: "UUID",
   hash: "Hash",
   url: "URL",
+  api: "API",
+  regex: "Regex",
+  diff: "Diff",
+  sql: "SQL",
+  html: "HTML",
+  css: "CSS",
+  javascript: "JavaScript",
+  cron: "Cron",
+  timestamp: "Timestamp",
   custom: "Custom",
 };
 
@@ -55,6 +73,15 @@ export const sessionCategoryDescriptions: Record<DevSessionCategory, string> = {
   uuid: "UUID v4 generator with bulk output",
   hash: "MD5, SHA-1, SHA-256 and SHA-512 for text and files",
   url: "URL encode, decode, parse and query parameters",
+  api: "API client with method, headers, query, body, response, history and collections",
+  regex: "Live regex testing with groups, replace preview and common patterns",
+  diff: "Text and JSON diff in side-by-side or inline view",
+  sql: "SQL formatter, beautifier, minifier and keyword highlighting",
+  html: "HTML formatter, beautifier and minifier",
+  css: "CSS formatter, beautifier and minifier",
+  javascript: "JavaScript formatter, beautifier and minifier",
+  cron: "Visual cron expression builder with human-readable output",
+  timestamp: "Convert between Unix timestamps, ISO 8601 and local time",
   custom: "Anything else you build",
 };
 
@@ -267,6 +294,185 @@ export const sessions: DevSessionDefinition[] = [
       "Parse into protocol, host, path, query and hash",
       "Query parameters viewer",
       "Copy any output",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-api",
+    kind: "api",
+    slug: "api",
+    name: "API client",
+    tagline: "GET, POST, PUT, PATCH and DELETE with full request and response inspection",
+    description:
+      "A professional API testing workspace. Build a request with method, URL, headers, query parameters and a JSON or text body, send it from the browser, and inspect the status, response headers, response body, response size and elapsed time. Every response lands in the per-session history; pin favourites, group into collections and search the history.",
+    intro:
+      "Open the API client to send a request from the browser. Choose a method, paste the URL, attach headers and query parameters, write a body, and press Send. The response, status, headers, size and elapsed time land in the right rail, and every call is stored in the per-session history.",
+    defaultCategory: "api",
+    keywords: ["api", "http", "request", "response", "headers", "query", "body", "DevPilot"],
+    highlights: [
+      "GET, POST, PUT, PATCH and DELETE",
+      "Headers and query parameters",
+      "Request body with content type",
+      "JSON viewer for the response",
+      "Response time, status, headers and size",
+      "Request history with collections and favourites",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-regex",
+    kind: "regex",
+    slug: "regex",
+    name: "Regex lab",
+    tagline: "Live regex testing with groups, replace preview and a common-patterns library",
+    description:
+      "Type a pattern, choose flags, paste text, and see every match highlight in place. The Groups panel surfaces every capture group; the Replace tab shows what the result would be. The common-patterns library covers email, URL, IPv4, ISO date, time, hex colour, semver and slug patterns.",
+    intro:
+      "Open the Regex lab to test a regular expression against any text. Pick a flag, type or paste a pattern, and see the matches, the capture groups and a replace preview in real time.",
+    defaultCategory: "regex",
+    keywords: ["regex", "regexp", "pattern", "match", "groups", "replace", "DevPilot"],
+    highlights: [
+      "Live match results",
+      "Capture groups",
+      "Replace preview",
+      "Flags (g, i, m, s, u, y)",
+      "Common-patterns library",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-diff",
+    kind: "diff",
+    slug: "diff",
+    name: "Diff viewer",
+    tagline: "Text and JSON diff in side-by-side or inline view",
+    description:
+      "Paste two text blocks or two JSON payloads and see a line-level diff. Switch the algorithm to JSON to re-parse the inputs before comparing so re-ordered keys and whitespace changes don't generate noise. Switch the layout to side-by-side or inline.",
+    intro:
+      "Open the Diff viewer to compare two text or JSON blocks. The tool computes a line-level diff using a Longest Common Subsequence algorithm; toggle JSON mode to canonicalise the inputs first, and switch the layout to side-by-side or inline.",
+    defaultCategory: "diff",
+    keywords: ["diff", "compare", "text", "json", "side by side", "inline", "DevPilot"],
+    highlights: [
+      "Text and JSON diff",
+      "Side-by-side and inline layouts",
+      "Line-level highlight",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-sql",
+    kind: "sql",
+    slug: "sql",
+    name: "SQL workspace",
+    tagline: "Format, beautify, minify and keyword-highlight SQL",
+    description:
+      "Format SQL with a configurable indent, optionally upper-case the keywords, minify, and inspect the keyword-highlighted view. The formatter is dependency-free and handles every common clause: SELECT / FROM / WHERE / GROUP BY / ORDER BY / JOIN / INSERT / UPDATE / DELETE / CREATE / DROP / ALTER / TRANSACTION.",
+    intro:
+      "Open the SQL workspace to format, beautify or minify a SQL string. The keyword-highlighted view helps you spot clauses at a glance.",
+    defaultCategory: "sql",
+    keywords: ["sql", "format", "beautify", "minify", "highlight", "DevPilot"],
+    highlights: [
+      "Format with configurable indent",
+      "Beautify with upper-case keywords",
+      "Minify",
+      "Keyword highlighting",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-html",
+    kind: "html",
+    slug: "html",
+    name: "HTML workspace",
+    tagline: "Format, beautify and minify HTML",
+    description:
+      "Format HTML with a configurable indent, beautify, or minify. The formatter understands the HTML void-element list and respects the existing element nesting.",
+    intro:
+      "Open the HTML workspace to format, beautify or minify an HTML document. The minifier drops comments and collapses whitespace between tags.",
+    defaultCategory: "html",
+    keywords: ["html", "format", "beautify", "minify", "DevPilot"],
+    highlights: [
+      "Format with configurable indent",
+      "Beautify",
+      "Minify",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-css",
+    kind: "css",
+    slug: "css",
+    name: "CSS workspace",
+    tagline: "Format, beautify and minify CSS",
+    description:
+      "Format CSS with a configurable indent, beautify, or minify. The minifier drops comments and removes redundant whitespace between rules and declarations.",
+    intro:
+      "Open the CSS workspace to format, beautify or minify a stylesheet.",
+    defaultCategory: "css",
+    keywords: ["css", "format", "beautify", "minify", "DevPilot"],
+    highlights: [
+      "Format with configurable indent",
+      "Beautify",
+      "Minify",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-js",
+    kind: "javascript",
+    slug: "javascript",
+    name: "JavaScript workspace",
+    tagline: "Format, beautify, minify and keyword-highlight JavaScript",
+    description:
+      "Format JavaScript with a configurable indent, beautify, minify, or inspect the keyword-highlighted view. The minifier understands string, template, regex, line- and block-comment contexts so it never strips a string that looks like a comment.",
+    intro:
+      "Open the JavaScript workspace to format, beautify or minify a script. The keyword-highlighted view highlights the standard reserved words and language literals.",
+    defaultCategory: "javascript",
+    keywords: ["javascript", "js", "format", "beautify", "minify", "highlight", "DevPilot"],
+    highlights: [
+      "Format with configurable indent",
+      "Beautify",
+      "Minify",
+      "Keyword highlighting",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-cron",
+    kind: "cron",
+    slug: "cron",
+    name: "Cron builder",
+    tagline: "Visual builder for a five-field cron expression",
+    description:
+      "Pick the minute, hour, day of month, month and day of week the schedule should run on. The tool renders the standard cron expression and a human-readable description such as \"At 09:30 every Monday\". Copy the expression, save it to the session, and reuse it from any future tool.",
+    intro:
+      "Open the Cron builder to assemble a cron expression without memorising the field ranges. The tool renders the expression and a human-readable description and lets you copy and save the result.",
+    defaultCategory: "cron",
+    keywords: ["cron", "schedule", "expression", "builder", "DevPilot"],
+    highlights: [
+      "Visual five-field builder",
+      "Human-readable description",
+      "Copy the expression",
+      "Save the expression with the session",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "dev-timestamp",
+    kind: "timestamp",
+    slug: "timestamp",
+    name: "Timestamp workspace",
+    tagline: "Convert between Unix, ISO 8601, UTC and local time",
+    description:
+      "Paste a Unix timestamp or an ISO 8601 string and the tool returns the other form plus the UTC and local-time representations and a relative-time string. Switch the direction to convert in either way. Seconds and milliseconds are both accepted.",
+    intro:
+      "Open the Timestamp workspace to convert between Unix, ISO 8601, UTC and local time. The tool also surfaces a relative-time string such as \"3 days ago\".",
+    defaultCategory: "timestamp",
+    keywords: ["timestamp", "unix", "iso", "utc", "local", "time", "DevPilot"],
+    highlights: [
+      "Unix timestamp ↔ ISO 8601",
+      "UTC and local time",
+      "Relative time",
     ],
     toolCount: 1,
   },

@@ -12,6 +12,15 @@ import { Base64Surface } from "@/components/devpilot/surfaces/base64";
 import { UuidSurface } from "@/components/devpilot/surfaces/uuid";
 import { HashSurface } from "@/components/devpilot/surfaces/hash";
 import { UrlSurface } from "@/components/devpilot/surfaces/url";
+import { ApiSurface } from "@/components/devpilot/surfaces/api";
+import { RegexSurface } from "@/components/devpilot/surfaces/regex";
+import { DiffSurface } from "@/components/devpilot/surfaces/diff";
+import { SqlSurface } from "@/components/devpilot/surfaces/sql";
+import { HtmlSurface } from "@/components/devpilot/surfaces/html";
+import { CssSurface } from "@/components/devpilot/surfaces/css";
+import { JsSurface } from "@/components/devpilot/surfaces/js";
+import { CronSurface } from "@/components/devpilot/surfaces/cron";
+import { TimestampSurface } from "@/components/devpilot/surfaces/timestamp";
 import { WorkspaceDashboard } from "@/components/devpilot/surfaces/workspace-dashboard";
 import {
   focusedSessions,
@@ -80,6 +89,24 @@ function pickSurface(session: DevSessionDefinition): SurfaceComponent {
       return HashSurface as unknown as SurfaceComponent;
     case "url":
       return UrlSurface as unknown as SurfaceComponent;
+    case "api":
+      return ApiSurface as unknown as SurfaceComponent;
+    case "regex":
+      return RegexSurface as unknown as SurfaceComponent;
+    case "diff":
+      return DiffSurface as unknown as SurfaceComponent;
+    case "sql":
+      return SqlSurface as unknown as SurfaceComponent;
+    case "html":
+      return HtmlSurface as unknown as SurfaceComponent;
+    case "css":
+      return CssSurface as unknown as SurfaceComponent;
+    case "javascript":
+      return JsSurface as unknown as SurfaceComponent;
+    case "cron":
+      return CronSurface as unknown as SurfaceComponent;
+    case "timestamp":
+      return TimestampSurface as unknown as SurfaceComponent;
     case "blank":
     default:
       return WorkspaceDashboard as unknown as SurfaceComponent;
