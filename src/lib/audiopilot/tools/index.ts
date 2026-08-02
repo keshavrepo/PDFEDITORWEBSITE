@@ -1,0 +1,8 @@
+/**
+ * AudioPilot tool implementations.
+ *
+ * Pure functions and browser-only helpers that every surface calls.
+ * Surfaces add their own UI on top.
+ */
+
+export * from "./audio";

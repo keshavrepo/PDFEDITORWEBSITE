@@ -217,6 +217,41 @@ export const products: Product[] = [
     ],
   },
   {
+    id: "audiopilot",
+    name: "AudioPilot",
+    tagline: "A professional audio workspace in your browser",
+    description:
+      "A single audio workspace inside LaunchStack: an Audio Player with playback controls, waveform preview, seek, volume, mute, playback speed and loop, an Audio Trimmer with precision controls, live preview, undo / redo and export, an Audio Converter for MP3, WAV, OGG, FLAC and AAC with metadata preservation, and a Recorder with microphone capture, pause / resume, playback and save. Everything runs in the browser, reuses the existing LaunchStack storage, autosave loop, dashboard, search, file manager, settings and notifications, and ships as a single workspace where future audio tools will live alongside the foundation.",
+    status: "active",
+    category: "Media",
+    version: "0.1.0",
+    href: "/audiopilot",
+    accent: "text-primary",
+    highlights: [
+      "Audio Player — Play, Pause, Stop, Seek, Volume, Mute, Playback Speed, Loop, Current Time, Duration, Waveform Preview",
+      "Audio Trimmer — Trim Start, Trim End, Precision Controls, Live Preview, Undo, Redo, Export",
+      "Audio Converter — MP3, WAV, OGG, FLAC, AAC import and export with metadata preservation where possible",
+      "Recorder — Microphone Recording, Pause, Resume, Stop, Playback, Save Recording",
+      "Reuses the LaunchStack workspace shell, IndexedDB storage, autosave loop, dashboard, search, file manager, settings and notifications — no second workspace was created",
+    ],
+    releaseNotes: [
+      {
+        version: "0.1.0",
+        date: "2026-08-02",
+        changes: [
+          "Added the AudioPlayer surface: play, pause, stop, seek, volume, mute, playback speed (0.5x, 0.75x, 1x, 1.25x, 1.5x, 2x), loop, current time, duration and a waveform preview derived from the decoded audio buffer",
+          "Added the Audio Trimmer surface: trim start, trim end, precision controls (fine / coarse), live preview, undo / redo and export to the same source format",
+          "Added the Audio Converter surface: MP3, WAV, OGG, FLAC and AAC import and export with metadata preservation where the format supports it",
+          "Added the Recorder surface: microphone recording with pause, resume, stop, playback and save — the recording lands in the same IndexedDB store the rest of the workspace uses",
+          "Added the AudioPilot workspace shell, left navigation rail, tool switcher, recent sessions, favourites, autosave loop, keyboard shortcuts and shortcuts dialog, the same shell WebPilot / DevPilot / SocialPilot / FinancePilot / OfficePilot ship",
+          "Added two new database tables: audio_sessions and audio_history, both keyed per user, mirroring the WebPilot / DevPilot recent-mirror pattern",
+          "Added two new API endpoints: /api/audiopilot/sessions and /api/audiopilot/sessions/[id], both rate-limited and origin-checked",
+          "The default /audiopilot landing opens the Workspace Dashboard; the rail and the new-session menu link to every other surface",
+        ],
+      },
+    ],
+  },
+  {
     id: "webpilot",
     name: "WebPilot",
     tagline: "A professional web workspace in your browser",
@@ -453,5 +488,5 @@ export const platform = {
   name: "LaunchStack",
   tagline: "One platform. Every tool you need.",
   description:
-    "LaunchStack is a growing suite of focused, privacy-first productivity products. PDFPilot, ImagePilot, OfficePilot, DevPilot, SocialPilot, FinancePilot and WebPilot are available today, with more modules on the way.",
+    "LaunchStack is a growing suite of focused, privacy-first productivity products. PDFPilot, ImagePilot, AudioPilot, OfficePilot, DevPilot, SocialPilot, FinancePilot and WebPilot are available today, with more modules on the way.",
 } as const;
