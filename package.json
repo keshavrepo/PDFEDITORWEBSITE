@@ -19,6 +19,7 @@
     "test:audit:financepilot": "node scripts/audit-financepilot.mjs",
     "test:verify:socialpilot:batch1": "node scripts/verify-socialpilot-batch1.mjs",
     "test:verify:socialpilot:batch2": "node scripts/verify-socialpilot-batch2.mjs",
+    "test:verify:socialpilot:batch3": "node scripts/verify-socialpilot-batch3.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node scripts/migrate.mjs",
     "admin:create": "node scripts/create-admin.mjs",

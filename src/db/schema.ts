@@ -421,3 +421,73 @@ export const socialBrandKits = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   }
 );
+
+/**
+ * SocialPilot multi-brand workspace.
+ *
+ * One row per user, holding the full list of brands the user
+ * manages. The active brand id is stored on the `socialUserState`
+ * row so the workspace can switch the active brand instantly
+ * without re-writing the whole brand list.
+ */
+export const socialBrandProfiles = pgTable(
+  "social_brand_profiles",
+  {
+    userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+    brands: jsonb("brands").default([]).notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  }
+);
+
+/**
+ * SocialPilot platform profiles.
+ *
+ * One row per user, holding the list of platform profiles
+ * (Facebook, Instagram, X, LinkedIn, YouTube, TikTok, Threads,
+ * Pinterest) the user manages. The future scheduler will reuse
+ * this list to know which profile to publish to.
+ */
+export const socialPlatformProfiles = pgTable(
+  "social_platform_profiles",
+  {
+    userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+    profiles: jsonb("profiles").default([]).notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  }
+);
+
+/**
+ * SocialPilot media collections.
+ *
+ * One row per user, holding the list of media-asset collections
+ * used by the Media Workspace.
+ */
+export const socialMediaCollections = pgTable(
+  "social_media_collections",
+  {
+    userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+    collections: jsonb("collections").default([]).notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  }
+);
+
+/**
+ * SocialPilot user state.
+ *
+ * One row per user, holding the small UI state the workspace needs
+ * across sessions: the active brand id, the active platform profile
+ * id, and the queue view preferences.
+ */
+export const socialUserState = pgTable(
+  "social_user_state",
+  {
+    userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+    activeBrandId: text("active_brand_id"),
+    activeProfileId: text("active_profile_id"),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  }
+);

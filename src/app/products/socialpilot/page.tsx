@@ -14,7 +14,7 @@ const product = getProduct("socialpilot");
 const url = `${getAppUrl()}/products/socialpilot`;
 const description =
   product?.description ??
-  "SocialPilot is LaunchStack's creator workspace. The foundation is live: a reusable workspace shell, a project system, a media library and a brand kit. Batch 2 adds the core creator tools: a full Post Creator, Caption Manager, Hashtag Manager, Content Calendar and Notes. Future batches add the scheduler, AI assistant and publishing on top of the same shell.";
+  "SocialPilot is LaunchStack's creator workspace. Batch 3 ships the professional creator workspace: Publishing Queue, Platform Profiles, Media Workspace, multi-brand Brand Workspace and the Workspace Dashboard. The reusable workspace shell, autosave, search, dashboard and storage are reused from the LaunchStack platform.";
 
 /** The features the product page advertises. */
 const FEATURE_HIGHLIGHTS = [
@@ -27,11 +27,16 @@ const FEATURE_HIGHLIGHTS = [
   "Hashtag Manager: named hashtag groups with categories, tags, search, favourite, duplicate and delete",
   "Content Calendar: monthly, weekly and daily views, platform filter, color labels, create / edit / delete / move plans",
   "Notes: rich text, plain text, optional checklist mode, tags, search and favourite",
+  "Publishing Queue with five statuses, drag-and-drop, priority, bulk actions, status filters and search",
+  "Platform Profiles for Facebook, Instagram, X, LinkedIn, YouTube, TikTok, Threads and Pinterest with default-per-platform and profile switching",
+  "Media Workspace with grid / list views, multi-select, drag-and-drop into collections, favourites, tags, search, filters and a details panel",
+  "Multi-brand Brand Workspace with logos, colours, fonts, watermarks, templates, default hashtags, default captions and an active-brand switcher",
+  "Workspace Dashboard surfacing recent projects, recent and favourite assets, favourite captions and hashtag groups, active brand, active platform profile and queue summary",
   "IndexedDB-backed autosave loop and server-side recent-projects mirror, the same architecture proven by OfficePilot and FinancePilot",
   "Right-rail tabbed panel with project properties, brand kit, media library and activity timeline (reuses the platform-level activity feed)",
 ];
 
-/** What ships in batches 1 and 2. */
+/** What ships in batches 1, 2 and 3. */
 const LAUNCHED_CHECKLIST = [
   "Batch 1 — Social workspace shell with left navigation, workspace header, tool switcher, recent projects, favourites, activity panel, properties panel, search, autosave and keyboard shortcuts",
   "Batch 1 — Project system: create, rename, duplicate, delete, favourite, recent mirror and dashboard integration",
@@ -42,6 +47,11 @@ const LAUNCHED_CHECKLIST = [
   "Batch 2 — Hashtag Manager: named groups, categories, tags, search, favourite, duplicate, delete and one-click group insertion into the Post Creator",
   "Batch 2 — Content Calendar: monthly, weekly and daily views, platform filter, color labels, create / edit / delete / move plans and a list of all plans with search",
   "Batch 2 — Notes: rich text, plain text, optional checklist mode, tags, search and favourite",
+  "Batch 3 — Publishing Queue with five statuses, drag-and-drop, priority, bulk actions, status filters and search",
+  "Batch 3 — Platform Profiles for Facebook, Instagram, X, LinkedIn, YouTube, TikTok, Threads and Pinterest with default-per-platform and profile switching",
+  "Batch 3 — Media Workspace with grid / list, multi-select, drag-and-drop into collections, favourites, tags, search, filters and a details panel",
+  "Batch 3 — Multi-brand Brand Workspace with logos, colours, fonts, watermarks, templates, default hashtags, default captions and an active-brand switcher",
+  "Batch 3 — Workspace Dashboard surfacing recent projects, recent and favourite assets, favourite captions and hashtag groups, active brand, active profile and the publishing-queue summary",
 ];
 
 export const metadata: Metadata = {
@@ -168,10 +178,11 @@ export default async function SocialPilotProductPage() {
                 <p className="mt-2 text-sm text-muted-foreground">
                   The reusable SocialPilot workspace is live with {projects.length}{" "}
                   project kinds (post, story, carousel, video, short, reel, thread,
-                  campaign, podcast, caption, hashtag, calendar, note) and a brand
-                  kit, media library, project properties and activity panel.
-                  Every future tool plugs straight into the same shell, sidebar,
-                  autosave loop and export pipeline.
+                  campaign, podcast, caption, hashtag, calendar, note, queue,
+                  profile, media, brand, dashboard) and a brand kit, media
+                  library, project properties and activity panel. Every future
+                  tool plugs straight into the same shell, sidebar, autosave
+                  loop and export pipeline.
                 </p>
               </Card>
             </div>
@@ -198,7 +209,7 @@ export default async function SocialPilotProductPage() {
           <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
             <div className="mb-6 flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <h2 className="text-lg font-semibold">What ships in batches 1 and 2</h2>
+              <h2 className="text-lg font-semibold">What ships in batches 1, 2 and 3</h2>
             </div>
             <Card className="p-6">
               <ul className="space-y-3 text-sm">
@@ -218,7 +229,7 @@ export default async function SocialPilotProductPage() {
 
         <section className="border-b border-border/40">
           <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
-            <h2 className="mb-6 text-lg font-semibold">Project kinds included in batches 1 and 2</h2>
+            <h2 className="mb-6 text-lg font-semibold">Project kinds included in batches 1, 2 and 3</h2>
             <ul className="grid gap-3 sm:grid-cols-2">
               {projects.map((entry) => (
                 <li key={entry.kind}>

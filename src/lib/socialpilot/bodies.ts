@@ -8,23 +8,50 @@
  */
 
 import type {
+  SocialBrand,
+  SocialBrandColor,
+  SocialBrandFont,
+  SocialBrandLogo,
+  SocialBrandTemplate,
+  SocialBrandWatermark,
   SocialCaptionBody,
   SocialContentCalendarBody,
   SocialContentPlan,
   SocialHashtagGroupBody,
+  SocialMediaCollection,
+  SocialMediaKind,
   SocialNoteBody,
+  SocialPlatformKey,
+  SocialPlatformProfile,
   SocialPostBody,
+  SocialQueueBody,
+  SocialQueueItem,
+  SocialQueueStatus,
   SocialRichTextMark,
   SocialRichTextParagraph,
 } from "./types";
 
 export type {
+  SocialBrand,
+  SocialBrandColor,
+  SocialBrandFont,
+  SocialBrandLogo,
+  SocialBrandTemplate,
+  SocialBrandWatermark,
   SocialCaptionBody,
   SocialContentCalendarBody,
   SocialContentPlan,
   SocialHashtagGroupBody,
+  SocialMediaCollection,
+  SocialMediaKind,
   SocialNoteBody,
+  SocialPlatformKey,
+  SocialPlatformMeta,
+  SocialPlatformProfile,
   SocialPostBody,
+  SocialQueueBody,
+  SocialQueueItem,
+  SocialQueueStatus,
   SocialRichTextMark,
   SocialRichTextParagraph,
 } from "./types";
@@ -364,5 +391,195 @@ export function asNoteBody(value: unknown): SocialNoteBody {
         )
       : [],
     isFavorite: record.isFavorite === true,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batch 3: publishing queue                                                  */
+/* -------------------------------------------------------------------------- */
+
+export const QUEUE_STATUSES = ["draft", "ready", "scheduled", "published", "failed"] as const;
+
+export const DEFAULT_QUEUE_BODY: SocialQueueBody = {
+  items: [],
+  statusFilter: "all",
+  search: "",
+};
+
+function asQueueStatus(value: unknown): SocialQueueStatus {
+  if (typeof value !== "string") return "draft";
+  return (QUEUE_STATUSES as readonly string[]).includes(value)
+    ? (value as SocialQueueStatus)
+    : "draft";
+}
+
+function asPlatformKey(value: unknown): SocialPlatformKey | "" {
+  if (typeof value !== "string") return "";
+  const allowed: SocialPlatformKey[] = [
+    "facebook",
+    "instagram",
+    "x",
+    "linkedin",
+    "youtube",
+    "tiktok",
+    "threads",
+    "pinterest",
+  ];
+  return (allowed as string[]).includes(value) ? (value as SocialPlatformKey) : "";
+}
+
+function asQueueItem(value: unknown): SocialQueueItem | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.title !== "string" || typeof record.id !== "string") return null;
+  return {
+    id: record.id,
+    title: record.title,
+    projectId: typeof record.projectId === "string" ? record.projectId : "",
+    platform: asPlatformKey(record.platform),
+    status: asQueueStatus(record.status),
+    priority:
+      typeof record.priority === "number" && Number.isFinite(record.priority)
+        ? Math.max(0, Math.floor(record.priority))
+        : 0,
+    scheduledFor:
+      typeof record.scheduledFor === "string" ? record.scheduledFor : "",
+    notes: typeof record.notes === "string" ? record.notes : "",
+    mediaIds: Array.isArray(record.mediaIds)
+      ? (record.mediaIds as unknown[]).filter(
+          (entry): entry is string => typeof entry === "string"
+        )
+      : [],
+    failureReason:
+      typeof record.failureReason === "string" ? record.failureReason : "",
+  };
+}
+
+export function asQueueBody(value: unknown): SocialQueueBody {
+  if (!value || typeof value !== "object") return { ...DEFAULT_QUEUE_BODY };
+  const record = value as Record<string, unknown>;
+  return {
+    items: Array.isArray(record.items)
+      ? (record.items as unknown[])
+          .map((entry) => asQueueItem(entry))
+          .filter((entry): entry is SocialQueueItem => Boolean(entry))
+      : [],
+    statusFilter:
+      record.statusFilter === "all" || asQueueStatus(record.statusFilter) === (record.statusFilter as SocialQueueStatus)
+        ? (record.statusFilter as SocialQueueBody["statusFilter"])
+        : "all",
+    search: typeof record.search === "string" ? record.search : "",
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batch 3: platform profiles (per-project body for the foundation entry)     */
+/* -------------------------------------------------------------------------- */
+
+export const DEFAULT_PROFILE_BODY: SocialPlatformProfile[] = [];
+
+export function asProfileBody(value: unknown): SocialPlatformProfile[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return null;
+      const record = entry as Record<string, unknown>;
+      if (typeof record.id !== "string" || typeof record.name !== "string") {
+        return null;
+      }
+      return {
+        id: record.id,
+        platform: asPlatformKey(record.platform) as SocialPlatformKey,
+        name: record.name,
+        handle: typeof record.handle === "string" ? record.handle : "",
+        url: typeof record.url === "string" ? record.url : "",
+        notes: typeof record.notes === "string" ? record.notes : "",
+        isDefault: record.isDefault === true,
+      };
+    })
+    .filter((entry): entry is SocialPlatformProfile => Boolean(entry));
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batch 3: media workspace                                                   */
+/* -------------------------------------------------------------------------- */
+
+export const DEFAULT_MEDIA_BODY = {
+  view: "grid" as "grid" | "list",
+  search: "",
+  kindFilter: "all" as SocialMediaKind | "all",
+  collectionFilter: "all" as string,
+  selectedIds: [] as string[],
+};
+
+export function asMediaBody(value: unknown): typeof DEFAULT_MEDIA_BODY {
+  if (!value || typeof value !== "object") return { ...DEFAULT_MEDIA_BODY };
+  const record = value as Record<string, unknown>;
+  return {
+    view: record.view === "list" ? "list" : "grid",
+    search: typeof record.search === "string" ? record.search : "",
+    kindFilter:
+      record.kindFilter === "image" ||
+      record.kindFilter === "video" ||
+      record.kindFilter === "audio" ||
+      record.kindFilter === "all"
+        ? (record.kindFilter as SocialMediaKind | "all")
+        : "all",
+    collectionFilter:
+      typeof record.collectionFilter === "string" ? record.collectionFilter : "all",
+    selectedIds: Array.isArray(record.selectedIds)
+      ? (record.selectedIds as unknown[]).filter(
+          (entry): entry is string => typeof entry === "string"
+        )
+      : [],
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batch 3: brand workspace (per-project body for the foundation entry)       */
+/* -------------------------------------------------------------------------- */
+
+export const DEFAULT_BRAND_BODY: Omit<SocialBrand, "id" | "createdAt" | "updatedAt"> = {
+  name: "",
+  description: "",
+  logos: [],
+  colors: [],
+  fonts: [],
+  watermarks: [],
+  templates: [],
+  defaultHashtags: [],
+  defaultCaptions: [],
+  defaultProfileId: "",
+};
+
+export function asBrandBody(
+  value: unknown
+): Omit<SocialBrand, "id" | "createdAt" | "updatedAt"> {
+  if (!value || typeof value !== "object") return { ...DEFAULT_BRAND_BODY };
+  const record = value as Record<string, unknown>;
+  return {
+    name: typeof record.name === "string" ? record.name : "",
+    description: typeof record.description === "string" ? record.description : "",
+    logos: Array.isArray(record.logos) ? (record.logos as SocialBrandLogo[]) : [],
+    colors: Array.isArray(record.colors) ? (record.colors as SocialBrandColor[]) : [],
+    fonts: Array.isArray(record.fonts) ? (record.fonts as SocialBrandFont[]) : [],
+    watermarks: Array.isArray(record.watermarks)
+      ? (record.watermarks as SocialBrandWatermark[])
+      : [],
+    templates: Array.isArray(record.templates)
+      ? (record.templates as SocialBrandTemplate[])
+      : [],
+    defaultHashtags: Array.isArray(record.defaultHashtags)
+      ? (record.defaultHashtags as unknown[]).filter(
+          (entry): entry is string => typeof entry === "string"
+        )
+      : [],
+    defaultCaptions: Array.isArray(record.defaultCaptions)
+      ? (record.defaultCaptions as unknown[]).filter(
+          (entry): entry is string => typeof entry === "string"
+        )
+      : [],
+    defaultProfileId:
+      typeof record.defaultProfileId === "string" ? record.defaultProfileId : "",
   };
 }

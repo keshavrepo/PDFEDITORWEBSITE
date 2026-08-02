@@ -32,6 +32,10 @@ export const projectCategoryOrder: SocialProjectCategory[] = [
   "hashtag",
   "calendar",
   "note",
+  "queue",
+  "profile",
+  "media",
+  "brand",
   "custom",
 ];
 
@@ -51,6 +55,10 @@ export const projectCategoryLabels: Record<SocialProjectCategory, string> = {
   hashtag: "Hashtag",
   calendar: "Calendar",
   note: "Note",
+  queue: "Queue",
+  profile: "Profile",
+  media: "Media",
+  brand: "Brand",
   custom: "Custom",
 };
 
@@ -70,6 +78,10 @@ export const projectCategoryDescriptions: Record<SocialProjectCategory, string> 
   hashtag: "Reusable hashtag group",
   calendar: "Multi-platform content plan",
   note: "Creator note with rich text and tags",
+  queue: "Publishing queue with status, priority and bulk actions",
+  profile: "Platform profile (Facebook, Instagram, X, etc.)",
+  media: "Media workspace: grid, list, multi-select, collections",
+  brand: "Brand workspace: logos, colours, fonts, watermarks, templates",
   custom: "Anything else you build",
 };
 
@@ -87,6 +99,27 @@ export const projectCategoryDescriptions: Record<SocialProjectCategory, string> 
  * for real editor surfaces.
  */
 export const projects: SocialProjectDefinition[] = [
+  {
+    id: "social-dashboard",
+    kind: "dashboard",
+    slug: "dashboard",
+    name: "Workspace dashboard",
+    tagline: "A one-page summary of your SocialPilot workspace",
+    description:
+      "The Workspace Dashboard surfaces every important surface in one place: recent projects, recent assets, favourite assets, favourite captions, favourite hashtag groups, the active brand, the active platform profile and a publishing-queue summary. The dashboard is the default landing surface for every SocialPilot session.",
+    intro:
+      "Open the Workspace Dashboard to see every SocialPilot surface in one place. The dashboard reads from the same IndexedDB-backed store the rest of the workspace uses, so the data is always in sync.",
+    defaultCategory: "blank",
+    keywords: ["dashboard", "summary", "SocialPilot"],
+    highlights: [
+      "Recent projects",
+      "Recent and favourite assets",
+      "Favourite captions and hashtag groups",
+      "Active brand and profile",
+      "Publishing-queue summary",
+    ],
+    toolCount: 1,
+  },
   {
     id: "social-blank",
     kind: "blank",
@@ -305,6 +338,91 @@ export const projects: SocialProjectDefinition[] = [
       "Tags",
       "Search",
       "Favourite",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "social-queue",
+    kind: "queue",
+    slug: "queue",
+    name: "Publishing queue",
+    tagline: "Plan, prioritise and bulk-manage every post",
+    description:
+      "A kanban-style publishing queue with five statuses (draft, ready, scheduled, published, failed), drag-and-drop reordering, priority, bulk actions, status filters and search. The queue is the natural home for every post the user is preparing.",
+    intro:
+      "The Publishing Queue holds every post the user is preparing. Create a new item, drag it between columns to change status, use the bulk actions to mark a group of items as ready, and filter by status to focus on what needs attention. The autosave loop keeps the queue in sync.",
+    defaultCategory: "queue",
+    keywords: ["queue", "publish", "schedule", "socialpilot"],
+    highlights: [
+      "Five statuses",
+      "Drag and drop",
+      "Priority",
+      "Bulk actions",
+      "Status filters",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "social-profile",
+    kind: "profile",
+    slug: "profiles",
+    name: "Platform profiles",
+    tagline: "Store every Facebook, Instagram, X, LinkedIn, YouTube, TikTok, Threads and Pinterest profile",
+    description:
+      "Manage every social profile in one place. Set a default profile per platform, switch between profiles, and reuse the profile data from the future scheduler. The profiles surface is read-write; profiles are saved on the user row.",
+    intro:
+      "The Platform Profiles surface holds every social profile the user manages. Set a default profile per platform, switch between profiles from the rail, and reuse the profile data from the future scheduler.",
+    defaultCategory: "profile",
+    keywords: ["profile", "facebook", "instagram", "x", "linkedin", "youtube", "tiktok", "threads", "pinterest"],
+    highlights: [
+      "8 platforms",
+      "Default profile per platform",
+      "Profile switching",
+      "Reusable by the future scheduler",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "social-media",
+    kind: "media",
+    slug: "media",
+    name: "Media workspace",
+    tagline: "Grid and list views, multi-select, collections",
+    description:
+      "A dedicated media workspace for every image, video and audio asset. Switch between grid and list views, multi-select assets, drag them between collections, mark favourites, tag and search.",
+    intro:
+      "The Media Workspace is a focused view for the user's media assets. Switch between grid and list views, multi-select assets to apply tags in bulk, drag assets into collections, and use the search to find any asset in seconds.",
+    defaultCategory: "media",
+    keywords: ["media", "asset", "library", "socialpilot"],
+    highlights: [
+      "Grid and list views",
+      "Multi-select",
+      "Drag and drop",
+      "Collections",
+      "Tags",
+      "Favourites",
+    ],
+    toolCount: 1,
+  },
+  {
+    id: "social-brand",
+    kind: "brand",
+    slug: "brands",
+    name: "Brand workspace",
+    tagline: "Multiple brands with logos, colours, fonts, watermarks, templates, default hashtags and captions",
+    description:
+      "Manage multiple brands from one place. Each brand has its own logos, colours, fonts, watermarks, templates, default hashtag groups and default captions. Switch the active brand from the rail and every tool reuses the active brand.",
+    intro:
+      "The Brand Workspace holds every brand the user manages. Add a new brand from the new-project menu, switch the active brand from the rail, and every tool reuses the active brand. The autosave loop keeps the workspace in sync.",
+    defaultCategory: "brand",
+    keywords: ["brand", "logo", "colour", "font", "watermark", "template", "socialpilot"],
+    highlights: [
+      "Multiple brands",
+      "Logos, colours, fonts",
+      "Watermarks",
+      "Templates",
+      "Default hashtags and captions",
+      "Active-brand switcher",
     ],
     toolCount: 1,
   },

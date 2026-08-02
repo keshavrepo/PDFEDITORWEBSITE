@@ -28,6 +28,10 @@ export type SocialProjectCategory =
   | "hashtag"
   | "calendar"
   | "note"
+  | "queue"
+  | "profile"
+  | "media"
+  | "brand"
   | "custom";
 
 /** A media-asset kind: image, video or audio. */
@@ -345,4 +349,134 @@ export interface SocialNoteBody {
   tags: string[];
   /** Favourite flag. */
   isFavorite: boolean;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Batch 3: professional creator workspace                                   */
+/* -------------------------------------------------------------------------- */
+
+/** A platform key. One of the eight supported social networks. */
+export type SocialPlatformKey =
+  | "facebook"
+  | "instagram"
+  | "x"
+  | "linkedin"
+  | "youtube"
+  | "tiktok"
+  | "threads"
+  | "pinterest";
+
+/** Human-readable platform label. */
+export interface SocialPlatformMeta {
+  key: SocialPlatformKey;
+  name: string;
+  /** Brand colour used by the chip. */
+  color: string;
+  /** Two-letter initials shown in the chip. */
+  initials: string;
+}
+
+/** A single platform profile. */
+export interface SocialPlatformProfile {
+  id: string;
+  platform: SocialPlatformKey;
+  /** Display name, e.g. "Personal" or "Brand: Acme". */
+  name: string;
+  /** Optional handle, e.g. "@acme". */
+  handle: string;
+  /** Optional profile URL. */
+  url: string;
+  /** Optional notes. */
+  notes: string;
+  /** Whether this profile is the default for its platform. */
+  isDefault: boolean;
+}
+
+/** A single watermark on a brand. Watermarks are stored as data URLs. */
+export interface SocialBrandWatermark {
+  id: string;
+  name: string;
+  dataUrl: string;
+  /** Optional opacity, 0-1. */
+  opacity: number;
+  /** Optional placement hint, e.g. "bottom-right". */
+  placement: "top-left" | "top-right" | "bottom-left" | "bottom-right" | "center";
+}
+
+/** A single template on a brand. Templates are reusable caption / body starters. */
+export interface SocialBrandTemplate {
+  id: string;
+  name: string;
+  description: string;
+  body: string;
+}
+
+/**
+ * A brand. The user can have multiple brands (e.g. "Personal",
+ * "Acme Inc."). Each brand has its own logos, colours, fonts,
+ * watermarks, templates, default hashtags and default captions.
+ */
+export interface SocialBrand {
+  id: string;
+  name: string;
+  /** Free-form description. */
+  description: string;
+  logos: SocialBrandLogo[];
+  colors: SocialBrandColor[];
+  fonts: SocialBrandFont[];
+  watermarks: SocialBrandWatermark[];
+  templates: SocialBrandTemplate[];
+  /** Default hashtag groups for this brand. */
+  defaultHashtags: string[];
+  /** Default captions for this brand. */
+  defaultCaptions: string[];
+  /** The id of the default platform profile, if any. */
+  defaultProfileId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A publishing-queue status. */
+export type SocialQueueStatus = "draft" | "ready" | "scheduled" | "published" | "failed";
+
+/** A single publishing-queue item. */
+export interface SocialQueueItem {
+  id: string;
+  /** Title shown in the queue. */
+  title: string;
+  /** Optional project id this item is generated from. */
+  projectId: string;
+  /** Target platform, drawn from the platform profiles. */
+  platform: SocialPlatformKey | "";
+  /** Status. */
+  status: SocialQueueStatus;
+  /** Lower number = higher priority. */
+  priority: number;
+  /** Optional ISO date the item is scheduled for. */
+  scheduledFor: string;
+  /** Free-form notes. */
+  notes: string;
+  /** Optional media-asset ids attached to the item. */
+  mediaIds: string[];
+  /** Optional failure reason when status is "failed". */
+  failureReason: string;
+}
+
+/** The publishing-queue body. */
+export interface SocialQueueBody {
+  items: SocialQueueItem[];
+  /** Default filter applied to the queue view. */
+  statusFilter: SocialQueueStatus | "all";
+  /** Default search term. */
+  search: string;
+}
+
+/** A media-asset collection. Collections group assets across projects. */
+export interface SocialMediaCollection {
+  id: string;
+  name: string;
+  description: string;
+  assetIds: string[];
+  createdAt: string;
+  updatedAt: string;
 }

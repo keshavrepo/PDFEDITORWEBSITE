@@ -9,6 +9,11 @@ import { CaptionManager } from "@/components/socialpilot/surfaces/caption-manage
 import { HashtagManager } from "@/components/socialpilot/surfaces/hashtag-manager";
 import { ContentCalendar } from "@/components/socialpilot/surfaces/content-calendar";
 import { Notes } from "@/components/socialpilot/surfaces/notes";
+import { PublishingQueue } from "@/components/socialpilot/surfaces/publishing-queue";
+import { PlatformProfiles } from "@/components/socialpilot/surfaces/platform-profiles";
+import { MediaWorkspace } from "@/components/socialpilot/surfaces/media-workspace";
+import { BrandWorkspace } from "@/components/socialpilot/surfaces/brand-workspace";
+import { WorkspaceDashboard } from "@/components/socialpilot/surfaces/workspace-dashboard";
 import { StorySurface } from "@/components/socialpilot/surfaces/story";
 import { CarouselSurface } from "@/components/socialpilot/surfaces/carousel";
 import { VideoSurface } from "@/components/socialpilot/surfaces/video";
@@ -76,6 +81,14 @@ function pickSurface(project: SocialProjectDefinition): SurfaceComponent {
       return ContentCalendar as unknown as SurfaceComponent;
     case "note":
       return Notes as unknown as SurfaceComponent;
+    case "queue":
+      return PublishingQueue as unknown as SurfaceComponent;
+    case "profile":
+      return PlatformProfiles as unknown as SurfaceComponent;
+    case "media":
+      return MediaWorkspace as unknown as SurfaceComponent;
+    case "brand":
+      return BrandWorkspace as unknown as SurfaceComponent;
     case "story":
       return StorySurface as unknown as SurfaceComponent;
     case "carousel":
@@ -94,7 +107,7 @@ function pickSurface(project: SocialProjectDefinition): SurfaceComponent {
       return PodcastSurface as unknown as SurfaceComponent;
     case "blank":
     default:
-      return BlankSurface as unknown as SurfaceComponent;
+      return WorkspaceDashboard as unknown as SurfaceComponent;
   }
 }
 
