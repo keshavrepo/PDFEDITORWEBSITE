@@ -50,6 +50,13 @@
       "when": 1785655511459,
       "tag": "0006_devpilot",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785741963675,
+      "tag": "0007_analytics_foundation",
+      "breakpoints": true
     }
   ]
 }

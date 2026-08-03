@@ -656,3 +656,118 @@ export const audioHistory = pgTable(
     index("audio_history_user_tool_idx").on(table.userId, table.toolName),
   ]
 );
+
+/* -------------------------------------------------------------------------- */
+/* Analytics infrastructure                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Visitor sessions.
+ *
+ * One row per anonymous or signed-in browser session. `sessionId` is the
+ * cookie the client tracker issues, kept short and URL-safe so it can ride in
+ * `keepalive` requests without inflating the payload. `userId` is filled in
+ * lazily as the visitor signs in, so the same session can be tracked across
+ * the unauthenticated funnel and the post-login experience without a
+ * second instrumentation pass.
+ */
+export const analyticsSessions = pgTable(
+  "analytics_sessions",
+  {
+    sessionId: varchar("session_id", { length: 64 }).primaryKey(),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    ipAddress: varchar("ip_address", { length: 45 }),
+    userAgent: text("user_agent"),
+    referrer: text("referrer"),
+    /** Country / region resolved from headers. Best-effort, nullable. */
+    locale: varchar("locale", { length: 20 }),
+    firstSeenAt: timestamp("first_seen_at").defaultNow().notNull(),
+    lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+    pageCount: integer("page_count").default(0).notNull(),
+  },
+  (table) => [
+    index("analytics_sessions_user_idx").on(table.userId),
+    index("analytics_sessions_last_seen_idx").on(table.lastSeenAt),
+  ]
+);
+
+/**
+ * Generic event log.
+ *
+ * One row per tracked event: page views, tool opens, project saves, exports,
+ * performance timings, client errors. Categorising the row by
+ * `category` + `action` keeps the table wide enough to support every product
+ * without a per-product schema, and the `props` JSONB column carries the
+ * small per-event payload (file size, tool name, error message) without
+ * requiring new columns for every new event type.
+ */
+export const analyticsEvents = pgTable(
+  "analytics_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sessionId: varchar("session_id", { length: 64 }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    /** "pageview" | "tool" | "project" | "export" | "import" | "save" |
+     *  "performance" | "error" | "navigation" | "funnel" | "engagement". */
+    category: varchar("category", { length: 30 }).notNull(),
+    /** Free-form within a category, e.g. "tool.open", "export.completed". */
+    action: varchar("action", { length: 60 }).notNull(),
+    /** Owning product, e.g. "pdfpilot". Defaults to "launchstack". */
+    productId: varchar("product_id", { length: 50 }).default("launchstack").notNull(),
+    /** Tool name when the event is scoped to a tool. */
+    toolName: varchar("tool_name", { length: 100 }),
+    /** Path the event was captured on, when relevant. */
+    path: varchar("path", { length: 500 }),
+    /** Referrer path for navigation events. */
+    fromPath: varchar("from_path", { length: 500 }),
+    /** Numeric duration, e.g. processing time or page-load timing in ms. */
+    durationMs: integer("duration_ms"),
+    /** HTTP-style status for errors / failed requests. */
+    status: integer("status"),
+    /** Free-form payload, small. */
+    props: jsonb("props"),
+    ipAddress: varchar("ip_address", { length: 45 }),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("analytics_events_category_idx").on(table.category, table.createdAt),
+    index("analytics_events_action_idx").on(table.action, table.createdAt),
+    index("analytics_events_product_idx").on(table.productId, table.createdAt),
+    index("analytics_events_user_idx").on(table.userId, table.createdAt),
+    index("analytics_events_session_idx").on(table.sessionId, table.createdAt),
+    index("analytics_events_tool_idx").on(table.toolName, table.createdAt),
+    index("analytics_events_path_idx").on(table.path, table.createdAt),
+  ]
+);
+
+/**
+ * Search usage log.
+ *
+ * One row per search submission. Carries the query, the result count and
+ * the latency, plus the session so a search funnel can be assembled
+ * downstream. Truncated query length keeps PII out — passwords and email
+ * addresses are filtered at write time.
+ */
+export const analyticsSearchQueries = pgTable(
+  "analytics_search_queries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sessionId: varchar("session_id", { length: 64 }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    query: varchar("query", { length: 200 }).notNull(),
+    resultsCount: integer("results_count").default(0).notNull(),
+    latencyMs: integer("latency_ms").default(0).notNull(),
+    /** "global" | "command_palette" | "file_manager" */
+    source: varchar("source", { length: 30 }).default("global").notNull(),
+    /** First result the user clicked, when known. */
+    firstClickHref: text("first_click_href"),
+    firstClickType: varchar("first_click_type", { length: 30 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("analytics_search_user_idx").on(table.userId, table.createdAt),
+    index("analytics_search_query_idx").on(table.query),
+    index("analytics_search_created_idx").on(table.createdAt),
+  ]
+);

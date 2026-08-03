@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AnalyticsProvider } from "@/components/analytics-provider";
 
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
@@ -13,7 +14,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
         enableSystem
         disableTransitionOnChange
       >
-        {children}
+        <AnalyticsProvider>{children}</AnalyticsProvider>
       </ThemeProvider>
     </SessionProvider>
   );

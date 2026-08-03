@@ -8,9 +8,21 @@
 
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { favorites, processingHistory } from "@/db/schema";
+import { analyticsEvents, favorites, files, processingHistory } from "@/db/schema";
 import { getProduct, products } from "@/lib/products";
 import { tools } from "@/lib/tools";
+import {
+  getActiveUsersSummary,
+  getPageViewSummary,
+  getPerformanceSummary,
+  getProductUsageSummary,
+  getSearchUsageSummary,
+  type ActiveUsersSummary,
+  type PageViewSummary,
+  type PerformanceSummary,
+  type ProductUsageSummary,
+  type SearchUsageSummary,
+} from "@/lib/platform/analytics";
 
 export interface UsageStatistics {
   totalOperations: number;
@@ -174,4 +186,140 @@ export async function toggleFavorite(
 
   await db.insert(favorites).values({ userId, toolName: identifier, kind });
   return true;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Dashboard analytics — extends the existing usage statistics with the       */
+/* rows the analytics event log captures. No UI depends on this yet; the      */
+/* payload is shaped so the next pass can drop it straight into cards.        */
+/* -------------------------------------------------------------------------- */
+
+export interface DashboardAnalytics {
+  /** Page view totals / uniques / top paths, platform-wide. */
+  pageViews: PageViewSummary;
+  /** Active sessions over 5 / 60 / 1440 minute windows. */
+  activeUsers: ActiveUsersSummary;
+  /** Per-product event volume for the last 30 days. */
+  productUsage: ProductUsageSummary[];
+  /** Performance summary: slow pages, recent errors, failed requests. */
+  performance: PerformanceSummary;
+  /** Search usage. */
+  search: SearchUsageSummary;
+  /** Per-user activity summary so the signed-in user's own analytics mirror. */
+  forUser: {
+    pageViews: number;
+    toolEvents: number;
+    errorEvents: number;
+    lastEventAt: Date | null;
+    exportCount: number;
+    /** Storage usage, derived from the file table the dashboard already shows. */
+    storage: {
+      usedBytes: number;
+      fileCount: number;
+      favoriteCount: number;
+    };
+  };
+}
+
+/**
+ * Single read for the dashboard's analytics cards. Combines the platform-
+ * wide aggregates (page views, active users, performance, search) with a
+ * per-user slice so the signed-in user can see their own funnel without a
+ * second round trip.
+ */
+export async function getDashboardAnalytics(userId: string | null): Promise<DashboardAnalytics> {
+  const [pageViews, activeUsers, productUsage, performance, search, userTotals, storage] =
+    await Promise.all([
+      getPageViewSummary(),
+      getActiveUsersSummary(),
+      getProductUsageSummary(),
+      getPerformanceSummary(),
+      getSearchUsageSummary(),
+      userId ? loadUserEventTotals(userId) : null,
+      userId ? loadUserStorage(userId) : null,
+    ]);
+
+  return {
+    pageViews,
+    activeUsers,
+    productUsage,
+    performance,
+    search,
+    forUser: {
+      pageViews: userTotals?.pageViews ?? 0,
+      toolEvents: userTotals?.toolEvents ?? 0,
+      errorEvents: userTotals?.errorEvents ?? 0,
+      lastEventAt: userTotals?.lastEventAt ?? null,
+      exportCount: userTotals?.exportCount ?? 0,
+      storage: storage ?? { usedBytes: 0, fileCount: 0, favoriteCount: 0 },
+    },
+  };
+}
+
+async function loadUserEventTotals(userId: string): Promise<{
+  pageViews: number;
+  toolEvents: number;
+  errorEvents: number;
+  lastEventAt: Date | null;
+  exportCount: number;
+}> {
+  const rows = await db
+    .select({
+      category: analyticsEvents.category,
+      count: sql<number>`count(*)::int`,
+      last: sql<Date | null>`max(${analyticsEvents.createdAt})`,
+    })
+    .from(analyticsEvents)
+    .where(eq(analyticsEvents.userId, userId))
+    .groupBy(analyticsEvents.category);
+
+  let pageViews = 0;
+  let toolEvents = 0;
+  let errorEvents = 0;
+  let lastEventAt: Date | null = null;
+
+  for (const row of rows) {
+    if (row.last && (!lastEventAt || row.last > lastEventAt)) lastEventAt = row.last;
+    if (row.category === "pageview") pageViews = row.count;
+    else if (row.category === "tool" || row.category === "project" || row.category === "export" || row.category === "import" || row.category === "save") toolEvents += row.count;
+    else if (row.category === "error") errorEvents = row.count;
+  }
+
+  const [exportCountRow] = await db
+    .select({ value: sql<number>`count(*)::int` })
+    .from(analyticsEvents)
+    .where(
+      and(
+        eq(analyticsEvents.userId, userId),
+        eq(analyticsEvents.category, "export")
+      )
+    );
+
+  return {
+    pageViews,
+    toolEvents,
+    errorEvents,
+    lastEventAt,
+    exportCount: exportCountRow?.value ?? 0,
+  };
+}
+
+async function loadUserStorage(userId: string): Promise<{
+  usedBytes: number;
+  fileCount: number;
+  favoriteCount: number;
+}> {
+  const [row] = await db
+    .select({
+      usedBytes: sql<number>`coalesce(sum(${files.size}), 0)::bigint`,
+      fileCount: sql<number>`count(*)::int`,
+      favoriteCount: sql<number>`count(*) filter (where ${files.isFavorite})::int`,
+    })
+    .from(files)
+    .where(and(eq(files.userId, userId), sql`${files.deletedAt} is null`));
+  return {
+    usedBytes: Number(row?.usedBytes ?? 0) || 0,
+    fileCount: row?.fileCount ?? 0,
+    favoriteCount: row?.favoriteCount ?? 0,
+  };
 }

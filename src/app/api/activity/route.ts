@@ -8,6 +8,7 @@ import { parsePreferences } from "@/lib/platform/preferences";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { checkRateLimit, isSameOrigin, rateLimitResponse } from "@/lib/request";
+import { readSessionIdFromCookieHeader, recordEvent } from "@/lib/platform/analytics";
 
 export const dynamic = "force-dynamic";
 
@@ -122,6 +123,33 @@ export async function POST(request: NextRequest) {
         body: input.fileName ? `${input.fileName} is ready.` : undefined,
         href: "/files",
       });
+    }
+
+    // Mirror the activity row into the analytics event log so the dashboard's
+    // product / tool / funnel / error views can read it through one query.
+    // Same user, same product, same tool — no duplicate schema writes, just
+    // a denormalised row in the analytics table.
+    try {
+      const sessionId = readSessionIdFromCookieHeader(request.headers.get("cookie"));
+      await recordEvent({
+        sessionId,
+        userId: user.id,
+        category: input.status === "failed" ? "error" : "tool",
+        action: input.status === "failed" ? "tool.failed" : "tool.completed",
+        productId: input.productId,
+        toolName: input.toolName,
+        path: "/files",
+        durationMs: input.processingTime,
+        status: input.status === "failed" ? 500 : 200,
+        props: {
+          fileName: input.fileName,
+          fileSize: input.fileSize,
+          inputFileSize: input.inputFileSize,
+          errorMessage: input.errorMessage,
+        },
+      });
+    } catch {
+      // Analytics is best-effort; never fail the activity record.
     }
 
     return Response.json({ ok: true, fileId });

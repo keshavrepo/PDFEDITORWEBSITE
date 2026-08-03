@@ -5,6 +5,7 @@ import { blogPosts, officeDocuments, financeCalculations, socialProjects, devSes
 import { searchStatic, type SearchResult } from "@/lib/platform/search";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "@/lib/request";
 import { getSession } from "@/lib/auth";
+import { readSessionIdFromCookieHeader, recordSearchQuery } from "@/lib/platform/analytics";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ export async function GET(request: NextRequest) {
   const limit = checkRateLimit(`search:${getClientIp(request)}`, 60, 60_000);
   if (!limit.allowed) return rateLimitResponse(limit.retryAfter);
 
+  const start = Date.now();
   const results: SearchResult[] = searchStatic(query, 20);
 
   try {
@@ -192,5 +194,25 @@ export async function GET(request: NextRequest) {
   }
 
   results.sort((a, b) => b.score - a.score);
-  return Response.json({ results: results.slice(0, 24) });
+  const top = results.slice(0, 24);
+
+  // Analytics: record the search submission server-side so a hand-rolled
+  // fetch (e.g. the command palette, the file manager) cannot double-count.
+  // The PII filter runs inside `recordSearchQuery`.
+  try {
+    const sessionId = readSessionIdFromCookieHeader(request.headers.get("cookie"));
+    const signedIn = await getSession();
+    await recordSearchQuery({
+      sessionId,
+      userId: signedIn?.id ?? null,
+      query,
+      resultsCount: top.length,
+      latencyMs: Date.now() - start,
+      source: "global",
+    });
+  } catch {
+    // Search must keep working even when analytics is broken.
+  }
+
+  return Response.json({ results: top });
 }
