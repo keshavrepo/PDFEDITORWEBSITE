@@ -109,6 +109,18 @@ function dedupeKey(endpoint: string, body: Record<string, unknown>): string {
   return `${endpoint}::${keyPart}`;
 }
 
+/**
+ * Some events are inherently bursty (a single long task, every LCP
+ * candidate, every window error). The dedup window is a guard against
+ * a double-mounted provider, not a throttling layer, so a stream of
+ * genuine events should pass through. Endpoints that need a tighter
+ * rate limit are expected to enforce it server-side (e.g. the
+ * performance route rate-limits to 240 req/min/IP).
+ */
+function bypassDedup(endpoint: string): boolean {
+  return endpoint.startsWith("/api/analytics/performance");
+}
+
 function shouldSend(key: string): boolean {
   const now = Date.now();
   const last = cache.recent.get(key);
@@ -145,7 +157,7 @@ async function send(
   if (!cache.enabled) return;
 
   const key = dedupeKey(endpoint, body);
-  if (!shouldSend(key)) return;
+  if (!bypassDedup(endpoint) && !shouldSend(key)) return;
 
   const payload = JSON.stringify({
     ...body,
@@ -378,6 +390,59 @@ export function installAnalytics(): () => void {
   window.addEventListener("online", onOnline);
   document.addEventListener("visibilitychange", onVisibility);
 
+  // PerformanceObserver hooks. These fill the Performance Analytics view
+  // (slow pages, slow APIs, client long tasks) by reusing the existing
+  // `trackPerformance` + `/api/analytics/performance` route — no new
+  // schema, no new endpoint, no duplicate tracking path. Long tasks and
+  // the largest-contentful-paint are the two signals the platform's
+  // performance summary actually aggregates; a slow API call is
+  // captured through the activity mirror in `/api/activity` already.
+  const performanceObservers: PerformanceObserver[] = [];
+  try {
+    if (typeof PerformanceObserver !== "undefined") {
+      // Long tasks: any main-thread work > 50ms. Reported with a path so
+      // `getPerformanceSummary` can group them per route.
+      const longTaskObserver = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          trackPerformance({
+            metric: "long_task",
+            durationMs: Math.round(entry.duration),
+            path: getCurrentPath(),
+          });
+        }
+      });
+      longTaskObserver.observe({ entryTypes: ["longtask"] });
+      performanceObservers.push(longTaskObserver);
+    }
+  } catch {
+    // Long tasks are best-effort; older browsers do not expose them.
+  }
+  try {
+    if (typeof PerformanceObserver !== "undefined") {
+      // Largest Contentful Paint is the metric the slow-pages list ranks
+      // by. `buffered: true` is what makes the first paint after
+      // `installAnalytics` mounts still surface, because the entry may
+      // have fired before the observer was registered.
+      let lcpReported = false;
+      const lcpObserver = new PerformanceObserver((list) => {
+        if (lcpReported) return;
+        for (const entry of list.getEntries()) {
+          lcpReported = true;
+          trackPerformance({
+            metric: "lcp",
+            durationMs: Math.round(entry.startTime + entry.duration),
+            path: getCurrentPath(),
+          });
+          break;
+        }
+      });
+      lcpObserver.observe({ type: "largest-contentful-paint", buffered: true });
+      performanceObservers.push(lcpObserver);
+    }
+  } catch {
+    // LCP is best-effort; browsers without it fall back to no data.
+  }
+
   return () => {
     window.removeEventListener("popstate", onPopState);
     window.removeEventListener("error", onError);
@@ -386,6 +451,13 @@ export function installAnalytics(): () => void {
     document.removeEventListener("visibilitychange", onVisibility);
     window.history.pushState = originalPush;
     window.history.replaceState = originalReplace;
+    for (const observer of performanceObservers) {
+      try {
+        observer.disconnect();
+      } catch {
+        /* swallow */
+      }
+    }
     installed = false;
   };
 }
