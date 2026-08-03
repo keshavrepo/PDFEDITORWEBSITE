@@ -26,3 +26,4 @@ export * from "./convert";
 export * from "./palette";
 export * from "./favicon";
 export * from "./print-layout";
+export * from "./text-detection";

@@ -19,11 +19,15 @@ import {
   AlignLeft,
   AlignRight,
   AlignStartHorizontal,
+  Eye,
   FlipHorizontal,
   FlipVertical,
   Italic,
+  Loader2,
   RotateCw,
+  ScanText,
   Underline,
+  X,
 } from "lucide-react";
 import {
   CANVAS_PRESETS,
@@ -35,6 +39,7 @@ import {
   type ShapeLayer,
   type TextLayer,
 } from "@/lib/imagepilot/core";
+import type { TextRegion } from "@/lib/imagepilot/types";
 import type { EditorAction } from "@/lib/imagepilot/editor-state";
 import {
   ColorField,
@@ -48,11 +53,27 @@ import {
   ToolbarButton,
 } from "./editor-controls";
 
+/**
+ * Optional text-detection controls, only populated by the screenshot
+ * workspace. The panel itself stays workspace-agnostic so the full editor
+ * and every other tool keep their existing property layouts.
+ */
+export interface TextDetectionControls {
+  enabled: boolean;
+  busy: boolean;
+  count: number;
+  confidence: number;
+  onDetect: () => void;
+  onClear: () => void;
+  onConfidenceChange: (value: number) => void;
+}
+
 interface PropertiesPanelProps {
   document: EditorDocument;
   selection: Layer[];
   dispatch: (action: EditorAction) => void;
   onResizeCanvas: () => void;
+  textDetection?: TextDetectionControls;
 }
 
 function PropertiesPanelImpl({
@@ -60,6 +81,7 @@ function PropertiesPanelImpl({
   selection,
   dispatch,
   onResizeCanvas,
+  textDetection,
 }: PropertiesPanelProps) {
   const layer = selection.length === 1 ? selection[0] : null;
 
@@ -70,7 +92,12 @@ function PropertiesPanelImpl({
   };
 
   if (!selection.length) {
-    return <DocumentProperties document={doc} dispatch={dispatch} onResizeCanvas={onResizeCanvas} />;
+    return (
+      <div>
+        {textDetection && <TextDetectionSection controls={textDetection} />}
+        <DocumentProperties document={doc} dispatch={dispatch} onResizeCanvas={onResizeCanvas} />
+      </div>
+    );
   }
 
   if (selection.length > 1) {
@@ -623,3 +650,63 @@ function DocumentProperties({
  * depend only on the document, the selection and stable callbacks.
  */
 export const PropertiesPanel = memo(PropertiesPanelImpl);
+
+/* -------------------------------------------------------------------------- */
+/* Text detection (screenshot workspace)                                      */
+/* -------------------------------------------------------------------------- */
+
+function TextDetectionSection({ controls }: { controls: TextDetectionControls }) {
+  return (
+    <PanelSection
+      title="Text detection"
+      defaultOpen
+      actions={
+        controls.count > 0 ? (
+          <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
+            {controls.count}
+          </span>
+        ) : undefined
+      }
+    >
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        Find every text region in the image. Click a region to replace it with an editable text
+        layer that matches the original colour and size.
+      </p>
+
+      <SliderField
+        label="Minimum confidence"
+        value={Math.round(controls.confidence * 100)}
+        min={0}
+        max={100}
+        neutral={40}
+        unit="%"
+        onChange={(value) => controls.onConfidenceChange(value / 100)}
+      />
+
+      <button
+        type="button"
+        onClick={controls.onDetect}
+        disabled={controls.busy}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-2 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+      >
+        {controls.busy ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+        ) : (
+          <ScanText className="h-3.5 w-3.5" aria-hidden="true" />
+        )}
+        {controls.busy ? "Detecting text…" : controls.count > 0 ? "Re-detect text" : "Detect text"}
+      </button>
+
+      {controls.count > 0 && (
+        <button
+          type="button"
+          onClick={controls.onClear}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          <X className="h-3 w-3" aria-hidden="true" />
+          Remove detected regions
+        </button>
+      )}
+    </PanelSection>
+  );
+}

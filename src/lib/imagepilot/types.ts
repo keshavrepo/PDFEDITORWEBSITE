@@ -245,6 +245,46 @@ export interface SelectionRect {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Text detection                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A region of text detected in a screenshot by the OCR pass.
+ *
+ * Bounding boxes are in document coordinates, so the canvas overlay can
+ * position them without any further transform. The colour and font size are
+ * the closest the recogniser can recover; the layer placed on top of a
+ * region uses them so the replacement text is sized and coloured the way
+ * the original was.
+ */
+export interface TextRegion {
+  /** Stable id; the click handler matches on this. */
+  id: string;
+  /** Document-space rectangle. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Recognised text. May contain trailing whitespace that the layer absorbs. */
+  text: string;
+  /** Tesseract confidence, 0..1. */
+  confidence: number;
+  /** Estimated font size in document pixels, derived from the bbox height. */
+  fontSize: number;
+  /**
+   * Dominant text colour as CSS `#rrggbb`. Sampled from the dark or light
+   * pixels in the bbox depending on what is more frequent.
+   */
+  color: string;
+  /**
+   * Inferred weight. 400 when most pixels are thin, 700 when they are heavy.
+   * Not perfect, but close enough that a "detected" layer looks like its
+   * surroundings until the user edits the actual content.
+   */
+  fontWeight: number;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Raster sources                                                             */
 /* -------------------------------------------------------------------------- */
 

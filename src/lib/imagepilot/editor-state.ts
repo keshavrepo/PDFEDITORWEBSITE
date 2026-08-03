@@ -45,6 +45,7 @@ import type {
   Layer,
   Rect,
   SelectionRect,
+  TextRegion,
 } from "./types";
 
 /* -------------------------------------------------------------------------- */
@@ -78,6 +79,13 @@ export interface EditorState {
   editingTextId: string | null;
   /** Transient message shown in the status bar. */
   status: { message: string; tone: "info" | "error" } | null;
+  /**
+   * Text regions the screenshot workspace has detected on the current
+   * image. Empty everywhere except the screenshot editor.
+   */
+  textRegions: TextRegion[];
+  /** True when the canvas should highlight detected text regions as clickable. */
+  textRegionActive: boolean;
 }
 
 export const defaultSettings: WorkspaceSettings = {
@@ -102,6 +110,8 @@ export function createEditorState(document?: EditorDocument): EditorState {
     marquee: null,
     editingTextId: null,
     status: null,
+    textRegions: [],
+    textRegionActive: false,
   };
 }
 
@@ -136,7 +146,12 @@ export type EditorAction =
   | { type: "reorder-selected"; mode: ReorderMode }
   | { type: "move-layer"; id: string; index: number }
   | { type: "align-selected"; mode: AlignMode }
-  | { type: "toggle-layer-flag"; id: string; flag: "visible" | "locked" };
+  | { type: "toggle-layer-flag"; id: string; flag: "visible" | "locked" }
+  /* Text detection (screenshot workspace). */
+  | { type: "set-text-regions"; regions: TextRegion[]; active: boolean }
+  | { type: "set-text-region-active"; active: boolean }
+  | { type: "remove-text-region"; id: string }
+  | { type: "clear-text-regions" };
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                    */
@@ -209,6 +224,9 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         editingTextId: null,
         viewport: action.viewport ?? state.viewport,
         status: null,
+        // A new image invalidates any regions detected on the old one.
+        textRegions: [],
+        textRegionActive: false,
       };
     }
 
@@ -395,6 +413,27 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
         return { ...next, selection: next.selection.filter((id) => id !== action.id) };
       }
       return next;
+    }
+
+    case "set-text-regions": {
+      return {
+        ...state,
+        textRegions: action.regions,
+        textRegionActive: action.active,
+      };
+    }
+
+    case "set-text-region-active": {
+      return { ...state, textRegionActive: action.active };
+    }
+
+    case "remove-text-region": {
+      const next = state.textRegions.filter((region) => region.id !== action.id);
+      return { ...state, textRegions: next, textRegionActive: next.length > 0 ? state.textRegionActive : false };
+    }
+
+    case "clear-text-regions": {
+      return { ...state, textRegions: [], textRegionActive: false };
     }
 
     default:

@@ -117,6 +117,19 @@ interface EditorCanvasProps {
   };
   /** Rectangles drawn over the canvas, e.g. obscure regions. */
   overlayRects?: Array<{ id: string; rect: Rect; selected: boolean; ellipse: boolean }>;
+  /**
+   * Detected text regions, drawn as clickable highlights when active. A click
+   * on one fires `onRequestTextFromRegion` so the host can replace the
+   * original with a real, editable text layer.
+   */
+  textRegions?: Array<{
+    id: string;
+    rect: Rect;
+    text: string;
+    confidence: number;
+  }>;
+  textRegionsActive?: boolean;
+  onRequestTextFromRegion?: (regionId: string) => void;
 }
 
 export function EditorCanvas({
@@ -129,6 +142,9 @@ export function EditorCanvas({
   onRequestTextEdit,
   overlay,
   overlayRects,
+  textRegions,
+  textRegionsActive,
+  onRequestTextFromRegion,
 }: EditorCanvasProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<HTMLCanvasElement>(null);
@@ -498,6 +514,29 @@ export function EditorCanvas({
       ctx.restore();
     }
 
+    // Detected text regions, drawn as subtle clickable highlights. The
+    // highlight tints darker for higher-confidence detections so the user can
+    // tell at a glance which ones the recogniser is sure about.
+    if (textRegionsActive && textRegions?.length) {
+      for (const region of textRegions) {
+        const topLeft = toScreen(region.rect.x, region.rect.y);
+        const w = region.rect.width * viewport.zoom;
+        const h = region.rect.height * viewport.zoom;
+        if (topLeft.x + w < 0 || topLeft.y + h < 0) continue;
+        if (topLeft.x > width || topLeft.y > height) continue;
+
+        const intensity = Math.max(0.15, Math.min(0.5, region.confidence * 0.5));
+        ctx.save();
+        ctx.fillStyle = `rgba(37, 99, 235, ${intensity})`;
+        ctx.fillRect(topLeft.x, topLeft.y, w, h);
+        ctx.strokeStyle = "rgba(37, 99, 235, 0.9)";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([3, 2]);
+        ctx.strokeRect(topLeft.x + 0.5, topLeft.y + 0.5, w - 1, h - 1);
+        ctx.restore();
+      }
+    }
+
     // Brush ring, so the user can see the size before painting.
     if (overlay?.mode === "brush" && overlay.brushRadius && pointerDoc) {
       const centre = toScreen(pointerDoc.x, pointerDoc.y);
@@ -576,7 +615,7 @@ export function EditorCanvas({
         }
       }
     }
-  }, [crop, doc, inset, marquee, overlay, overlayRects, pointerDoc, selection, size, tool, viewport]);
+  }, [crop, doc, inset, marquee, overlay, overlayRects, pointerDoc, selection, size, textRegions, textRegionsActive, tool, viewport]);
 
   useEffect(() => {
     paintScene();
@@ -615,6 +654,27 @@ export function EditorCanvas({
       return null;
     },
     [doc.layers, selection, viewport]
+  );
+
+  /**
+   * Detected text region under the pointer, in screen space. Used to
+   * intercept a click on the screenshot workspace so the user can replace a
+   * detected region with a real text layer.
+   */
+  const textRegionAt = useCallback(
+    (docX: number, docY: number): string | null => {
+      if (!textRegionsActive || !textRegions?.length) return null;
+      // Iterate in reverse so the visually-topmost region wins on overlap.
+      for (let i = textRegions.length - 1; i >= 0; i--) {
+        const region = textRegions[i];
+        const r = region.rect;
+        if (docX >= r.x && docX <= r.x + r.width && docY >= r.y && docY <= r.y + r.height) {
+          return region.id;
+        }
+      }
+      return null;
+    },
+    [textRegions, textRegionsActive]
   );
 
   /** Crop handle under the pointer. */
@@ -673,6 +733,16 @@ export function EditorCanvas({
       if (event.button === 1 || tool === "hand" || spaceRef.current) {
         beginPan(event);
         return;
+      }
+
+      // A text region on the screenshot workspace swallows the click so the
+      // user can replace the detected text without first hitting a layer.
+      if (tool === "move" && !event.shiftKey) {
+        const regionId = textRegionAt(point.x, point.y);
+        if (regionId) {
+          onRequestTextFromRegion?.(regionId);
+          return;
+        }
       }
 
       // A workspace overlay owns the gesture when one is active.
@@ -808,8 +878,10 @@ export function EditorCanvas({
       doc,
       handleAt,
       onRequestTextEdit,
+      onRequestTextFromRegion,
       overlay,
       selection,
+      textRegionAt,
       tool,
       toWorkspace,
       viewport,

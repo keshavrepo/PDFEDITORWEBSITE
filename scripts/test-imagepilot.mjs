@@ -3920,6 +3920,87 @@ await test("the slider component module resolves and the prop type is present", 
 
 /* -------------------------------------------------------------------------- */
 
+suite("Text detection");
+
+await test("text-detection module exports the expected surface", async () => {
+  const core = await loadEditorCore();
+  assert(typeof core.detectTextRegions === "function", "detectTextRegions is exported");
+  assert(typeof core.disposeTextDetector === "function", "disposeTextDetector is exported");
+});
+
+await test("reducer accepts the new text-region actions", async () => {
+  const { editorReducer, createEditorState } = await loadEditorState();
+  const state = createEditorState();
+  assert(Array.isArray(state.textRegions), "textRegions is an array on a fresh state");
+  assert(state.textRegionActive === false, "textRegionActive is false on a fresh state");
+
+  const sample = [
+    {
+      id: "region_0",
+      x: 10,
+      y: 20,
+      width: 80,
+      height: 12,
+      text: "Hello",
+      confidence: 0.9,
+      fontSize: 16,
+      color: "#111111",
+      fontWeight: 500,
+    },
+  ];
+  const withRegions = editorReducer(state, {
+    type: "set-text-regions",
+    regions: sample,
+    active: true,
+  });
+  assert(withRegions.textRegions.length === 1, "regions were stored");
+  assert(withRegions.textRegionActive === true, "active flag flipped to true");
+
+  const toggledOff = editorReducer(withRegions, { type: "set-text-region-active", active: false });
+  assert(toggledOff.textRegionActive === false, "active flag can be turned off");
+
+  const removed = editorReducer(withRegions, { type: "remove-text-region", id: "region_0" });
+  assert(removed.textRegions.length === 0, "remove-text-region drops the matching id");
+  assert(removed.textRegionActive === false, "removing the last region turns the toggle off");
+
+  const cleared = editorReducer(withRegions, { type: "clear-text-regions" });
+  assert(cleared.textRegions.length === 0, "clear empties the regions array");
+  assert(cleared.textRegionActive === false, "clear resets the active flag");
+});
+
+await test("loading a new document discards the previous text regions", async () => {
+  const { editorReducer, createEditorState } = await loadEditorState();
+  const sample = [
+    {
+      id: "region_0",
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      text: "stale",
+      confidence: 0.5,
+      fontSize: 8,
+      color: "#000000",
+      fontWeight: 400,
+    },
+  ];
+  const seeded = editorReducer(createEditorState(), {
+    type: "set-text-regions",
+    regions: sample,
+    active: true,
+  });
+  const core = await loadEditorCore();
+  const reloaded = editorReducer(seeded, {
+    type: "load",
+    document: core.createDocument(800, 600),
+    label: "New image",
+  });
+  assert(reloaded.textRegions.length === 0, "load clears the regions");
+  assert(reloaded.textRegionActive === false, "load resets the active flag");
+});
+
+/* -------------------------------------------------------------------------- */
+
 console.log(
   `\n\x1b[1mResults\x1b[0m  ${results.passed} passed, ${results.failed} failed\n`
 );

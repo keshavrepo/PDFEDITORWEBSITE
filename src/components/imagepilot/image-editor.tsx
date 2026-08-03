@@ -109,6 +109,8 @@ import {
   MIME_BY_FORMAT,
   formatFromMime,
   createImageLayer as makeImageLayer,
+  detectTextRegions,
+  createTextLayer,
   type CompressionSettings,
   type EditorDocument,
   type EditorToolId,
@@ -369,6 +371,10 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
     bytes: number;
     originalBytes: number;
   } | null>(null);
+
+  /** Screenshot workspace text detection. */
+  const [textDetectBusy, setTextDetectBusy] = useState(false);
+  const [textDetectConfidence, setTextDetectConfidence] = useState(0.4);
 
   /**
    * Asks the browser which formats it can encode.
@@ -1992,6 +1998,114 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
   }, [batch, convertSettings, notify]);
 
   /* ---------------------------------------------------------------------- */
+  /* Workspace: text detection (screenshot editor)                          */
+  /* ---------------------------------------------------------------------- */
+
+  /**
+   * Runs OCR over the current photo and stores the regions on the reducer.
+   *
+   * The first image layer is the subject. Pixel data is read straight from
+   * the raster store; nothing is uploaded, matching how every other
+   * ImagePilot tool works.
+   */
+  const runTextDetection = useCallback(async () => {
+    if (workspace.id !== "screenshot") return;
+    const current = editorDocument(state);
+    const photo = current.layers.find(
+      (layer): layer is Extract<Layer, { type: "image" }> => layer.type === "image"
+    );
+    const source = photo ? rasters.get(photo.sourceId) : undefined;
+    if (!source) {
+      notify("Import a screenshot first.", "error");
+      return;
+    }
+
+    setTextDetectBusy(true);
+    try {
+      const result = await detectTextRegions(
+        source.image,
+        source.width,
+        source.height,
+        { minConfidence: textDetectConfidence }
+      );
+      dispatch({ type: "set-text-regions", regions: result.regions, active: true });
+      notify(
+        result.regions.length
+          ? `Detected ${result.regions.length} text region${result.regions.length === 1 ? "" : "s"}.`
+          : "No text was detected. Try lowering the minimum confidence."
+      );
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "Text detection failed.",
+        "error"
+      );
+    } finally {
+      setTextDetectBusy(false);
+    }
+  }, [
+    dispatch,
+    notify,
+    rasters,
+    state,
+    textDetectConfidence,
+    workspace.id,
+  ]);
+
+  const clearTextDetection = useCallback(() => {
+    dispatch({ type: "clear-text-regions" });
+  }, [dispatch]);
+
+  /**
+   * Replaces a detected text region with an editable text layer.
+   *
+   * The new layer uses the region's own font size and colour so the
+   * replacement sits in the same place as the original glyphs, matching
+   * the brief's "preserve alignment, preserve spacing, preserve colors".
+   * The recognised text is pre-filled so the user can edit it in place.
+   */
+  const replaceTextRegion = useCallback(
+    (regionId: string) => {
+      const region = state.textRegions.find((entry) => entry.id === regionId);
+      if (!region) return;
+      const layer = createTextLayer(
+        region.text,
+        {
+          x: region.x,
+          y: region.y,
+          width: region.width,
+          height: region.height,
+        },
+        {
+          fontSize: region.fontSize,
+          color: region.color,
+          fontWeight: region.fontWeight,
+          fontFamily:
+            "Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif",
+          // Auto-size would collapse the box before the user can edit, so
+          // fixed dimensions are kept for the inline edit.
+          autoSize: false,
+          align: "left",
+          // The recognised text was read against the image, not the font
+          // file. A semibold weight and a small line-height give the
+          // replacement the same vertical footprint as the original.
+          lineHeight: 1.1,
+          letterSpacing: 0,
+          italic: false,
+          underline: false,
+          strokeColor: "#ffffff",
+          strokeWidth: 0,
+          shadow: { enabled: false, color: "#00000080", blur: 8, offsetX: 0, offsetY: 0 },
+        }
+      );
+      dispatch({ type: "add-layer", layer });
+      dispatch({ type: "remove-text-region", id: regionId });
+      // Open the inline editor so the user can keep typing immediately.
+      setTimeout(() => dispatch({ type: "edit-text", id: layer.id }), 0);
+    },
+    [dispatch, state.textRegions]
+  );
+
+  /* ---------------------------------------------------------------------- */
   /* Keyboard                                                               */
   /* ---------------------------------------------------------------------- */
 
@@ -2548,7 +2662,15 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
             cropRatio={cropRatio}
             overlay={canvasOverlay}
             overlayRects={overlayRects}
+            textRegions={state.textRegions.map((region) => ({
+              id: region.id,
+              rect: { x: region.x, y: region.y, width: region.width, height: region.height },
+              text: region.text,
+              confidence: region.confidence,
+            }))}
+            textRegionsActive={state.textRegionActive}
             onRequestTextEdit={(id) => dispatch({ type: "edit-text", id })}
+            onRequestTextFromRegion={replaceTextRegion}
           />
 
           {/* Empty state */}
@@ -2656,6 +2778,19 @@ export function ImageEditor({ workspace = getWorkspace("editor") }: ImageEditorP
                 selection={selected}
                 dispatch={dispatch}
                 onResizeCanvas={() => setDialog("resize")}
+                textDetection={
+                  workspace.id === "screenshot"
+                    ? {
+                        enabled: state.textRegionActive,
+                        busy: textDetectBusy,
+                        count: state.textRegions.length,
+                        confidence: textDetectConfidence,
+                        onDetect: () => void runTextDetection(),
+                        onClear: clearTextDetection,
+                        onConfidenceChange: setTextDetectConfidence,
+                      }
+                    : undefined
+                }
               />
             )}
             {rightTab === "adjust" && (
