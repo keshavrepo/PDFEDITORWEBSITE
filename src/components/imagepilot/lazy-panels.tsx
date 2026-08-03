@@ -19,16 +19,17 @@
  */
 
 import dynamic from "next/dynamic";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /** Skeleton shown while a panel chunk is in flight. */
 function PanelSkeleton() {
   return (
     <div className="space-y-3 p-3" aria-hidden="true">
-      <div className="h-3 w-24 animate-pulse rounded bg-muted" />
-      <div className="h-8 w-full animate-pulse rounded-lg bg-muted" />
-      <div className="h-8 w-full animate-pulse rounded-lg bg-muted" />
-      <div className="h-3 w-20 animate-pulse rounded bg-muted" />
-      <div className="h-16 w-full animate-pulse rounded-lg bg-muted" />
+      <Skeleton className="h-3 w-24" />
+      <Skeleton className="h-8 w-full" />
+      <Skeleton className="h-8 w-full" />
+      <Skeleton className="h-3 w-20" />
+      <Skeleton className="h-16 w-full" />
     </div>
   );
 }
